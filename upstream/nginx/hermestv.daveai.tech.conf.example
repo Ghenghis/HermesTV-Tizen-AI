@@ -67,9 +67,9 @@ server {
 
     # --- Web app SPA ---
     # hermes-web-tv container (nginx serving the Vite build) will bind host
-    # port 8081 once Phase 2 brings the stack up.
+    # port 3080 once Phase 2 brings the stack up.
     location / {
-        proxy_pass http://127.0.0.1:8081;
+        proxy_pass http://127.0.0.1:3080;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -79,7 +79,7 @@ server {
 
     # --- Cache policy for static assets ---
     location ~* \.(js|css|png|jpg|jpeg|ico|svg|woff2?)$ {
-        proxy_pass http://127.0.0.1:8081;
+        proxy_pass http://127.0.0.1:3080;
         proxy_http_version 1.1;
         expires 1y;
         add_header Cache-Control "public, immutable";
@@ -105,6 +105,6 @@ server {
 #   curl -I https://voice.daveai.tech/            # must remain 200 (unchanged)
 #
 # 502 from hermestv.daveai.tech is correct before Phase 2 deploy — the
-# upstream containers are not yet listening on 3011 / 8081. nginx itself is
+# upstream containers are not yet listening on 3011 / 3080. nginx itself is
 # healthy; the empty upstream is expected.
 # ============================================================================
