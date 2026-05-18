@@ -47,7 +47,7 @@
     },
     "provider_preference": {
       "type": ["string", "null"],
-      "enum": ["apollo_group", "xtremehd", null],
+      "enum": ["apollo_group", "xtremehd", "iptv-org", "jellyfin", null],
       "description": "Provider preferred by this profile for this item, if the user has explicitly chosen one."
     },
     "similar_item_ids": {

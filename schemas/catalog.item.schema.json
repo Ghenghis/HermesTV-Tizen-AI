@@ -37,7 +37,7 @@
     },
     "provider_id": {
       "type": "string",
-      "enum": ["apollo_group", "xtremehd"],
+      "enum": ["apollo_group", "xtremehd", "iptv-org", "jellyfin"],
       "description": "Primary provider supplying this item. For items on multiple providers, use the preferred/primary provider here; full provider list lives in the providers array."
     },
     "category": {

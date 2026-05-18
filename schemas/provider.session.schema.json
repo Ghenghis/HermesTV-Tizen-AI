@@ -13,7 +13,7 @@
     },
     "provider_id": {
       "type": "string",
-      "enum": ["apollo", "xtremehd"]
+      "enum": ["apollo_group", "xtremehd", "iptv-org", "jellyfin"]
     },
     "profile_id": {
       "type": "string",

@@ -10,7 +10,7 @@
   "properties": {
     "provider_id": {
       "type": "string",
-      "enum": ["apollo", "xtremehd"]
+      "enum": ["apollo_group", "xtremehd", "iptv-org", "jellyfin"]
     },
     "display_label": { "type": "string", "maxLength": 64 },
     "enabled": { "type": "boolean" },

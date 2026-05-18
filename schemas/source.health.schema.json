@@ -22,7 +22,7 @@
   "properties": {
     "provider_id": {
       "type": "string",
-      "enum": ["apollo_group", "xtremehd"],
+      "enum": ["apollo_group", "xtremehd", "iptv-org", "jellyfin"],
       "description": "Provider that owns this source."
     },
     "source_id": {
