@@ -1177,7 +1177,22 @@ function App() {
         <FloatingChatbot profile={profile} online={state.online} onCommand={handleChatbotCommand} />
 
         {/* QR onboarding modal */}
-        <QROnboarding isOpen={state.showQR} onClose={handleCloseQR} />
+        <QROnboarding
+          isOpen={state.showQR}
+          onClose={handleCloseQR}
+          online={state.online}
+          onCompleted={function() {
+            // Pairing handshake finished — refresh provider list so the
+            // newly-added entry shows up in ProviderFilter and chips.
+            var api = state.online ? hermesApi : mockApi;
+            api.getProviders().then(function(payload) {
+              var list = payload && payload.providers
+                ? payload.providers
+                : (Array.isArray(payload) ? payload : []);
+              patchState({ providers: list });
+            }).catch(function() { /* non-fatal; tick again on next user action */ });
+          }}
+        />
 
         {/* Media detail panel — full-screen overlay */}
         {state.selectedItem && (

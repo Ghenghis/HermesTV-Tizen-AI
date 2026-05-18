@@ -177,8 +177,47 @@ function cancelDownload(jobId) {
   });
 }
 
+/**
+ * Mint a fresh pairing code for the "Add a Provider" QR flow.
+ * Returns { pairing_code, status, issued_at, expires_at, ttl_ms } from
+ * POST /api/pair. The TV displays the pairing_code under the QR and then
+ * polls getPairingStatus(code) every 5s until status === 'completed'.
+ */
+function createPairing() {
+  return fetchWithTimeout(BASE_URL + '/api/pair', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  }).then(function(response) {
+    if (!response.ok) {
+      throw makeNetworkError('Pairing create failed: HTTP ' + response.status);
+    }
+    return response.json();
+  });
+}
+
+/**
+ * Poll for pairing completion. Returns the envelope from GET /api/pair/:code
+ * with status one of 'pending' | 'completed' | 'expired'. On 'completed' the
+ * envelope also carries provider_id so the UI can refresh /api/providers.
+ */
+function getPairingStatus(code) {
+  return fetchWithTimeout(BASE_URL + '/api/pair/' + encodeURIComponent(code)).then(function(response) {
+    if (response.status === 404) {
+      // Treat as 'expired' so the modal can recover by minting a new code,
+      // rather than throwing — server restart wipes the in-memory store.
+      return { pairing_code: code, status: 'expired' };
+    }
+    if (!response.ok) {
+      throw makeNetworkError('Pairing status failed: HTTP ' + response.status);
+    }
+    return response.json();
+  });
+}
+
 export {
   isReachable, getProfile, getProviders, getCatalog, getEpg,
   submitCommand, validateCommand, startPlayback,
   startDownload, listDownloads, cancelDownload,
+  createPairing, getPairingStatus,
 };
