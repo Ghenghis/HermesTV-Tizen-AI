@@ -81,7 +81,16 @@ function TiviMateShell(props) {
               <button
                 key={item.id || idx}
                 data-focusable="true"
+                tabIndex={0}
+                aria-label={item.title || 'Channel ' + (idx + 1)}
                 onClick={function() { setActiveIdx(idx); if (onItemSelect) onItemSelect(item); }}
+                onKeyDown={function(e) {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveIdx(idx);
+                    if (onItemSelect) onItemSelect(item);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
