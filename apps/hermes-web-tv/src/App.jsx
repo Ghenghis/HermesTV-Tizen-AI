@@ -341,25 +341,59 @@ function App() {
     return function() { document.removeEventListener('keydown', onCtrlL); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Samsung Tizen remote — color buttons + Smart Hub route to chatbot commands
+  // Samsung Tizen remote — color buttons + Smart Hub route to chatbot commands.
+  // Back (10009) / Exit (10182) cascade through the modal stack so the user
+  // doesn't accidentally exit the app via the OS-level back handler.
   React.useEffect(function() {
-    var cleanup = installTizenKeyHandler(function(commandText) {
-      var api = state.online ? hermesApi : mockApi;
-      api.validateCommand({ command_text: commandText, profile_id: (state.profile && state.profile.profile_id) || 'mom_tv' })
-        .then(function(result) {
-          if (result && result.valid) {
-            handleChatbotCommand({ action: result.action, params: result.params });
-          } else if (commandText === 'toggle layout switcher') {
-            patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
-          }
-        }).catch(function() {
-          if (commandText === 'toggle layout switcher') {
-            patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
-          }
-        });
-    });
+    var cleanup = installTizenKeyHandler(
+      function(commandText) {
+        var api = state.online ? hermesApi : mockApi;
+        api.validateCommand({ command_text: commandText, profile_id: (state.profile && state.profile.profile_id) || 'mom_tv' })
+          .then(function(result) {
+            if (result && result.valid) {
+              handleChatbotCommand({ action: result.action, params: result.params });
+            } else if (commandText === 'toggle layout switcher') {
+              patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
+            }
+          }).catch(function() {
+            if (commandText === 'toggle layout switcher') {
+              patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
+            }
+          });
+      },
+      function(/* keyCode */) {
+        // Modal stack cascade — close whichever overlay is top-most.
+        // Return true to swallow the Back key so Tizen OS doesn't exit the app.
+        if (state.showPlayer) {
+          patchState({ showPlayer: false, playerTicket: null, playerError: '' });
+          return true;
+        }
+        if (state.showVoicePicker) {
+          patchState({ showVoicePicker: false });
+          return true;
+        }
+        if (state.showLayoutSwitcher) {
+          patchState({ showLayoutSwitcher: false });
+          return true;
+        }
+        if (state.selectedItem) {
+          patchState({ selectedItem: null, selectedProviderId: null });
+          return true;
+        }
+        if (state.showSettings) {
+          patchState({ showSettings: false });
+          return true;
+        }
+        if (state.showQR) {
+          patchState({ showQR: false });
+          return true;
+        }
+        // Nothing to dismiss — let the OS handle Back at the profile picker.
+        return false;
+      }
+    );
     return cleanup;
-  }, [state.online, state.profile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
