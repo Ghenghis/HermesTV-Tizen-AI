@@ -150,6 +150,7 @@ html {
   font-size: 16px;
   background-color: var(--bg, #0d1117);
   color: var(--text, #e6edf3);
+  height: 100%;
 }
 
 body {
@@ -158,12 +159,22 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
   background-color: var(--bg, #0d1117);
   color: var(--text, #e6edf3);
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
+/* The shell components (TiviMate, Netflix, Plex, Apple TV, Samsung, Mom Mode,
+   Dave Power) all set `height: 100%` on their root divs and rely on internal
+   `overflowY: 'auto'` for scrolling within their own content panels. For that
+   `height: 100%` to resolve to a definite pixel value (rather than collapsing
+   to the children's content height — which leaves the shells cut off or only
+   filling part of the screen), every ancestor in the chain — html, body,
+   #root, LayoutShell — needs a definite height too. min-height: 100vh is NOT
+   enough; flexbox children with height: 100% only resolve correctly when the
+   parent has an exact height. */
 #root {
-  min-height: 100vh;
+  height: 100%;
 }
 
 /* ── Reduced motion: when profile sets reduced_motion=true, add .motion-reduced to body ── */

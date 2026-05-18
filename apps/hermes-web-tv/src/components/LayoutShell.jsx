@@ -11,11 +11,20 @@ function LayoutShell(props) {
   // grid-standard: flex-col single column flow, 3-col card grid
   // rail-hero: header rail + scrollable content rows
   // jumbo-rail: 2-col large-card layout
+  //
+  // height (not minHeight) is required so children with `height: 100%` —
+  // notably every shell in src/shells/ — resolve to the viewport instead of
+  // collapsing to their content height. Without this, shells like Netflix
+  // and Plex render cut off, and grid-style shells (TiviMate, Plex,
+  // Dave Power) collapse to a thin strip. overflow:hidden keeps the page
+  // from scrolling at the LayoutShell level; each shell's internal panel
+  // handles its own overflowY: 'auto'.
   return (
     <div
       className={layoutClass}
       style={{
-        minHeight: '100vh',
+        height: '100%',
+        overflow: 'hidden',
         backgroundColor: 'var(--bg)',
         color: 'var(--text)',
         display: 'flex',
