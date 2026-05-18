@@ -2,11 +2,15 @@
 
 const { Router } = require('express');
 const jellyfin = require('../lib/jellyfin');
+const iptvOrg = require('../lib/iptvOrg');
 const { SEED_CATALOG } = require('../data/seedCatalog');
 const router = Router();
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
-const VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'all'];
+// 'iptv-org' added so /api/catalog?provider_id=iptv-org filters correctly.
+// 'jellyfin' is allowed too even though the Jellyfin adapter currently
+// returns its own catalog (it doesn't go through the filter path).
+const VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'iptv-org', 'jellyfin', 'all'];
 
 // X-Catalog-Source header values surfaced to the web/Tizen client so the UI
 // can render a "Live Jellyfin" vs "Mock catalog" badge.
@@ -21,6 +25,11 @@ const CATALOG_SOURCE_HEADER = 'X-Catalog-Source';
 const SRC_JELLYFIN = 'jellyfin';
 const SRC_MOCK_FALLBACK = 'mock-fallback';
 const SRC_MOCK_NO_JELLYFIN = 'mock-no-jellyfin';
+// iptv-org merged onto the mock seed (or Jellyfin) when the operator has
+// flipped IPTV_ORG_ENABLED=true and the refresh cron has populated the
+// /var/cache/iptv-org/ JSON files. The badge in the Settings panel turns
+// green when this is the active source.
+const SRC_MERGED_IPTV_ORG = 'merged-with-iptv-org';
 
 // ---------------------------------------------------------------------------
 // Actors — same 5 actors as in catalog.mock.json companion data.
@@ -106,30 +115,63 @@ router.get('/api/actors', (req, res) => {
 // Both params may be combined.
 // ---------------------------------------------------------------------------
 // Decide which catalog source to use for this request and return the result
-// alongside a label for the X-Catalog-Source header. Never throws — Jellyfin
-// failures fall back to mock cleanly.
+// alongside a label for the X-Catalog-Source header. Never throws — failures
+// fall back to mock cleanly.
+//
+// Branch order:
+//   1. Jellyfin (if configured + reachable) — wholesale replaces the catalog
+//   2. Mock seed — used when Jellyfin missing/failed
+//   3. If IPTV_ORG_ENABLED=true AND the cache has channels, merge them into
+//      whatever base was chosen (mock or jellyfin) so the badge flips to
+//      green ('merged-with-iptv-org').
 async function resolveCatalog() {
+  let baseItems;
+  let baseSource;
+
   const hasJellyfinConfig = !!(process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY);
   if (!hasJellyfinConfig) {
-    return { items: [...CATALOG_ITEMS], source: SRC_MOCK_NO_JELLYFIN };
-  }
-  try {
-    const jellyfinItems = await jellyfin.fetchCatalog();
-    if (Array.isArray(jellyfinItems) && jellyfinItems.length > 0) {
-      // Jellyfin items have a different shape from the schema-validated
-      // mock fixture (provider_id='jellyfin', poster_url points at the
-      // workstation). The frontend dispatches on provider_id when picking
-      // a player URL, so this is safe to return through the same endpoint.
-      return { items: jellyfinItems, source: SRC_JELLYFIN };
+    baseItems = [...CATALOG_ITEMS];
+    baseSource = SRC_MOCK_NO_JELLYFIN;
+  } else {
+    try {
+      const jellyfinItems = await jellyfin.fetchCatalog();
+      if (Array.isArray(jellyfinItems) && jellyfinItems.length > 0) {
+        baseItems = jellyfinItems;
+        baseSource = SRC_JELLYFIN;
+      } else {
+        baseItems = [...CATALOG_ITEMS];
+        baseSource = SRC_MOCK_FALLBACK;
+      }
+    } catch (err) {
+      console.warn('[catalog] Jellyfin fetch failed (' + (err && err.code ? err.code : 'unknown') + '): ' + (err && err.message ? err.message : 'no message') + ' — serving mock');
+      baseItems = [...CATALOG_ITEMS];
+      baseSource = SRC_MOCK_FALLBACK;
     }
-    // Configured but the call returned an empty body — treat as a failure
-    // so the operator gets a "mock-fallback" signal in DevTools instead
-    // of an empty grid.
-    return { items: [...CATALOG_ITEMS], source: SRC_MOCK_FALLBACK };
-  } catch (err) {
-    console.warn('[catalog] Jellyfin fetch failed (' + (err && err.code ? err.code : 'unknown') + '): ' + (err && err.message ? err.message : 'no message') + ' — serving mock');
-    return { items: [...CATALOG_ITEMS], source: SRC_MOCK_FALLBACK };
   }
+
+  // Merge iptv-org channels onto the base (after the cache cron has run).
+  let iptvOrgCount = 0;
+  let iptvOrgAge = null;
+  if (iptvOrg.isEnabled()) {
+    try {
+      const orgItems = iptvOrg.fetchCatalog({ limit: 300 });
+      if (Array.isArray(orgItems) && orgItems.length > 0) {
+        iptvOrgCount = orgItems.length;
+        iptvOrgAge = iptvOrg.getDataAgeHours();
+        baseItems = baseItems.concat(orgItems);
+        baseSource = SRC_MERGED_IPTV_ORG;
+      }
+    } catch (err) {
+      console.warn('[catalog] iptv-org merge failed: ' + (err && err.message ? err.message : 'unknown'));
+    }
+  }
+
+  return {
+    items: baseItems,
+    source: baseSource,
+    iptv_org_count: iptvOrgCount,
+    iptv_org_data_age_h: iptvOrgAge,
+  };
 }
 
 router.get('/api/catalog', async (req, res) => {

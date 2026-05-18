@@ -85,6 +85,13 @@ app.use((err, req, res, next) => {
 // --- Start server ---
 const server = app.listen(PORT, () => {
   console.log(`[HermesAPI] hermes-tv-api v0.1.0 listening on port ${PORT} (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
+  // Start the iptv-org refresh cron AFTER the server is listening so it
+  // never runs inside supertest fixtures (which require() this module
+  // but don't call app.listen). Dormant unless IPTV_ORG_ENABLED === 'true'.
+  if (process.env.NODE_ENV !== 'test') {
+    try { require('./lib/iptvOrgRefresh').start(); }
+    catch (e) { console.warn('[HermesAPI] iptv-org refresh start failed: ' + e.message); }
+  }
 });
 
 // --- Graceful shutdown ---
