@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HermesTV — Architecture (single-page reference)</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-raised: #161b22;
+    --bg-soft: #1c2128;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --danger: #f85149;
+    --apollo: #1f6feb;
+    --xtremehd: #e94560;
+    --iptvorg: #00d4aa;
+    --jellyfin: #9b59d0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    font-size: 15px;
+  }
+  body { padding: 0 0 4rem 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 2rem 1.5rem; }
+  header.hero {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  header.hero h1 {
+    margin: 0 0 .35rem 0;
+    font-size: 2rem;
+    letter-spacing: -.01em;
+    color: #fff;
+  }
+  header.hero .sub {
+    color: var(--muted);
+    font-size: .95rem;
+  }
+  header.hero .meta {
+    margin-top: .85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    font-size: .8rem;
+  }
+  .pill {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: .15rem .65rem;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .75rem;
+    color: var(--muted);
+  }
+  .pill.accent { color: var(--accent); border-color: var(--accent); }
+  .pill.ok     { color: var(--ok);     border-color: var(--ok); }
+  .pill.warn   { color: var(--warn);   border-color: var(--warn); }
+  h2 {
+    margin: 2.4rem 0 .8rem 0;
+    font-size: 1.35rem;
+    color: #fff;
+    border-left: 3px solid var(--accent);
+    padding-left: .65rem;
+  }
+  h3 {
+    margin: 1.4rem 0 .4rem 0;
+    font-size: 1.05rem;
+    color: var(--text);
+  }
+  p { color: var(--text); margin: .55rem 0; }
+  code, kbd {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .05rem .35rem;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .85em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .8rem 1rem;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .82rem;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: .75rem 0 1.25rem 0;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: .87rem;
+  }
+  th, td {
+    text-align: left;
+    padding: .55rem .75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--bg-soft);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: .76rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(88,166,255,0.04); }
+
+  details {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: .6rem 0;
+    padding: .15rem .85rem;
+  }
+  details summary {
+    cursor: pointer;
+    padding: .55rem 0;
+    font-weight: 600;
+    color: var(--text);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  details summary::before {
+    content: "\25B8";
+    color: var(--accent);
+    font-size: .8rem;
+    transition: transform .15s;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details summary::-webkit-details-marker { display: none; }
+  details .body { padding: .25rem 0 .85rem 0; color: var(--muted); }
+
+  .badge {
+    display: inline-block;
+    padding: .1rem .55rem;
+    border-radius: 4px;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .badge-apollo   { background: rgba(31,111,235,0.18);  color: #58a6ff; border: 1px solid var(--apollo); }
+  .badge-xtremehd { background: rgba(233,69,96,0.18);   color: #ff7a8c; border: 1px solid var(--xtremehd); }
+  .badge-iptvorg  { background: rgba(0,212,170,0.18);   color: #2fe1b8; border: 1px solid var(--iptvorg); }
+  .badge-jellyfin { background: rgba(155,89,208,0.18);  color: #c78ff5; border: 1px solid var(--jellyfin); }
+  .badge-status-ok      { background: rgba(63,185,80,0.18); color: var(--ok);    border: 1px solid var(--ok); }
+  .badge-status-degraded{ background: rgba(210,153,34,0.18); color: var(--warn); border: 1px solid var(--warn); }
+  .badge-status-down    { background: rgba(248,81,73,0.18);  color: var(--danger);border: 1px solid var(--danger); }
+  .badge-status-planned { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+  @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .diagram-box {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0 1.5rem 0;
+    overflow-x: auto;
+  }
+  .diagram-box svg { display: block; max-width: 100%; height: auto; }
+  .caption {
+    color: var(--muted);
+    font-size: .8rem;
+    margin-top: .35rem;
+    font-style: italic;
+  }
+
+  svg .node-bg    { fill: #1c2128; stroke: #30363d; stroke-width: 1.2; }
+  svg .node-bg-accent { fill: #182747; stroke: #58a6ff; stroke-width: 1.4; }
+  svg .node-bg-ok     { fill: #0e2618; stroke: #3fb950; stroke-width: 1.4; }
+  svg .node-bg-warn   { fill: #2d2110; stroke: #d29922; stroke-width: 1.4; }
+  svg .node-text  { fill: #e6edf3; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; }
+  svg .node-sub   { fill: #8b949e; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node-tiny  { fill: #8b949e; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10px; }
+  svg .arrow      { stroke: #58a6ff; stroke-width: 1.5; fill: none; }
+  svg .arrow-muted{ stroke: #8b949e; stroke-width: 1.2; fill: none; stroke-dasharray: 4,3; }
+  svg .arrow-ok   { stroke: #3fb950; stroke-width: 1.5; fill: none; }
+  svg .arrow-warn { stroke: #d29922; stroke-width: 1.5; fill: none; }
+  svg .arrow-text { fill: #c9d1d9; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; }
+  svg .group-box  { fill: rgba(88,166,255,0.04); stroke: #30363d; stroke-width: 1; stroke-dasharray: 3,3; }
+  svg .group-label{ fill: #58a6ff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; }
+
+  ul.flat { list-style: none; padding-left: 0; margin: .35rem 0; }
+  ul.flat li { padding: .15rem 0; color: var(--muted); }
+  ul.flat li code { color: #c9d1d9; }
+  ul.dotted { padding-left: 1.1rem; margin: .35rem 0; color: var(--muted); }
+  ul.dotted li { padding: .1rem 0; }
+  ul.dotted li code { color: #c9d1d9; }
+
+  .tree {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .82rem;
+    color: var(--muted);
+    line-height: 1.6;
+    white-space: pre;
+  }
+  .tree .f { color: var(--text); }
+  .tree .d { color: var(--accent); }
+  .tree .n { color: var(--ok); }
+
+  footer { color: var(--muted); font-size: .8rem; margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>HermesTV - System Architecture</h1>
+  <div class="sub">
+    Single-page architectural reference for the HermesTV Tizen + Web TV app and its VPS backend.
+    Captures the live state of <code>main</code> at the time this file was written. Use it to onboard,
+    debug, or plan changes without re-reading the whole repo.
+  </div>
+  <div class="meta">
+    <span class="pill accent">repo: HermesTV-Tizen-AI</span>
+    <span class="pill">main HEAD: 1f33bd2</span>
+    <span class="pill">branch: docs/architecture-html</span>
+    <span class="pill ok">schema gate: 61 / 61</span>
+    <span class="pill">date: 2026-05-18</span>
+  </div>
+</header>
+
+<!-- Section 1 - Public surface -->
+<h2>1. Public surface - Cloudflare to host nginx to containers</h2>
+<p>
+  Production traffic for <code>hermestv.daveai.tech</code> goes through Cloudflare in Flexible-TLS mode:
+  the edge terminates HTTPS, the origin is HTTP. The Hostinger VPS runs a host-level nginx (not
+  containerised) that owns ports <code>80/443</code> and reverse-proxies HermesTV's two private
+  loopback ports to public hostnames. Caddy was originally planned in-stack but was removed in
+  Phase 2 because the VPS already runs the host nginx for ten other <code>daveai.tech</code> sites.
+</p>
+
+<div class="diagram-box">
+  <svg viewBox="0 0 1100 360" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowblue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+      </marker>
+      <marker id="arrowgreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#3fb950"/>
+      </marker>
+    </defs>
+
+    <rect class="node-bg" x="20" y="100" width="160" height="80" rx="6"/>
+    <text class="node-text" x="100" y="130" text-anchor="middle">Mom's QN85 TV</text>
+    <text class="node-sub"  x="100" y="148" text-anchor="middle">Samsung Internet</text>
+    <text class="node-sub"  x="100" y="162" text-anchor="middle">+ Tizen .wgt</text>
+
+    <rect class="node-bg" x="20" y="210" width="160" height="60" rx="6"/>
+    <text class="node-text" x="100" y="234" text-anchor="middle">Dave (Windows)</text>
+    <text class="node-sub"  x="100" y="252" text-anchor="middle">Chromium browser</text>
+
+    <rect class="node-bg-accent" x="240" y="140" width="160" height="100" rx="6"/>
+    <text class="node-text" x="320" y="170" text-anchor="middle">Cloudflare edge</text>
+    <text class="node-sub"  x="320" y="190" text-anchor="middle">TLS terminate</text>
+    <text class="node-sub"  x="320" y="206" text-anchor="middle">Flexible mode</text>
+    <text class="node-sub"  x="320" y="222" text-anchor="middle">hermestv.daveai.tech</text>
+
+    <rect class="node-bg-accent" x="460" y="120" width="200" height="160" rx="6"/>
+    <text class="node-text" x="560" y="150" text-anchor="middle">Hostinger VPS</text>
+    <text class="node-sub"  x="560" y="170" text-anchor="middle">host nginx (system)</text>
+    <text class="node-sub"  x="560" y="186" text-anchor="middle">:80 / :443 only edge</text>
+    <line x1="475" y1="200" x2="645" y2="200" stroke="#30363d" stroke-width="1"/>
+    <text class="node-tiny" x="560" y="218" text-anchor="middle">/api/* to 127.0.0.1:3011</text>
+    <text class="node-tiny" x="560" y="234" text-anchor="middle">/health to 127.0.0.1:3011</text>
+    <text class="node-tiny" x="560" y="250" text-anchor="middle">/* to 127.0.0.1:3080</text>
+    <text class="node-tiny" x="560" y="266" text-anchor="middle">(serves Vite dist via container)</text>
+
+    <rect class="node-bg-ok" x="720" y="60" width="220" height="110" rx="6"/>
+    <text class="node-text" x="830" y="86" text-anchor="middle">hermestv-vps-api</text>
+    <text class="node-sub"  x="830" y="106" text-anchor="middle">Express, Node 20</text>
+    <text class="node-sub"  x="830" y="122" text-anchor="middle">container :3011</text>
+    <text class="node-tiny" x="830" y="142" text-anchor="middle">/api/catalog and /api/play</text>
+    <text class="node-tiny" x="830" y="156" text-anchor="middle">/api/ui-command and /api/tts</text>
+
+    <rect class="node-bg-ok" x="720" y="200" width="220" height="100" rx="6"/>
+    <text class="node-text" x="830" y="226" text-anchor="middle">hermestv-vps-web</text>
+    <text class="node-sub"  x="830" y="246" text-anchor="middle">nginx (container)</text>
+    <text class="node-sub"  x="830" y="262" text-anchor="middle">serves Vite build</text>
+    <text class="node-tiny" x="830" y="282" text-anchor="middle">container :80 (mapped :3080)</text>
+
+    <line class="arrow" x1="180" y1="140" x2="240" y2="180" marker-end="url(#arrowblue)"/>
+    <line class="arrow" x1="180" y1="240" x2="240" y2="200" marker-end="url(#arrowblue)"/>
+    <line class="arrow" x1="400" y1="190" x2="460" y2="190" marker-end="url(#arrowblue)"/>
+    <line class="arrow-ok" x1="660" y1="170" x2="720" y2="110" marker-end="url(#arrowgreen)"/>
+    <line class="arrow-ok" x1="660" y1="220" x2="720" y2="240" marker-end="url(#arrowgreen)"/>
+
+    <text class="arrow-text" x="210" y="135">HTTPS 443</text>
+    <text class="arrow-text" x="420" y="183">HTTP 80</text>
+    <text class="arrow-text" x="660" y="135">/api/*, /health</text>
+    <text class="arrow-text" x="660" y="263">/* (SPA)</text>
+
+    <text class="node-tiny" x="560" y="306" text-anchor="middle">upstream/nginx/hermestv.daveai.tech.conf</text>
+  </svg>
+  <div class="caption">Diagram 1 - public TLS path. The container ports are bound to <code>127.0.0.1</code> only; the public internet cannot reach them directly.</div>
+</div>
+
+<!-- Section 2 - VPS docker stack -->
+<h2>2. VPS docker stack (<code>upstream/docker-vps/VPS_COMPOSE.yml</code>)</h2>
+<p>
+  All HermesTV containers share one private Docker bridge, <code>hermestv-vps-internal</code>.
+  Admin UIs for IPTV tooling (Threadfin, m3u-editor, xtreamfilter) are unauthenticated by design,
+  so after PR #39 each one is bound strictly to <code>127.0.0.1</code> - the operator reaches them
+  via Tailscale or an SSH local-forward. State lives in named volumes prefixed
+  <code>hermestv-vps-</code>.
+</p>
+
+<div class="diagram-box">
+  <svg viewBox="0 0 1100 520" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowblue2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+      </marker>
+      <marker id="arrowmuted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+      </marker>
+    </defs>
+
+    <rect class="group-box" x="40" y="60" width="1020" height="430" rx="8"/>
+    <text class="group-label" x="60" y="84">DOCKER BRIDGE - hermestv-vps-internal</text>
+
+    <rect class="node-bg-ok" x="80" y="120" width="240" height="120" rx="6"/>
+    <text class="node-text" x="200" y="148" text-anchor="middle">hermestv-vps-api</text>
+    <text class="node-sub"  x="200" y="170" text-anchor="middle">Express :3011</text>
+    <text class="node-tiny" x="200" y="190" text-anchor="middle">127.0.0.1:3011 to container</text>
+    <text class="node-tiny" x="200" y="208" text-anchor="middle">vol: settings-store</text>
+    <text class="node-tiny" x="200" y="224" text-anchor="middle">vol: iptv-org-cache</text>
+
+    <rect class="node-bg-ok" x="80" y="280" width="240" height="100" rx="6"/>
+    <text class="node-text" x="200" y="306" text-anchor="middle">hermestv-vps-web</text>
+    <text class="node-sub"  x="200" y="328" text-anchor="middle">nginx :80 (container)</text>
+    <text class="node-tiny" x="200" y="350" text-anchor="middle">127.0.0.1:3080 to :80</text>
+    <text class="node-tiny" x="200" y="366" text-anchor="middle">depends_on: api</text>
+
+    <rect class="node-bg-warn" x="380" y="120" width="220" height="100" rx="6"/>
+    <text class="node-text" x="490" y="146" text-anchor="middle">threadfin</text>
+    <text class="node-sub"  x="490" y="166" text-anchor="middle">M3U / EPG proxy</text>
+    <text class="node-tiny" x="490" y="186" text-anchor="middle">127.0.0.1:34400 (admin)</text>
+    <text class="node-tiny" x="490" y="202" text-anchor="middle">vol: threadfin-data</text>
+
+    <rect class="node-bg-warn" x="380" y="240" width="220" height="100" rx="6"/>
+    <text class="node-text" x="490" y="266" text-anchor="middle">m3u-editor</text>
+    <text class="node-sub"  x="490" y="286" text-anchor="middle">playlist editor UI</text>
+    <text class="node-tiny" x="490" y="306" text-anchor="middle">127.0.0.1:4200</text>
+    <text class="node-tiny" x="490" y="322" text-anchor="middle">vol: m3u-editor-data</text>
+
+    <rect class="node-bg-warn" x="380" y="360" width="220" height="100" rx="6"/>
+    <text class="node-text" x="490" y="386" text-anchor="middle">xtreamfilter</text>
+    <text class="node-sub"  x="490" y="406" text-anchor="middle">Xtream API filter</text>
+    <text class="node-tiny" x="490" y="426" text-anchor="middle">127.0.0.1:3456</text>
+    <text class="node-tiny" x="490" y="442" text-anchor="middle">vol: xtreamfilter-data</text>
+
+    <rect class="node-bg" x="680" y="120" width="350" height="80" rx="6"/>
+    <text class="node-text" x="855" y="146" text-anchor="middle">Jellyfin (workstation, via Tailscale)</text>
+    <text class="node-sub"  x="855" y="166" text-anchor="middle">JELLYFIN_URL + JELLYFIN_API_KEY</text>
+    <text class="node-tiny" x="855" y="184" text-anchor="middle">lib/jellyfin.js - 8s timeout - 5-min cache</text>
+
+    <rect class="node-bg" x="680" y="220" width="350" height="80" rx="6"/>
+    <text class="node-text" x="855" y="246" text-anchor="middle">iptv-org (public GitHub Pages JSON)</text>
+    <text class="node-sub"  x="855" y="266" text-anchor="middle">IPTV_ORG_ENABLED=true</text>
+    <text class="node-tiny" x="855" y="284" text-anchor="middle">lib/iptvOrgRefresh.js cron - 24h cadence</text>
+
+    <rect class="node-bg" x="680" y="320" width="350" height="80" rx="6"/>
+    <text class="node-text" x="855" y="346" text-anchor="middle">Azure Cognitive Services TTS</text>
+    <text class="node-sub"  x="855" y="366" text-anchor="middle">AZURE_TTS_KEY + AZURE_TTS_REGION</text>
+    <text class="node-tiny" x="855" y="384" text-anchor="middle">/api/tts/speak server-side proxy</text>
+
+    <rect class="node-bg" x="680" y="420" width="350" height="50" rx="6"/>
+    <text class="node-text" x="855" y="448" text-anchor="middle">Apollo + xTremeHD via Threadfin (M3U URLs)</text>
+
+    <line class="arrow" x1="320" y1="160" x2="680" y2="160" marker-end="url(#arrowblue2)"/>
+    <line class="arrow-muted" x1="320" y1="190" x2="680" y2="260" marker-end="url(#arrowmuted)"/>
+    <line class="arrow-muted" x1="320" y1="220" x2="680" y2="360" marker-end="url(#arrowmuted)"/>
+    <line class="arrow-muted" x1="320" y1="170" x2="380" y2="170" marker-end="url(#arrowmuted)"/>
+    <text class="arrow-text" x="430" y="158">fetch (planned)</text>
+  </svg>
+  <div class="caption">Diagram 2 - VPS Docker stack. Solid arrows = wired today; dashed = present integration, optional or planned wiring.</div>
+</div>
+
+<h3>Volume map</h3>
+<table>
+  <thead><tr><th>Volume name</th><th>Mount</th><th>Owner</th><th>Survives <code>compose down</code></th></tr></thead>
+  <tbody>
+    <tr><td><code>hermestv-vps-settings-store</code></td><td><code>/var/lib/hermestv</code></td><td>hermes-tv-api</td><td><span class="badge badge-status-ok">YES</span></td></tr>
+    <tr><td><code>hermestv-vps-iptv-org-cache</code></td><td><code>/var/cache/iptv-org</code></td><td>hermes-tv-api</td><td><span class="badge badge-status-ok">YES</span></td></tr>
+    <tr><td><code>hermestv-vps-threadfin-data</code></td><td><code>/home/threadfin</code></td><td>threadfin</td><td><span class="badge badge-status-ok">YES</span></td></tr>
+    <tr><td><code>hermestv-vps-m3u-editor-data</code></td><td><code>/config</code></td><td>m3u-editor</td><td><span class="badge badge-status-ok">YES</span></td></tr>
+    <tr><td><code>hermestv-vps-xtreamfilter-data</code></td><td><code>/config</code></td><td>xtreamfilter</td><td><span class="badge badge-status-ok">YES</span></td></tr>
+  </tbody>
+</table>
+
+<!-- Section 3 - Backend modules -->
+<h2>3. Backend modules (<code>services/hermes-tv-api/src/</code>)</h2>
+<p>
+  The API is a single Express app composed of seventeen route modules and seven lib modules.
+  Every JSON response passes through <code>credentialGuard</code>, which wraps <code>res.json</code>
+  and refuses to send if it detects a known credential shape - defence in depth against
+  accidental leaks.
+</p>
+
+<h3>Route x lib dependency table</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Route module</th>
+      <th>Mount path</th>
+      <th>Depends on (lib)</th>
+      <th>Provider integration</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><code>health.js</code></td>     <td><code>/health</code></td>           <td>-</td>                                  <td>-</td></tr>
+    <tr><td><code>profiles.js</code></td>   <td><code>/api/profiles</code></td>     <td><code>settingsStore</code></td>        <td>-</td></tr>
+    <tr><td><code>providers.js</code></td>  <td><code>/api/providers</code></td>    <td><code>settingsStore</code>, <code>jellyfin</code></td><td>all four</td></tr>
+    <tr><td><code>catalog.js</code></td>    <td><code>/api/catalog</code>, <code>/api/actors</code></td><td><code>jellyfin</code>, <code>iptvOrg</code>, <code>data/seedCatalog</code></td><td><span class="badge badge-jellyfin">jellyfin</span> <span class="badge badge-iptvorg">iptv-org</span></td></tr>
+    <tr><td><code>channels.js</code></td>   <td><code>/api/channels</code></td>     <td>-</td>                                  <td>seed</td></tr>
+    <tr><td><code>epg.js</code></td>        <td><code>/api/epg</code></td>          <td>-</td>                                  <td>seed</td></tr>
+    <tr><td><code>epgGrid.js</code></td>    <td><code>/api/epg/grid</code></td>     <td>-</td>                                  <td>seed</td></tr>
+    <tr><td><code>commands.js</code></td>   <td><code>/api/commands/*</code></td>   <td>-</td>                                  <td>-</td></tr>
+    <tr><td><code>tts.js</code></td>        <td><code>/api/tts/*</code></td>        <td><code>azureVoices</code></td>          <td>Azure TTS</td></tr>
+    <tr><td><code>setup.js</code></td>      <td><code>/api/setup</code></td>        <td><code>settingsStore</code></td>        <td>-</td></tr>
+    <tr><td><code>versions.js</code></td>   <td><code>/api/versions</code></td>     <td>-</td>                                  <td>-</td></tr>
+    <tr><td><code>settings.js</code></td>   <td><code>/api/settings</code></td>     <td><code>settingsStore</code></td>        <td>-</td></tr>
+    <tr><td><code>uiCommand.js</code></td>  <td><code>/api/ui-command/*</code></td> <td><code>llmFallback</code></td>          <td>chatbot</td></tr>
+    <tr><td><code>upstreamApps.js</code></td><td><code>/api/upstream-apps</code></td><td>-</td>                                  <td>-</td></tr>
+    <tr><td><code>layouts.js</code></td>    <td><code>/api/layouts</code></td>      <td>manifests JSON</td>                     <td>-</td></tr>
+    <tr><td><code>sourceHealth.js</code></td><td><code>/api/source-health/*</code></td><td><code>streamProbe</code></td>       <td>per-provider</td></tr>
+    <tr><td><code>play.js</code></td>       <td><code>/api/play</code>, <code>/api/play/:ticket/stream</code></td><td><code>data/seedCatalog</code></td><td>ticket only (Phase 4 streaming)</td></tr>
+  </tbody>
+</table>
+
+<h3>Middleware chain (order matters)</h3>
+<ul class="flat">
+  <li>1. <code>cors</code> - allows <code>localhost</code>, <code>hermestv.local</code>, and any LAN <code>192.168.x.x</code> origin.</li>
+  <li>2. <code>express.json({ limit: '64kb' })</code> - bounded body parsing.</li>
+  <li>3. <code>requestLogger</code> - logs <code>method - path - status - ms</code>; never the body.</li>
+  <li>4. <code>credentialGuard</code> - wraps <code>res.json</code>; blocks responses that look like they contain credentials.</li>
+</ul>
+
+<h3>Seed data</h3>
+<p>
+  <code>data/seedCatalog.js</code> exports <code>SEED_CATALOG</code> with 147 items
+  (live channels, VOD, series, and episodes) so every layout shell renders a full grid
+  before the operator has wired any real provider. Each item carries a <code>providers[]</code>
+  array referencing the four <span class="badge badge-apollo">apollo_group</span>
+  <span class="badge badge-xtremehd">xtremehd</span>
+  <span class="badge badge-iptvorg">iptv-org</span>
+  <span class="badge badge-jellyfin">jellyfin</span> provider IDs.
+</p>
+
+<!-- Section 4 - Frontend modules -->
+<h2>4. Frontend modules (<code>apps/hermes-web-tv/src/</code>)</h2>
+<p>
+  React 18 SPA built with Vite. Targets Chrome 76 (Tizen 2020 WebView) - no optional
+  chaining or nullish coalescing in shipped code paths. The same bundle runs in the
+  browser and packed into a Tizen <code>.wgt</code>. Mom (Sherri) on the QN85 and Dave
+  on Windows both reach the same Vite-built artifact through the host nginx.
+</p>
+
+<h3>Top-level entry and root</h3>
+<table>
+  <thead><tr><th>File</th><th>Role</th></tr></thead>
+  <tbody>
+    <tr><td><code>main.jsx</code></td><td>React DOM mount, imports <code>App.jsx</code>.</td></tr>
+    <tr><td><code>App.jsx</code></td><td>Root component (~1235 lines). Owns boot, profile-picker, layout selection, modal stack, Tizen key handler, chatbot, and player.</td></tr>
+  </tbody>
+</table>
+
+<h3>Component tree (click to expand)</h3>
+
+<details>
+  <summary>shells/ - seven layout shells (one per design language)</summary>
+  <div class="body">
+    <ul class="dotted">
+      <li><code>TiviMateShell.jsx</code> - channel-grid first; mirrors the TiviMate Android Live TV look.</li>
+      <li><code>NetflixShell.jsx</code> - hero billboard + horizontal carousels.</li>
+      <li><code>PlexShell.jsx</code> - library-rail with poster wall.</li>
+      <li><code>AppleTVShell.jsx</code> - large-tile editorial wall.</li>
+      <li><code>SamsungShell.jsx</code> - Samsung One UI / Tizen home strip.</li>
+      <li><code>MomModeShell.jsx</code> - jumbo tiles, high contrast, reduced motion. <code>font_scale &gt;= 1.25</code> enforced.</li>
+      <li><code>DavePowerShell.jsx</code> - dense info layout for Dave's UN-class set.</li>
+    </ul>
+    <p>Each shell consumes the same <code>profile</code> + <code>catalog</code> + <code>providers</code> and renders against its own JSON manifest in <code>layouts/manifests/</code>.</p>
+  </div>
+</details>
+
+<details>
+  <summary>components/ - ~26 reusable surfaces</summary>
+  <div class="body">
+    <ul class="dotted">
+      <li><code>ProfilePicker.jsx</code> - first-run picker, triggers <code>bootWithProfileId</code>.</li>
+      <li><code>LayoutShell.jsx</code>, <code>LayoutSwitcher.jsx</code> - shell-selection modal.</li>
+      <li><code>CatalogGrid.jsx</code>, <code>CatalogCard.jsx</code>, <code>ActorCard.jsx</code> - content surfaces.</li>
+      <li><code>MediaDetailPanel.jsx</code> - opens on tile click; hosts the new Watch button.</li>
+      <li><code>PlayerModal.jsx</code> <strong>(new)</strong> - POSTs to <code>/api/play</code>, opens ticket, polls <code>/stream</code>.</li>
+      <li><code>FloatingChatbot.jsx</code> - chat surface with mic / text input and command history.</li>
+      <li><code>CommandChips.jsx</code>, <code>CommandHelpModal.jsx</code>, <code>CommandValidator.jsx</code> - chatbot affordances.</li>
+      <li><code>ProviderFilter.jsx</code>, <code>ProviderBadge.jsx</code> - provider chips and tab bar.</li>
+      <li><code>SourceComparePanel.jsx</code>, <code>QualityBadge.jsx</code>, <code>StreamingQualityBar.jsx</code> - quality / source health.</li>
+      <li><code>QROnboarding.jsx</code> - pairs the TV to the operator workstation.</li>
+      <li><code>ThemeProvider.jsx</code> - owns CSS-variable theme injection.</li>
+      <li><code>VoicePickerModal.jsx</code> - Azure voice chooser.</li>
+      <li><code>ShellDetailDrawer.jsx</code>, <code>MiniPlayer.jsx</code> - secondary surfaces.</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>engine/ - dynamic layout engine</summary>
+  <div class="body">
+    <ul class="dotted">
+      <li><code>ShellRenderer.jsx</code> - picks the shell component for the active layout id.</li>
+      <li><code>layoutRegistry.js</code> - maps manifest ids to shell components.</li>
+      <li><code>useLayoutEngine.js</code> - React hook holding the current layout and transition guards.</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>api/ - HTTP clients (mockApi being removed)</summary>
+  <div class="body">
+    <ul class="dotted">
+      <li><code>hermesApi.js</code> - production client (<code>/api/*</code> calls). Exposes <code>isReachable</code>, <code>getProfile</code>, <code>getProviders</code>, <code>getCatalog</code>, <code>getActors</code>, <code>play</code>.</li>
+      <li><code>mockApi.js</code> - silent fallback used only when <code>isReachable()</code> rejects. Being phased out so the UI surfaces an honest "Offline mode" banner instead.</li>
+      <li><code>azureVoiceClient.js</code> - wraps <code>/api/tts/speak</code> for the chatbot's audio feedback.</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>store/, utils/, themes/</summary>
+  <div class="body">
+    <ul class="dotted">
+      <li><code>store/profileStore.js</code> - local-storage profile + agent-name persistence.</li>
+      <li><code>store/commandStore.js</code> - chat history + last-command memory.</li>
+      <li><code>utils/tizenKeyMap.js</code> - Samsung TV remote key codes to command strings (Smart Hub, Guide, RGYB).</li>
+      <li><code>utils/commandMatchers.js</code>, <code>utils/commandResponseText.js</code> - local fast-path command match + canned replies.</li>
+      <li><code>themes/tokens/</code> - design token JSON.</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>layouts/manifests/ - seven JSON manifests</summary>
+  <div class="body">
+    <ul class="dotted">
+      <li><code>tivimate.json</code></li>
+      <li><code>netflix.json</code></li>
+      <li><code>plex.json</code></li>
+      <li><code>apple-tv.json</code></li>
+      <li><code>samsung-tizen.json</code></li>
+      <li><code>mom-mode.json</code></li>
+      <li><code>dave-power.json</code></li>
+    </ul>
+    <p>Aggregated by <code>layouts/manifests/index.js</code> as <code>ALL_LAYOUTS</code>; also served at <code>/api/layouts</code> so a Tizen build with no source access still gets manifests over HTTPS.</p>
+  </div>
+</details>
+
+<!-- Section 5 - Provider integration matrix -->
+<h2>5. External provider integration matrix</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Provider</th>
+      <th>Config keys</th>
+      <th>Adapter / lib file</th>
+      <th>Default state</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-apollo">apollo_group</span></td>
+      <td><code>APOLLO_M3U_URL</code></td>
+      <td>via Threadfin (operator pastes M3U in admin UI)</td>
+      <td>unconfigured</td>
+      <td><span class="badge badge-status-degraded">manual wire</span></td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-xtremehd">xtremehd</span></td>
+      <td><code>XTREMEHD_M3U_URL</code></td>
+      <td>via Threadfin (operator pastes M3U in admin UI)</td>
+      <td>unconfigured</td>
+      <td><span class="badge badge-status-degraded">manual wire</span></td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-iptvorg">iptv-org</span></td>
+      <td><code>IPTV_ORG_ENABLED=true</code>, <code>IPTV_ORG_CACHE_DIR</code>, <code>IPTV_ORG_COUNTRIES</code>, <code>IPTV_ORG_CATEGORIES</code></td>
+      <td><code>lib/iptvOrg.js</code>, <code>lib/iptvOrgRefresh.js</code></td>
+      <td>opt-in (dormant)</td>
+      <td><span class="badge badge-status-ok">live merge</span></td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-jellyfin">jellyfin</span></td>
+      <td><code>JELLYFIN_URL</code>, <code>JELLYFIN_API_KEY</code></td>
+      <td><code>lib/jellyfin.js</code> (Tailscale workstation)</td>
+      <td>unconfigured (mock until set)</td>
+      <td><span class="badge badge-status-ok">wholesale catalog</span></td>
+    </tr>
+    <tr>
+      <td>Azure TTS</td>
+      <td><code>AZURE_TTS_KEY</code>, <code>AZURE_TTS_REGION</code></td>
+      <td><code>lib/azureVoices.js</code>, <code>routes/tts.js</code></td>
+      <td>unconfigured</td>
+      <td><span class="badge badge-status-ok">server-only proxy</span></td>
+    </tr>
+  </tbody>
+</table>
+<p>
+  No credentials are ever served to the client. The <code>credentialGuard</code> middleware
+  blocks <code>res.json</code> calls whose payload matches known token shapes; provider IDs and
+  display labels travel free.
+</p>
+
+<!-- Section 6 - Boot sequence -->
+<h2>6. Boot sequence flowchart</h2>
+<p>
+  On every load the web app picks (or restores) a profile, then runs <code>bootWithProfileId</code>:
+  it probes the API once via <code>isReachable</code>, picks the live or mock client, and fans
+  out three parallel requests. If reachability fails, the offline banner appears and
+  <code>mockApi</code> is used silently (a deliberate UX choice being removed in favour of an
+  honest "Offline" mode).
+</p>
+
+<div class="diagram-box">
+  <svg viewBox="0 0 1100 360" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowblue3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+      </marker>
+    </defs>
+
+    <rect class="node-bg-accent" x="20" y="140" width="140" height="60" rx="6"/>
+    <text class="node-text" x="90" y="166" text-anchor="middle">ProfilePicker</text>
+    <text class="node-sub"  x="90" y="184" text-anchor="middle">dave_tv / mom_tv</text>
+
+    <rect class="node-bg" x="200" y="140" width="170" height="60" rx="6"/>
+    <text class="node-text" x="285" y="166" text-anchor="middle">bootWithProfileId</text>
+    <text class="node-sub"  x="285" y="184" text-anchor="middle">App.jsx</text>
+
+    <polygon points="410,170 470,140 530,170 470,200" fill="#1c2128" stroke="#58a6ff" stroke-width="1.2"/>
+    <text class="node-text" x="470" y="174" text-anchor="middle">isReachable?</text>
+
+    <rect class="node-bg-ok" x="580" y="50" width="180" height="60" rx="6"/>
+    <text class="node-text" x="670" y="76" text-anchor="middle">hermesApi</text>
+    <text class="node-sub"  x="670" y="94" text-anchor="middle">(real /api/*)</text>
+
+    <rect class="node-bg-warn" x="580" y="230" width="180" height="60" rx="6"/>
+    <text class="node-text" x="670" y="256" text-anchor="middle">mockApi (fallback)</text>
+    <text class="node-sub"  x="670" y="274" text-anchor="middle">silent - to be removed</text>
+
+    <rect class="node-bg" x="800" y="40" width="270" height="80" rx="6"/>
+    <text class="node-text" x="935" y="64" text-anchor="middle">parallel calls</text>
+    <text class="node-sub" x="935" y="84" text-anchor="middle">api.getProfile(id)</text>
+    <text class="node-sub" x="935" y="100" text-anchor="middle">api.getProviders()</text>
+    <text class="node-sub" x="935" y="116" text-anchor="middle">api.getCatalog()</text>
+
+    <rect class="node-bg" x="800" y="230" width="270" height="60" rx="6"/>
+    <text class="node-text" x="935" y="256" text-anchor="middle">offline banner +</text>
+    <text class="node-sub"  x="935" y="274" text-anchor="middle">cached / seed catalog</text>
+
+    <line class="arrow" x1="160" y1="170" x2="200" y2="170" marker-end="url(#arrowblue3)"/>
+    <line class="arrow" x1="370" y1="170" x2="410" y2="170" marker-end="url(#arrowblue3)"/>
+    <line class="arrow" x1="500" y1="150" x2="580" y2="80"  marker-end="url(#arrowblue3)"/>
+    <line class="arrow" x1="500" y1="190" x2="580" y2="260" marker-end="url(#arrowblue3)"/>
+    <line class="arrow" x1="760" y1="80"  x2="800" y2="80"  marker-end="url(#arrowblue3)"/>
+    <line class="arrow" x1="760" y1="260" x2="800" y2="260" marker-end="url(#arrowblue3)"/>
+
+    <text class="arrow-text" x="540" y="120">yes</text>
+    <text class="arrow-text" x="540" y="225">no</text>
+  </svg>
+  <div class="caption">Diagram 3 - Boot. Once both branches resolve the app calls <code>applyDocumentTheme(profile)</code> and renders the chosen shell.</div>
+</div>
+
+<!-- Section 7 - Chatbot command flow -->
+<h2>7. Chatbot command flow</h2>
+<p>
+  Voice input (Samsung mic only - no Bixby) and text input both feed the same
+  <code>/api/ui-command/validate</code> endpoint. The route table has 22 regex patterns
+  for the fast path; misses fall through to the LLM fallback. The validated <code>action</code>
+  is dispatched back into the app's reducer.
+</p>
+
+<div class="diagram-box">
+  <svg viewBox="0 0 1100 310" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowblue4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+      </marker>
+      <marker id="arrowwarn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#d29922"/>
+      </marker>
+    </defs>
+
+    <rect class="node-bg-accent" x="20" y="60" width="160" height="60" rx="6"/>
+    <text class="node-text" x="100" y="86" text-anchor="middle">FloatingChatbot</text>
+    <text class="node-sub"  x="100" y="104" text-anchor="middle">text / mic input</text>
+
+    <rect class="node-bg" x="220" y="60" width="180" height="60" rx="6"/>
+    <text class="node-text" x="310" y="86" text-anchor="middle">CommandValidator</text>
+    <text class="node-sub"  x="310" y="104" text-anchor="middle">client-side regex</text>
+
+    <rect class="node-bg" x="440" y="60" width="220" height="60" rx="6"/>
+    <text class="node-text" x="550" y="86" text-anchor="middle">POST /api/ui-command/validate</text>
+    <text class="node-sub"  x="550" y="104" text-anchor="middle">server-authoritative</text>
+
+    <rect class="node-bg-ok" x="700" y="20" width="200" height="60" rx="6"/>
+    <text class="node-text" x="800" y="46" text-anchor="middle">regex match (fast)</text>
+    <text class="node-sub"  x="800" y="64" text-anchor="middle">22 patterns</text>
+
+    <rect class="node-bg-warn" x="700" y="100" width="200" height="60" rx="6"/>
+    <text class="node-text" x="800" y="126" text-anchor="middle">lib/llmFallback.js</text>
+    <text class="node-sub"  x="800" y="144" text-anchor="middle">slow path (optional)</text>
+
+    <rect class="node-bg" x="940" y="60" width="140" height="60" rx="6"/>
+    <text class="node-text" x="1010" y="86" text-anchor="middle">action JSON</text>
+    <text class="node-sub"  x="1010" y="104" text-anchor="middle">schema-validated</text>
+
+    <rect class="node-bg-accent" x="440" y="200" width="220" height="60" rx="6"/>
+    <text class="node-text" x="550" y="226" text-anchor="middle">App.jsx dispatcher</text>
+    <text class="node-sub"  x="550" y="244" text-anchor="middle">switch_profile - filter_*</text>
+
+    <rect class="node-bg" x="700" y="200" width="200" height="60" rx="6"/>
+    <text class="node-text" x="800" y="226" text-anchor="middle">azureVoiceClient.speak</text>
+    <text class="node-sub"  x="800" y="244" text-anchor="middle">only if audio_feedback</text>
+
+    <line class="arrow" x1="180" y1="90" x2="220" y2="90" marker-end="url(#arrowblue4)"/>
+    <line class="arrow" x1="400" y1="90" x2="440" y2="90" marker-end="url(#arrowblue4)"/>
+    <line class="arrow" x1="660" y1="80" x2="700" y2="50" marker-end="url(#arrowblue4)"/>
+    <line class="arrow-warn" x1="660" y1="100" x2="700" y2="130" marker-end="url(#arrowwarn)"/>
+    <line class="arrow" x1="900" y1="50" x2="940" y2="80" marker-end="url(#arrowblue4)"/>
+    <line class="arrow" x1="900" y1="130" x2="940" y2="100" marker-end="url(#arrowblue4)"/>
+    <line class="arrow" x1="1010" y1="120" x2="550" y2="200" marker-end="url(#arrowblue4)"/>
+    <line class="arrow" x1="660" y1="230" x2="700" y2="230" marker-end="url(#arrowblue4)"/>
+
+    <text class="arrow-text" x="450" y="76">command text</text>
+    <text class="arrow-text" x="900" y="190" text-anchor="middle">action dispatch</text>
+  </svg>
+  <div class="caption">Diagram 4 - Chatbot. Fast path returns in &lt;50 ms; the LLM path is optional and disabled by default.</div>
+</div>
+
+<!-- Section 8 - Play ticket -->
+<h2>8. Play-ticket flow</h2>
+<p>
+  Raw stream URLs are never returned to the client. <code>/api/play</code> issues a 5-minute
+  ticket containing item + provider metadata and a <code>stream_endpoint</code> pointer. The
+  actual byte-stream proxy lands in Phase 4 - today the endpoint returns <code>503
+  player_pipeline_not_implemented</code> with the ticket payload, so the frontend wiring is
+  testable end-to-end without a real stream.
+</p>
+
+<div class="diagram-box">
+  <svg viewBox="0 0 1100 280" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowblue5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+      </marker>
+    </defs>
+
+    <rect class="node-bg-accent" x="20" y="60" width="160" height="70" rx="6"/>
+    <text class="node-text" x="100" y="86" text-anchor="middle">MediaDetailPanel</text>
+    <text class="node-sub"  x="100" y="104" text-anchor="middle">Watch button</text>
+    <text class="node-tiny" x="100" y="120" text-anchor="middle">item_id + profile_id</text>
+
+    <rect class="node-bg" x="220" y="60" width="180" height="70" rx="6"/>
+    <text class="node-text" x="310" y="86" text-anchor="middle">PlayerModal</text>
+    <text class="node-sub"  x="310" y="104" text-anchor="middle">api.play(item, profile)</text>
+
+    <rect class="node-bg-ok" x="440" y="60" width="220" height="70" rx="6"/>
+    <text class="node-text" x="550" y="86" text-anchor="middle">POST /api/play</text>
+    <text class="node-sub"  x="550" y="104" text-anchor="middle">routes/play.js</text>
+    <text class="node-tiny" x="550" y="120" text-anchor="middle">5-min ticket</text>
+
+    <rect class="node-bg" x="700" y="20" width="170" height="60" rx="6"/>
+    <text class="node-text" x="785" y="46" text-anchor="middle">ticket JSON</text>
+    <text class="node-sub"  x="785" y="64" text-anchor="middle">item + provider only</text>
+
+    <rect class="node-bg-warn" x="700" y="100" width="170" height="60" rx="6"/>
+    <text class="node-text" x="785" y="126" text-anchor="middle">GET /stream</text>
+    <text class="node-sub"  x="785" y="144" text-anchor="middle">503 Phase 4</text>
+
+    <rect class="node-bg" x="900" y="60" width="180" height="70" rx="6"/>
+    <text class="node-text" x="990" y="86" text-anchor="middle">PlayerModal renders</text>
+    <text class="node-sub"  x="990" y="104" text-anchor="middle">"player pending"</text>
+
+    <rect class="node-bg" x="220" y="180" width="660" height="60" rx="6"/>
+    <text class="node-text" x="550" y="206" text-anchor="middle">in-memory ticket store</text>
+    <text class="node-sub"  x="550" y="224" text-anchor="middle">cleaned on expiry; Redis / JWT replacement deferred</text>
+
+    <line class="arrow" x1="180" y1="90" x2="220" y2="90" marker-end="url(#arrowblue5)"/>
+    <line class="arrow" x1="400" y1="90" x2="440" y2="90" marker-end="url(#arrowblue5)"/>
+    <line class="arrow" x1="660" y1="80" x2="700" y2="50" marker-end="url(#arrowblue5)"/>
+    <line class="arrow" x1="660" y1="100" x2="700" y2="130" marker-end="url(#arrowblue5)"/>
+    <line class="arrow" x1="870" y1="50" x2="900" y2="80" marker-end="url(#arrowblue5)"/>
+    <line class="arrow" x1="870" y1="130" x2="900" y2="100" marker-end="url(#arrowblue5)"/>
+  </svg>
+  <div class="caption">Diagram 5 - Play. The raw stream URL never appears outside the server process; the ticket is the only artifact crossing the wire.</div>
+</div>
+
+<!-- Section 9 - Catalog source resolution -->
+<h2>9. Catalog source resolution</h2>
+<p>
+  <code>routes/catalog.js</code> resolves the catalog in a deterministic order and surfaces
+  the active source to the client via the <code>X-Catalog-Source</code> response header.
+  The Settings panel reads that header and renders an honest provider badge.
+</p>
+
+<div class="diagram-box">
+  <svg viewBox="0 0 1100 380" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowblue6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+      </marker>
+    </defs>
+
+    <rect class="node-bg-accent" x="450" y="20" width="220" height="60" rx="6"/>
+    <text class="node-text" x="560" y="46" text-anchor="middle">GET /api/catalog</text>
+    <text class="node-sub"  x="560" y="64" text-anchor="middle">resolveCatalog()</text>
+
+    <polygon points="420,140 560,100 700,140 560,180" fill="#1c2128" stroke="#58a6ff" stroke-width="1.2"/>
+    <text class="node-text" x="560" y="146" text-anchor="middle">JELLYFIN_URL + KEY?</text>
+
+    <rect class="node-bg-ok" x="60" y="220" width="240" height="80" rx="6"/>
+    <text class="node-text" x="180" y="246" text-anchor="middle">Jellyfin fetch OK</text>
+    <text class="node-sub"  x="180" y="264" text-anchor="middle">X-Catalog-Source: jellyfin</text>
+    <text class="node-tiny" x="180" y="282" text-anchor="middle">wholesale catalog</text>
+
+    <rect class="node-bg-warn" x="340" y="220" width="240" height="80" rx="6"/>
+    <text class="node-text" x="460" y="246" text-anchor="middle">Jellyfin set but failed</text>
+    <text class="node-sub"  x="460" y="264" text-anchor="middle">X-Catalog-Source: mock-fallback</text>
+    <text class="node-tiny" x="460" y="282" text-anchor="middle">seed (147 items)</text>
+
+    <rect class="node-bg" x="620" y="220" width="240" height="80" rx="6"/>
+    <text class="node-text" x="740" y="246" text-anchor="middle">Jellyfin not configured</text>
+    <text class="node-sub"  x="740" y="264" text-anchor="middle">X-Catalog-Source: mock-no-jellyfin</text>
+    <text class="node-tiny" x="740" y="282" text-anchor="middle">seed (147 items)</text>
+
+    <rect class="node-bg-accent" x="320" y="320" width="500" height="50" rx="6"/>
+    <text class="node-text" x="570" y="350" text-anchor="middle">if IPTV_ORG_ENABLED, merge ~300 items, X-Catalog-Source: merged-with-iptv-org</text>
+
+    <line class="arrow" x1="560" y1="80" x2="560" y2="100" marker-end="url(#arrowblue6)"/>
+    <line class="arrow" x1="490" y1="170" x2="180" y2="220" marker-end="url(#arrowblue6)"/>
+    <line class="arrow" x1="540" y1="180" x2="460" y2="220" marker-end="url(#arrowblue6)"/>
+    <line class="arrow" x1="620" y1="170" x2="740" y2="220" marker-end="url(#arrowblue6)"/>
+    <line class="arrow" x1="180" y1="300" x2="380" y2="325" marker-end="url(#arrowblue6)"/>
+    <line class="arrow" x1="460" y1="300" x2="500" y2="320" marker-end="url(#arrowblue6)"/>
+    <line class="arrow" x1="740" y1="300" x2="700" y2="320" marker-end="url(#arrowblue6)"/>
+
+    <text class="arrow-text" x="280" y="200">success</text>
+    <text class="arrow-text" x="510" y="208">error</text>
+    <text class="arrow-text" x="700" y="200">no creds</text>
+  </svg>
+  <div class="caption">Diagram 6 - catalog resolution. The iptv-org merge runs on every branch when the cache is populated; the merge takes the badge to green.</div>
+</div>
+
+<!-- Section 10 - Tizen Back key modal stack -->
+<h2>10. Tizen Back-key modal-stack cascade</h2>
+<p>
+  Samsung remote sends keyCode <code>10009</code> for Back. The app dismisses modals in
+  priority order; only when no modal is open does Back take the user back to the profile
+  picker (and from there an actual Tizen exit). <code>utils/tizenKeyMap.js</code> maps the
+  full key set (Smart Hub, Guide, RGYB, transport keys).
+</p>
+
+<div class="diagram-box">
+  <svg viewBox="0 0 1100 380" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowback" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#e94560"/>
+      </marker>
+    </defs>
+
+    <rect class="node-bg" x="40" y="30" width="200" height="50" rx="6"/>
+    <text class="node-text" x="140" y="60" text-anchor="middle">Back (keyCode 10009)</text>
+
+    <rect class="node-bg-warn" x="320" y="30" width="220" height="50" rx="6"/>
+    <text class="node-text" x="430" y="52" text-anchor="middle">1. PlayerModal open?</text>
+    <text class="node-sub"  x="430" y="68" text-anchor="middle">close modal</text>
+
+    <rect class="node-bg-warn" x="320" y="100" width="220" height="50" rx="6"/>
+    <text class="node-text" x="430" y="122" text-anchor="middle">2. MediaDetailPanel?</text>
+    <text class="node-sub"  x="430" y="138" text-anchor="middle">close panel</text>
+
+    <rect class="node-bg-warn" x="320" y="170" width="220" height="50" rx="6"/>
+    <text class="node-text" x="430" y="192" text-anchor="middle">3. LayoutSwitcher?</text>
+    <text class="node-sub"  x="430" y="208" text-anchor="middle">close switcher</text>
+
+    <rect class="node-bg-warn" x="320" y="240" width="220" height="50" rx="6"/>
+    <text class="node-text" x="430" y="262" text-anchor="middle">4. VoicePicker / QR / Help?</text>
+    <text class="node-sub"  x="430" y="278" text-anchor="middle">close whichever is open</text>
+
+    <rect class="node-bg-warn" x="320" y="310" width="220" height="50" rx="6"/>
+    <text class="node-text" x="430" y="332" text-anchor="middle">5. FloatingChatbot expanded?</text>
+    <text class="node-sub"  x="430" y="348" text-anchor="middle">collapse to minimized</text>
+
+    <rect class="node-bg-accent" x="600" y="170" width="280" height="50" rx="6"/>
+    <text class="node-text" x="740" y="192" text-anchor="middle">no modal open</text>
+    <text class="node-sub"  x="740" y="208" text-anchor="middle">return to ProfilePicker</text>
+
+    <rect class="node-bg" x="600" y="240" width="280" height="50" rx="6"/>
+    <text class="node-text" x="740" y="262" text-anchor="middle">at ProfilePicker</text>
+    <text class="node-sub"  x="740" y="278" text-anchor="middle">Tizen native exit</text>
+
+    <line stroke="#e94560" stroke-width="1.5" fill="none" x1="240" y1="55" x2="320" y2="55" marker-end="url(#arrowback)"/>
+    <line stroke="#e94560" stroke-width="1.5" fill="none" x1="240" y1="55" x2="320" y2="125" marker-end="url(#arrowback)"/>
+    <line stroke="#e94560" stroke-width="1.5" fill="none" x1="240" y1="55" x2="320" y2="195" marker-end="url(#arrowback)"/>
+    <line stroke="#e94560" stroke-width="1.5" fill="none" x1="240" y1="55" x2="320" y2="265" marker-end="url(#arrowback)"/>
+    <line stroke="#e94560" stroke-width="1.5" fill="none" x1="240" y1="55" x2="320" y2="335" marker-end="url(#arrowback)"/>
+    <line stroke="#e94560" stroke-width="1.5" fill="none" x1="540" y1="195" x2="600" y2="195" marker-end="url(#arrowback)"/>
+    <line stroke="#e94560" stroke-width="1.5" fill="none" x1="740" y1="220" x2="740" y2="240" marker-end="url(#arrowback)"/>
+
+    <text class="arrow-text" x="555" y="183">none open</text>
+  </svg>
+  <div class="caption">Diagram 7 - Modal-stack cascade. Each Back press dismisses exactly one layer; the user is never trapped, and a Tizen-native exit only happens at the root.</div>
+</div>
+
+<!-- Section 11 - Schema enum sync -->
+<h2>11. Schema enum sync (provider IDs)</h2>
+<p>
+  As of PR #32 / #37, every schema that names providers shares one enum:
+  <code>[apollo_group, xtremehd, iptv-org, jellyfin]</code>. The schema validator
+  (<code>tools/schema-validate.js</code>) enforces this on every PR.
+</p>
+<table>
+  <thead>
+    <tr>
+      <th>Schema</th>
+      <th>Field</th>
+      <th>apollo_group</th>
+      <th>xtremehd</th>
+      <th>iptv-org</th>
+      <th>jellyfin</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>catalog.item.schema.json</code></td>
+      <td><code>provider_id</code></td>
+      <td><span class="badge badge-apollo">yes</span></td>
+      <td><span class="badge badge-xtremehd">yes</span></td>
+      <td><span class="badge badge-iptvorg">yes</span></td>
+      <td><span class="badge badge-jellyfin">yes</span></td>
+    </tr>
+    <tr>
+      <td><code>source.health.schema.json</code></td>
+      <td><code>provider_id</code></td>
+      <td><span class="badge badge-apollo">yes</span></td>
+      <td><span class="badge badge-xtremehd">yes</span></td>
+      <td><span class="badge badge-iptvorg">yes</span></td>
+      <td><span class="badge badge-jellyfin">yes</span></td>
+    </tr>
+    <tr>
+      <td><code>provider.profile.schema.json</code></td>
+      <td><code>provider_id</code></td>
+      <td><span class="badge badge-apollo">yes</span></td>
+      <td><span class="badge badge-xtremehd">yes</span></td>
+      <td><span class="badge badge-iptvorg">yes</span></td>
+      <td><span class="badge badge-jellyfin">yes</span></td>
+    </tr>
+    <tr>
+      <td><code>provider.capabilities.schema.json</code></td>
+      <td><code>provider_id</code></td>
+      <td><span class="badge badge-apollo">yes</span></td>
+      <td><span class="badge badge-xtremehd">yes</span></td>
+      <td><span class="badge badge-iptvorg">yes</span></td>
+      <td><span class="badge badge-jellyfin">yes</span></td>
+    </tr>
+    <tr>
+      <td><code>provider.session.schema.json</code></td>
+      <td><code>provider_id</code></td>
+      <td><span class="badge badge-apollo">yes</span></td>
+      <td><span class="badge badge-xtremehd">yes</span></td>
+      <td><span class="badge badge-iptvorg">yes</span></td>
+      <td><span class="badge badge-jellyfin">yes</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Section 12 - CI gates -->
+<h2>12. CI gates</h2>
+<table>
+  <thead><tr><th>Gate</th><th>Tool</th><th>Pass criterion</th></tr></thead>
+  <tbody>
+    <tr><td>Schema validation</td><td><code>tools/schema-validate.js</code></td><td><code>61 PASS, 0 FAIL</code></td></tr>
+    <tr><td>Web build (Vite)</td><td><code>npm run build</code></td><td>dist/ produced</td></tr>
+    <tr><td>Chatbot integration</td><td><code>tools/test-chatbot-commands.js</code></td><td><code>40 PASS, 0 FAIL</code></td></tr>
+    <tr><td>Secret scan</td><td><code>tools/secret-scan.sh</code></td><td>zero verified secrets</td></tr>
+    <tr><td>Playwright prod-smoke (nightly)</td><td>-</td><td>planned</td></tr>
+  </tbody>
+</table>
+
+<!-- Section 13 - Repo tree -->
+<h2>13. Repository tree (click to expand)</h2>
+
+<details>
+  <summary>HermesTV-Tizen-AI/ - top-level layout</summary>
+  <div class="body">
+<pre class="tree"><span class="d">apps/</span>
+  <span class="d">hermes-web-tv/</span>             Vite SPA (web + Tizen)
+    <span class="d">src/</span>
+      App.jsx
+      main.jsx
+      <span class="d">api/</span>                   hermesApi - mockApi - azureVoiceClient
+      <span class="d">components/</span>            ~26 reusable surfaces
+      <span class="d">engine/</span>                layout engine + shell renderer
+      <span class="d">layouts/manifests/</span>     7 JSON manifests
+      <span class="d">shells/</span>                7 layout shells
+      <span class="d">store/</span>                 profileStore - commandStore
+      <span class="d">themes/tokens/</span>         design-token JSON
+      <span class="d">utils/</span>                 tizenKeyMap - command matchers
+<span class="d">services/</span>
+  <span class="d">hermes-tv-api/</span>             Express API (Node 20)
+    <span class="d">src/</span>
+      index.js
+      <span class="d">routes/</span>               17 route modules
+      <span class="d">lib/</span>                   azureVoices - iptvOrg - iptvOrgRefresh
+                              jellyfin - llmFallback - settingsStore - streamProbe
+      <span class="d">middleware/</span>           credentialGuard - requestLogger
+      <span class="d">data/</span>                  seedCatalog (147 items)
+<span class="d">schemas/</span>                      catalog/source.health/provider.* + themes + layouts
+<span class="d">upstream/</span>
+  <span class="d">docker-vps/</span>               VPS_COMPOSE.yml
+  <span class="d">nginx/</span>                    hermestv.daveai.tech.conf
+<span class="d">tools/</span>                         schema-validate - secret-scan - test-chatbot
+                            tizen-package - tizen-prep - vps-audit
+<span class="d">docs/</span>                          numbered specs + research/* + proof/*
+                            <span class="f">ARCHITECTURE.html</span> (this file)
+<span class="d">.github/workflows/</span>
+  ci.yml                    schema - build - chatbot - secret-scan</pre>
+  </div>
+</details>
+
+<details>
+  <summary>Routes mounted in <code>services/hermes-tv-api/src/index.js</code></summary>
+  <div class="body">
+    <pre class="tree">app.use('/',             healthRouter);       <span class="n">// /health</span>
+app.use('/',             profilesRouter);     <span class="n">// /api/profiles</span>
+app.use('/',             providersRouter);    <span class="n">// /api/providers</span>
+app.use('/',             catalogRouter);      <span class="n">// /api/catalog and /api/actors</span>
+app.use('/api/channels', channelsRouter);
+app.use('/',             epgRouter);
+app.use('/',             epgGridRouter);
+app.use('/',             commandsRouter);
+app.use('/',             ttsRouter);
+app.use('/',             setupRouter);
+app.use('/',             versionsRouter);
+app.use('/',             settingsRouter);
+app.use('/',             uiCommandRouter);    <span class="n">// /api/ui-command/*</span>
+app.use('/',             upstreamAppsRouter);
+app.use('/',             layoutsRouter);
+app.use('/',             sourceHealthRouter);
+app.use('/',             playRouter);         <span class="n">// /api/play[/:ticket[/stream]]</span></pre>
+  </div>
+</details>
+
+<footer>
+  Single-page architectural reference. Renders standalone in any modern browser (Chrome 76+ for Tizen parity).
+  All diagrams are inline SVG - no external images, no JavaScript, no network calls.
+  - <code>docs/ARCHITECTURE.html</code>
+</footer>
+
+</div>
+</body>
+</html>
