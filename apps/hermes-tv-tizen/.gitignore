@@ -1,0 +1,14 @@
+# Tizen build outputs and intermediates
+dist/
+dist-tizen/
+.buildResult/
+.tizen-build/
+*.wgt
+
+# Generated icon (use icon.png.example as template if needed)
+icon.png
+
+# Author/distributor cert dirs (never commit signing material)
+.tizen/
+author.p12
+distributor.p12

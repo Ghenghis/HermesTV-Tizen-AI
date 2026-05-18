@@ -4,7 +4,7 @@
 // Mom's QN85 calls the public VPS. The VPS holds all API keys.
 // On dev workstation: override to local API via Samsung TV's Settings panel.
 
-var DEFAULT_API_BASE = 'https://hermestv.example.com';
+var DEFAULT_API_BASE = 'https://hermestv.daveai.tech';
 
 var apiBase = DEFAULT_API_BASE;
 
