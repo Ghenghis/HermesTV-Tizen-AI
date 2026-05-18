@@ -2,15 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Shared radius scale (every theme inherits these) ──
+/* ── Design tokens — radius scale, easing curves, shadows, gradients ──
    Mirrors RADII in src/design/tokens.js so JS-styled components and CSS
-   classes can stay in lockstep when the polish PRs swap boxy corners for
-   the rounded ones. */
+   classes stay in lockstep. Bumps every boxy/sharp-corner element to
+   consistent rounded geometry and ships shared easing curves + shadow
+   recipes so animations and focus rings feel cohesive across shells.
+   All values are Tizen 6.5 (Chrome 76) safe — no :has(), no @container,
+   no logical properties. */
 :root {
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 22px;
+  --radius-pill: 9999px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --shadow-md: 0 6px 18px rgba(0,0,0,0.28);
+  --shadow-lg: 0 12px 36px rgba(0,0,0,0.42);
+  --shadow-focus: 0 0 0 3px var(--accent, #00d4ff), 0 12px 36px rgba(0,212,255,0.35);
+  /* Shared accent gradients — themes can override --accent and the
+     warm/sunset variants will still read sensibly against any palette. */
+  --gradient-accent: linear-gradient(135deg, var(--accent, #1f6feb), #6366f1);
+  --gradient-warm: linear-gradient(135deg, #f59e0b, #ef4444);
+  --gradient-sunset: linear-gradient(135deg, #6366f1, #d946ef);
 }
 
 /* ── Theme: night-blue (Dave default) ── */
@@ -190,19 +205,23 @@
   --hero-height: 50vh;
 }
 
-/* Enhanced focus glow */
+/* Enhanced focus glow — uses the shared --shadow-focus recipe so every
+   shell renders the same accent-colored halo at 3px / 12px soft fall-off. */
 .enhanced .focus-active {
-  box-shadow: var(--focus-glow);
+  box-shadow: var(--shadow-focus);
 }
 
-/* Enhanced card transitions */
-.enhanced .catalog-card {
-  transition: transform 150ms ease, box-shadow 150ms ease;
+/* Catalog card transitions — global so the polish lands even on
+   degraded tiers; the enhanced tier additionally scales on focus. */
+.catalog-card {
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+  border-radius: var(--radius-md);
 }
 
 .enhanced .catalog-card:focus,
 .enhanced .catalog-card.focus-active {
   transform: scale(1.03);
+  box-shadow: var(--shadow-focus);
 }
 
 /* Enhanced overlay blur — Chrome 76 (Tizen 6.5) requires -webkit- prefix */
@@ -285,10 +304,15 @@ body {
   }
 }
 
-/* ── TV focus rings — visible at viewing distance ── */
+/* ── TV focus rings — visible at viewing distance ──
+   Rounded outlines + the shared shadow-focus recipe so every focusable
+   element reads with the same accent halo Mom and Dave see from the
+   couch. `border-radius` on :focus rounds the outline itself on Chrome
+   76+ (Tizen 6.5). */
 :focus {
   outline: 2px solid var(--accent, #1f6feb);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 :focus:not(:focus-visible) {
@@ -298,6 +322,26 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent, #1f6feb);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Global focus-visible bump — focused elements get a slightly larger
+   radius so square chips and tile thumbnails soften when they receive
+   keyboard focus. Pairs with the shared --shadow-focus recipe so each
+   focus event tells the user "you're here" with a glow + rounding. */
+*:focus-visible {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Default rounded geometry for every form control — bumps the visual
+   warmth of the FilterBar selects, search inputs, and any inline buttons
+   without us needing to touch each component's inline style block. */
+button,
+select,
+input,
+textarea {
+  border-radius: var(--radius-md);
 }
 
 /* ── Font scale utility ── */
@@ -337,7 +381,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--muted, #8b949e);
-  border-radius: 3px;
+  border-radius: var(--radius-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -351,4 +395,25 @@ body {
 
 .quality-badge-wrap:focus-within .codec-label {
   display: inline;
+}
+
+/* ── Shared entrance animations ──
+   Other agents hook these into modals, panels, and rail items so the
+   shell feels alive rather than snapping in. Kept short (220ms-ish) so
+   even 60fps-only Mom-TV degraded path stays comfortable. Reduced-motion
+   respect is handled by the existing motion-reduced / prefers-reduced-
+   motion rules earlier in the file. */
+@keyframes hermes-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hermes-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes hermes-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
