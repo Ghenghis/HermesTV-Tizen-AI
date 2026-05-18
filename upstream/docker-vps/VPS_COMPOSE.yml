@@ -150,8 +150,13 @@ services:
     # (see services/hermes-tv-api/src/lib/settingsStore.js). The volume name is
     # intentionally generic ("-store" not "-settings-store") because sibling
     # PRs (e.g. voice prefs) drop their own files in the same dir.
+    # iptv-org cache lives in a separate volume — refreshed by the
+    # in-process cron at 24h cadence (lib/iptvOrgRefresh.js) and survives
+    # `docker compose up -d` so the API never has to refetch ~5 MB of JSON
+    # on every container restart.
     volumes:
       - hermestv-vps-settings-store:/var/lib/hermestv
+      - hermestv-vps-iptv-org-cache:/var/cache/iptv-org
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
@@ -244,5 +249,10 @@ volumes:
   # same dir so they all survive container restarts together.
   hermestv-vps-settings-store:
     name: hermestv-vps-settings-store
+  # Local cache of the iptv-org public JSON catalog (channels/streams/etc.).
+  # Refreshed once per 24h by lib/iptvOrgRefresh.js. Separate volume so
+  # `docker compose down -v` on settings doesn't nuke ~5 MB of fresh cache.
+  hermestv-vps-iptv-org-cache:
+    name: hermestv-vps-iptv-org-cache
   # hermestv-vps-caddy-data and -config removed in Phase 2 — Caddy
   # service is no longer in this stack. Host nginx is the edge.
