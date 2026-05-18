@@ -88,19 +88,28 @@ You should see the TV listed as `device`. If it shows `offline`, the TV may not 
 
 ## Step 3 — Build the .wgt package
 
+> **Path note (2026-05-18 consolidation):** This checklist's build commands
+> below target the legacy native scaffold at `apps/hermes-tv-tizen-native/`
+> (renamed from `apps/tizen-hermes-tv/`). The **current canonical Tizen build**
+> is the web-mirror wrapper at `apps/hermes-tv-tizen/`, driven by
+> `tools/tizen-prep.js` + `tools/tizen-package.js` — see
+> [`docs/34_TIZEN_BUILD_AND_SIDELOAD.md`](34_TIZEN_BUILD_AND_SIDELOAD.md) for
+> the active flow. The legacy native commands below remain operational for
+> the AVPlay-integrated reference build only.
+
 From the `HermesTV-Tizen-AI` folder on your PC, run:
 
 ```bash
-node apps/tizen-hermes-tv/scripts/package-wgt.js
+node apps/hermes-tv-tizen-native/scripts/package-wgt.js
 ```
 
 This script bundles the Tizen app into a `.wgt` file. Output location:
 
 ```
-apps/tizen-hermes-tv/dist/HermesTV.wgt
+apps/hermes-tv-tizen-native/dist/HermesTV.wgt
 ```
 
-If the script fails, check that you ran `npm run install:all` and that the `apps/tizen-hermes-tv/` folder exists.
+If the script fails, check that you ran `npm run install:all` and that the `apps/hermes-tv-tizen-native/` folder exists.
 
 ---
 
@@ -111,13 +120,13 @@ Signing requires the Tizen authkey stored at `G:\private\authkey`. This file mus
 Run the sign-and-deploy script:
 
 ```bash
-bash apps/tizen-hermes-tv/scripts/sign-and-deploy.sh
+bash apps/hermes-tv-tizen-native/scripts/sign-and-deploy.sh
 ```
 
 The script:
 1. Reads the authkey from `G:\private\authkey`.
-2. Signs `apps/tizen-hermes-tv/dist/HermesTV.wgt` using the Tizen signing tool.
-3. Outputs a signed package: `apps/tizen-hermes-tv/dist/HermesTV.signed.wgt`.
+2. Signs `apps/hermes-tv-tizen-native/dist/HermesTV.wgt` using the Tizen signing tool.
+3. Outputs a signed package: `apps/hermes-tv-tizen-native/dist/HermesTV.signed.wgt`.
 
 If signing fails with "certificate not found", verify `G:\private\authkey` exists and has not been moved or renamed.
 

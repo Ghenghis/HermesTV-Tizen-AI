@@ -34,8 +34,17 @@ Both TVs run **Tizen 6.5** (confirmed from project lock). The Tizen version is t
 
 ## 2. Project Directory Structure
 
+> **Path note (2026-05-18 consolidation):** This document describes the original
+> native-Tizen scaffold, which now lives at `apps/hermes-tv-tizen-native/`
+> (renamed from `apps/tizen-hermes-tv/`). The current canonical Tizen build is
+> `apps/hermes-tv-tizen/` — a wrapper that re-packages the React web app as
+> a `.wgt` via [`tools/tizen-prep.js`](../tools/tizen-prep.js). See
+> [`docs/34_TIZEN_BUILD_AND_SIDELOAD.md`](34_TIZEN_BUILD_AND_SIDELOAD.md) for
+> the active build pipeline. The structure below remains accurate for
+> `apps/hermes-tv-tizen-native/`, kept as AVPlay/focus-engine reference.
+
 ```
-apps/tizen-hermes-tv/
+apps/hermes-tv-tizen-native/  (formerly apps/tizen-hermes-tv/)
 ├── config.xml            ← Tizen app manifest
 ├── icon.png              ← App icon (117×117 px minimum)
 ├── index.html            ← Single-page entry point
@@ -343,8 +352,8 @@ Use these exact commands. Do not use the Tizen Studio IDE for routine sideloads 
 #    Add to PATH: <TizenStudio>/tools/ide/bin and <TizenStudio>/tools
 export PATH=$PATH:/path/to/tizen-studio/tools/ide/bin:/path/to/tizen-studio/tools
 
-# 1. Build webpack bundle
-cd apps/tizen-hermes-tv
+# 1. Build webpack bundle (legacy native scaffold — current build is in apps/hermes-tv-tizen/)
+cd apps/hermes-tv-tizen-native
 npm run build
 # Output: dist/bundle.js, dist/bundle.css
 
