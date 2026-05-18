@@ -1,8 +1,16 @@
 /* HermesTV — 12 Layout Preset CSS Classes */
-/* Applied to #app-root. All layouts use CSS Grid. */
+/* Applied to #app-root. All layouts use CSS Grid.                          */
+/* PRIMARY TARGET: QN85Q7FAAFXZA / QN95-class QLED.                        */
+/* UN-class (UN55CU8000BXZA) gets graceful degradation via body.un-degraded */
 
 /* ==========================================================================
-   Layout 1: classic_cable_grid — 4×3 tile grid with sidenav + EPG-style now bar
+   Enhanced-only utility — hidden on UN-class degraded mode
+   ========================================================================== */
+.enhanced-only { display: block; }
+.un-degraded .enhanced-only { display: none; }
+
+/* ==========================================================================
+   Layout 1: classic_cable_grid — 5×3 tile grid (QN default), 4×3 UN fallback
    ========================================================================== */
 #app-root.layout--classic_cable_grid {
   display: grid;
@@ -16,10 +24,14 @@
 
 #app-root.layout--classic_cable_grid .grid-main {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: 12px;
   padding: 12px;
+}
+
+.un-degraded #app-root.layout--classic_cable_grid .grid-main {
+  grid-template-columns: repeat(4, 1fr);
 }
 
 /* ==========================================================================
@@ -189,6 +201,7 @@
 
 /* ==========================================================================
    Layout 9: discovery_walls — dense poster wall with filter bar
+   QN default: 8-column grid. UN-degraded fallback: 4-column.
    ========================================================================== */
 #app-root.layout--discovery_walls {
   display: grid;
@@ -218,16 +231,21 @@
 
 #app-root.layout--discovery_walls .grid-main {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 8px;
 }
 
+.un-degraded #app-root.layout--discovery_walls .grid-main {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 /* ==========================================================================
-   Layout 10: cinematic_hero — big hero banner + content rails below
+   Layout 10: cinematic_hero — big hero banner (65vh) + content rails below
+   Parallax GPU layer enabled for QN-class. Taller hero vs. old 55vh.
    ========================================================================== */
 #app-root.layout--cinematic_hero {
   display: grid;
-  grid-template-rows: 60px 55vh 1fr;
+  grid-template-rows: 60px 65vh 1fr;
   grid-template-columns: 1fr;
   grid-template-areas:
     "topbar"
@@ -235,10 +253,21 @@
     "rails";
 }
 
+.un-degraded #app-root.layout--cinematic_hero {
+  grid-template-rows: 60px 55vh 1fr;
+}
+
 #app-root.layout--cinematic_hero .region-hero {
   grid-area: hero;
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.un-degraded #app-root.layout--cinematic_hero .region-hero {
+  transform: none;
+  will-change: auto;
 }
 
 #app-root.layout--cinematic_hero .region-rails {
@@ -252,6 +281,7 @@
 
 /* ==========================================================================
    Layout 11: minimal_player — full-bleed player + thin channel/queue rail
+   Cinematic frosted-glass overlay for QN QLED GPU; plain surface on UN.
    ========================================================================== */
 #app-root.layout--minimal_player {
   display: grid;
@@ -269,6 +299,16 @@
   overflow: hidden;
 }
 
+#app-root.layout--minimal_player .player-overlay {
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.un-degraded #app-root.layout--minimal_player .player-overlay {
+  backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.70);
+}
+
 #app-root.layout--minimal_player .region-thinrail {
   grid-area: thinrail;
   display: flex;
@@ -282,6 +322,7 @@
 
 /* ==========================================================================
    Layout 12: ambient_idle — screensaver/idle state, full-bleed
+   Slow-fade CSS animation enabled by default for QN-class.
    ========================================================================== */
 #app-root.layout--ambient_idle {
   display: grid;
@@ -296,6 +337,29 @@
   position: relative;
   overflow: hidden;
   background: #000;
+  animation: ambient-slow-fade 8s ease-in-out infinite alternate;
+}
+
+.un-degraded #app-root.layout--ambient_idle .region-ambient {
+  animation: none;
+}
+
+@keyframes ambient-slow-fade {
+  from { opacity: 0.85; }
+  to   { opacity: 1.0;  }
+}
+
+/* ==========================================================================
+   Overlay panels — frosted glass for QN QLED GPU; no blur on UN-degraded
+   ========================================================================== */
+.overlay-panel {
+  backdrop-filter: blur(var(--enhanced-blur, 12px));
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.un-degraded .overlay-panel {
+  backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.80);
 }
 
 /* ==========================================================================

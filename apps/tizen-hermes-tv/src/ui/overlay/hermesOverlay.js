@@ -91,16 +91,21 @@
     compactPanel.appendChild(compactInput.row);
     _dom.compactPanel = compactPanel;
 
-    // --- Expanded panel (400px, 60% height) ---
+    // --- Expanded panel (500px for enhanced/QN-class, 400px for degraded/UN-class) ---
+    var isEnhanced = window.HERMES_CAP && window.HERMES_CAP.isEnhancedTier;
+    var expandedWidth = isEnhanced ? '500px' : '400px';
+    var expandedExtras = isEnhanced
+      ? ';backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 0 24px rgba(90,161,255,0.3)'
+      : '';
     var expandedPanel = _el('div', 'hermes-overlay__expanded', [
-      'width:400px',
+      'width:' + expandedWidth,
       'height:60vh',
       'background:var(--surface-0,#1F242C)',
       'border-radius:12px',
       'padding:16px',
       'display:none',
       'flex-direction:column'
-    ].join(';'));
+    ].join(';') + expandedExtras);
 
     var expandedTitle = _el('div', 'hermes-overlay__title', [
       'font-size:18px',
@@ -129,10 +134,15 @@
     _dom.expandedPanel = expandedPanel;
 
     // --- Walkie-talkie (full-screen semi-transparent, large mic icon) ---
+    // Enhanced (QN-class): animated radial gradient background for visual depth.
+    var isEnhancedWT = window.HERMES_CAP && window.HERMES_CAP.isEnhancedTier;
+    var wtBackground = isEnhancedWT
+      ? 'radial-gradient(ellipse at 50% 60%,rgba(90,161,255,0.18) 0%,rgba(0,0,0,0.88) 70%)'
+      : 'rgba(0,0,0,0.82)';
     var wt = _el('div', 'hermes-overlay__walkie', [
       'position:fixed',
       'inset:0',
-      'background:rgba(0,0,0,0.82)',
+      'background:' + wtBackground,
       'display:none',
       'flex-direction:column',
       'align-items:center',

@@ -112,6 +112,38 @@
     } else {
       document.body.classList.remove('reduced-motion');
     }
+
+    // Apply tier-specific CSS variable overrides based on HERMES_CAP.
+    // Enhanced (QN-class, primary target): enable glow, blur, parallax, animation.
+    // Degraded (UN-class): disable all enhanced visual features for performance.
+    if (window.HERMES_CAP && window.HERMES_CAP.isEnhancedTier) {
+      applyEnhancedOverrides();
+    } else {
+      applyDegradedOverrides();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Enhanced / degraded tier CSS variable overrides
+  // ---------------------------------------------------------------------------
+
+  // applyEnhancedOverrides — inject CSS vars for glow, parallax, and blur
+  // when running on QN-class QLED hardware (QN85, QN95 primary targets).
+  function applyEnhancedOverrides() {
+    var style = document.getElementById('hermes-enhanced-vars') || document.createElement('style');
+    style.id = 'hermes-enhanced-vars';
+    style.textContent = ':root { --focus-ring-glow: 0 0 12px var(--focus-ring, #FFD86B); --overlay-blur: 12px; --animation-scale: 1.0; --hero-parallax: enabled; }';
+    document.head.appendChild(style);
+  }
+
+  // applyDegradedOverrides — inject conservative vars for UN-class TVs.
+  // Disables blur, glow, animation scaling, and parallax to maintain
+  // acceptable performance on Crystal UHD hardware.
+  function applyDegradedOverrides() {
+    var style = document.getElementById('hermes-enhanced-vars') || document.createElement('style');
+    style.id = 'hermes-enhanced-vars';
+    style.textContent = ':root { --focus-ring-glow: none; --overlay-blur: 0px; --animation-scale: 0; --hero-parallax: disabled; }';
+    document.head.appendChild(style);
   }
 
   // ---------------------------------------------------------------------------
@@ -119,8 +151,10 @@
   // ---------------------------------------------------------------------------
 
   window.hermesTheme = {
-    apply:        apply,
-    getCurrent:   getCurrent,
-    applyProfile: applyProfile
+    apply:                  apply,
+    getCurrent:             getCurrent,
+    applyProfile:           applyProfile,
+    applyEnhancedOverrides: applyEnhancedOverrides,
+    applyDegradedOverrides: applyDegradedOverrides
   };
 }());

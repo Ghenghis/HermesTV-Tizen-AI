@@ -11,11 +11,22 @@ import FloatingChatbot from './components/FloatingChatbot.jsx';
 import QROnboarding from './components/QROnboarding.jsx';
 
 // Determine tier from TV model prefix
+// default to degraded — QN is the design target
 function resolveTier(tvModel) {
-  if (!tvModel) { return 'baseline'; }
+  if (!tvModel) { return 'degraded'; }
   var upper = tvModel.toUpperCase();
   if (upper.indexOf('QN') === 0) { return 'enhanced'; }
-  return 'baseline';
+  return 'degraded';
+}
+
+function applyTierClasses(tier) {
+  var htmlEl = document.documentElement;
+  htmlEl.classList.remove('enhanced', 'un-degraded');
+  if (tier === 'enhanced') {
+    htmlEl.classList.add('enhanced');
+  } else {
+    htmlEl.classList.add('un-degraded');
+  }
 }
 
 function applyDocumentTheme(profile) {
@@ -54,7 +65,7 @@ var INITIAL_STATE = {
   providers: [],
   catalog: [],
   activeTab: 'all',
-  tier: 'baseline',
+  tier: 'degraded',
   online: true,
   showProfilePicker: false,
   showQR: false,
@@ -94,6 +105,7 @@ function App() {
       return api.getProfile(profileId).then(function(profile) {
         var tier = resolveTier(profile.tv_model || '');
         applyDocumentTheme(profile);
+        applyTierClasses(tier);
 
         return Promise.all([
           api.getProviders(),
@@ -118,6 +130,7 @@ function App() {
           return mockApi.getProfile(profileId).then(function(profile) {
             var tier = resolveTier(profile.tv_model || '');
             applyDocumentTheme(profile);
+            applyTierClasses(tier);
 
             return Promise.all([
               mockApi.getProviders(),
@@ -409,6 +422,8 @@ function App() {
             items={state.catalog}
             activeTab={state.activeTab}
             profile={profile}
+            tier={state.tier}
+            columns={state.activeTab === 'discovery' ? (state.tier === 'enhanced' ? 8 : 4) : (state.tier === 'enhanced' ? 5 : 3)}
           />
         </main>
 

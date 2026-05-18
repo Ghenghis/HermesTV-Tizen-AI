@@ -1,8 +1,8 @@
 {
   "preset_id": "recents_resume",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Recents and Resume",
-  "intent": "Resume watching rail + recent activity rail for returning viewers",
+  "intent": "Resume watching rail + recent activity rail for returning viewers — animated focus and motion for QN-class",
   "tier_floor": "baseline",
   "grid": {
     "columns": 6,
@@ -13,12 +13,16 @@
   "regions": ["top_bar", "resume_rail", "recent_rail"],
   "focus_order": ["resume_rail", "recent_rail", "top_bar"],
   "safe_area_pct": 5,
-  "animation_density_default": "low",
-  "dave_variant": {
+  "animation_density_default": "medium",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "ambient_motion_01",
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
     "font_scale": 1.0,
     "tile_density": "medium",
     "focus_ring": "static_thick",
-    "animation_density": "low"
+    "animation_density": "low",
+    "columns_override": 4
   },
   "mom_variant": {
     "font_scale": 1.35,
@@ -27,14 +31,10 @@
     "animation_density": "off",
     "audio_feedback": true
   },
-  "enhanced_overrides": {
-    "animation_density": "medium",
-    "focus_ring": "animated_glow",
-    "background_pack_default": "ambient_motion_01"
-  },
   "proof_required": [
-    "screenshot_dave",
+    "screenshot_qn",
     "screenshot_mom",
+    "screenshot_un_degraded",
     "focus_traversal_log",
     "frame_budget_proof"
   ]

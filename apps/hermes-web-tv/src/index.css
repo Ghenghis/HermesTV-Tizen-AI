@@ -80,6 +80,48 @@
   --font-scale: 1.0;
 }
 
+/* ── QN-class performance vars (enhanced-first design target) ── */
+:root {
+  --enhanced-blur: 12px;
+  --animation-budget: high;
+  --grid-cols-standard: 5;
+  --grid-cols-discovery: 8;
+  --grid-cols-jumbo: 2;
+  --focus-glow: 0 0 14px var(--accent, #5AA1FF);
+  --hero-height: 65vh;
+}
+
+/* UN-class degraded overrides */
+.un-degraded :root {
+  --enhanced-blur: 0px;
+  --animation-budget: low;
+  --grid-cols-standard: 3;
+  --grid-cols-discovery: 4;
+  --focus-glow: none;
+  --hero-height: 50vh;
+}
+
+/* Enhanced focus glow */
+.enhanced .focus-active {
+  box-shadow: var(--focus-glow);
+}
+
+/* Enhanced card transitions */
+.enhanced .catalog-card {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.enhanced .catalog-card:focus,
+.enhanced .catalog-card.focus-active {
+  transform: scale(1.03);
+}
+
+/* Enhanced overlay blur */
+.enhanced .overlay-panel,
+.enhanced .chatbot-panel {
+  backdrop-filter: blur(var(--enhanced-blur));
+}
+
 /* ── Layout mode markers ── */
 .layout-grid-standard {
   --layout-cols: 3;

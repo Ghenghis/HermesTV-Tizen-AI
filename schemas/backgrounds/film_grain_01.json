@@ -1,17 +1,19 @@
 {
   "pack_id": "film_grain_01",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Film Grain",
-  "intent": "Subtle film grain overlay on deep red-black for a theatrical texture",
-  "tier_required": "enhanced",
+  "intent": "Subtle film grain overlay on deep red-black for a theatrical texture — QN-class primary",
+  "tier_required": "qn_primary",
   "type": "subtle_grain_overlay",
+  "motion_enabled": true,
   "base_bg": "#110005",
   "grain_opacity": 0.12,
   "static_frame_src": "assets/bg/film_grain_01_static.jpg",
   "motion_src": "assets/bg/film_grain_01_overlay.mp4",
   "motion_type": "overlay_loop",
+  "un_fallback_pack_id": "static_dark_default",
   "reduced_motion_fallback_pack_id": "static_dark_default",
   "reduced_motion_fallback_src": "assets/bg/film_grain_01_static.jpg",
   "default_for_themes": ["cinema_velvet"],
-  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+  "proof_required": ["screenshot_qn", "screenshot_un_fallback"]
 }

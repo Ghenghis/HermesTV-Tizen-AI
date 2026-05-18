@@ -1,16 +1,18 @@
 {
   "pack_id": "neon_grid_01",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Neon Grid",
-  "intent": "Animated neon grid lines on near-black for synthwave cinema aesthetic",
-  "tier_required": "enhanced",
+  "intent": "Animated neon grid lines on near-black for synthwave cinema aesthetic — QN-class primary",
+  "tier_required": "qn_primary",
   "type": "css_animation",
+  "motion_enabled": true,
   "static_frame_src": "assets/bg/neon_grid_01_static.jpg",
   "motion_src": null,
   "motion_type": "css_keyframes",
   "css_animation_class": "bg-neon-grid",
+  "un_fallback_pack_id": "static_dark_default",
   "reduced_motion_fallback_pack_id": "static_dark_default",
   "reduced_motion_fallback_src": "assets/bg/neon_grid_01_static.jpg",
   "default_for_themes": ["cinema_neon"],
-  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+  "proof_required": ["screenshot_qn", "screenshot_un_fallback"]
 }

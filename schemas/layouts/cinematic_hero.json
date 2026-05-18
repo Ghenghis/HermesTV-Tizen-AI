@@ -1,10 +1,8 @@
 {
   "preset_id": "cinematic_hero",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Cinematic Hero",
-  "intent": "Big rotating hero section + content rails below, showcase mode",
-  "tier_floor": "enhanced",
-  "tier_floor_note": "baseline shows static hero",
+  "intent": "Big rotating hero section + content rails below, showcase mode — rotating preview is the primary QN-class default",
   "grid": {
     "columns": 4,
     "rows": 3,
@@ -14,12 +12,18 @@
   "regions": ["hero_banner", "content_rails"],
   "focus_order": ["hero_banner", "content_rails"],
   "safe_area_pct": 5,
-  "animation_density_default": "low",
-  "dave_variant": {
+  "animation_density_default": "medium_high",
+  "hero_mode": "rotating_with_preview",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "ambient_motion_01",
+  "parallax_enabled": true,
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
     "font_scale": 1.0,
     "hero_mode": "static",
     "focus_ring": "static_thick",
-    "animation_density": "low"
+    "animation_density": "low",
+    "parallax_enabled": false
   },
   "mom_variant": {
     "font_scale": 1.35,
@@ -28,15 +32,10 @@
     "animation_density": "off",
     "audio_feedback": true
   },
-  "enhanced_overrides": {
-    "hero_mode": "rotating_with_preview",
-    "animation_density": "medium_high",
-    "focus_ring": "animated_glow",
-    "background_pack_default": "ambient_motion_01"
-  },
   "proof_required": [
-    "screenshot_dave",
+    "screenshot_qn",
     "screenshot_mom",
+    "screenshot_un_degraded",
     "focus_traversal_log",
     "frame_budget_proof"
   ]

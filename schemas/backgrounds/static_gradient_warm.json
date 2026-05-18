@@ -1,10 +1,11 @@
 {
   "pack_id": "static_gradient_warm",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Ember Gradient",
-  "intent": "Radial gradient from warm dark to deep amber for a glowing embers feel",
+  "intent": "Radial gradient from warm dark to deep amber — UN-class fallback for warm ember themes",
   "tier_required": "baseline",
   "type": "static_gradient",
+  "motion_enabled": false,
   "direction": "radial",
   "colors": ["#120E0A", "#1A1008"],
   "static_frame_src": "assets/bg/static_gradient_warm_static.jpg",
@@ -12,5 +13,5 @@
   "motion_type": null,
   "reduced_motion_fallback_src": "assets/bg/static_gradient_warm_static.jpg",
   "default_for_themes": [],
-  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+  "proof_required": ["screenshot_qn", "screenshot_un_fallback"]
 }

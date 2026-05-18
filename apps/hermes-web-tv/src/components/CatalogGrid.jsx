@@ -5,6 +5,7 @@ function CatalogGrid(props) {
   var items = props.items || [];
   var activeTab = props.activeTab || 'all';
   var profile = props.profile || {};
+  var tier = props.tier || 'degraded';
 
   var profileId = profile.profile_id;
   var activeLayout = profile.active_layout || 'grid-standard';
@@ -22,15 +23,24 @@ function CatalogGrid(props) {
     return !profileId || access.indexOf(profileId) !== -1;
   });
 
-  // Determine grid columns from layout
+  // Determine grid columns from layout and tier
+  // enhanced: 5 for grid-standard, 8 for discovery, 2 for jumbo-rail
+  // degraded: 3 for grid-standard, 4 for discovery, 2 for jumbo-rail
   var cols;
-  if (activeLayout === 'jumbo-rail') {
+  if (props.columns !== undefined) {
+    // explicit override from App.jsx
+    cols = props.columns;
+  } else if (activeLayout === 'jumbo-rail') {
     cols = 2;
-  } else if (activeLayout === 'rail-hero') {
-    cols = 4;
+  } else if (activeLayout === 'discovery') {
+    cols = tier === 'enhanced' ? 8 : 4;
   } else {
-    cols = 3;
+    // grid-standard and rail-hero
+    cols = tier === 'enhanced' ? 5 : 3;
   }
+
+  // CSS class for grid container
+  var gridClass = tier === 'enhanced' ? 'enhanced-grid' : 'degraded-grid';
 
   var gridStyle = {
     display: 'grid',
@@ -39,6 +49,11 @@ function CatalogGrid(props) {
     padding: '1rem 1.5rem',
     flex: 1,
   };
+
+  // Degraded: disable hover transitions on grid container
+  if (tier !== 'enhanced') {
+    gridStyle.transition = 'none';
+  }
 
   if (!filtered.length) {
     return (
@@ -58,13 +73,14 @@ function CatalogGrid(props) {
   }
 
   return (
-    <div style={gridStyle}>
+    <div className={gridClass} style={gridStyle}>
       {filtered.map(function(item) {
         return (
           <CatalogCard
-            key={item.item_id}
+            key={item.item_id || item.id}
             item={item}
             profile={profile}
+            tier={tier}
           />
         );
       })}

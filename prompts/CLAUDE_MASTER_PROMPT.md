@@ -18,10 +18,11 @@ Thin Samsung Tizen TV app (remote-first, dark-first UI shell + player) talks onl
 
 ## Target TVs — ALWAYS research both before implementing anything
 
-| Profile | TV Model | Tizen | Tier |
+| Profile | TV Model | Screen | Tier |
 |---|---|---|---|
-| Mom / Sherri (`mom_tv`) | `QN85Q7FAAFXZA` | ~6.0–6.5 | Enhanced (QN-class — never artificially limited) |
-| Dave (`dave_tv`) | `UN55CU8000BXZA` | ~6.5–7.0 | Baseline (UN-class — never upgraded by agents) |
+| Mom / Sherri (`mom_tv`) | `QN85Q7FAAFXZA` | 85" QLED | **PRIMARY TARGET** — Enhanced tier, all bells and whistles, full performance |
+| Dave (`dave_tv`) | `UN55CU8000BXZA` | 55" Crystal UHD | Graceful degradation — not the design floor, UN-class may not be smooth |
+| Extended target | QN95-class | 95" QLED | Same as mom_tv — all enhanced features, QN95 parity target |
 
 ## Providers (no credentials ever in code/docs)
 
@@ -72,6 +73,8 @@ Stop and ask before: deleting files, docker prune/rm, stopping VPS services, tou
 
 ## Phase status
 
+**Architecture note:** QN85/QN95 QLED is now the PRIMARY design target. Enhanced tier is the design assumption, not an opt-in override. UN-class (UN55CU8000BXZA) receives graceful degradation only — it is not the design floor and smooth performance on UN-class hardware is not guaranteed.
+
 | Phase | Status |
 |---|---|
 | R0 — Research lock | In progress (research/ docs accumulating, NEEDS VERIFICATION flags require on-device) |
@@ -106,6 +109,8 @@ tools/                    — Dev/operator tooling
 2. No direct provider API calls from the Tizen/web TV app — all data from hermestv.local backend.
 3. No AI API call that carries credential or user-private data.
 4. Every UI mutation goes through `schemas/ui-command.schema.json` command envelope.
-5. Mom's TV is NEVER artificially limited. Dave's TV is NEVER upgraded beyond baseline by agents.
-6. Claims require proof. Screenshots, CLI output, schema validation — not assertions.
-7. Mark unverifiable findings `<!-- NEEDS VERIFICATION: <what to check> -->` rather than guessing.
+5. Mom's TV is NEVER artificially limited.
+6. The design target is QN85/QN95 QLED. UN-class TVs receive graceful degradation only. Performance on UN-class TVs is not guaranteed to be smooth.
+7. The project is built for the 85" and 95" Samsung QLED TVs at full enhanced tier capacity.
+8. Claims require proof. Screenshots, CLI output, schema validation — not assertions.
+9. Mark unverifiable findings `<!-- NEEDS VERIFICATION: <what to check> -->` rather than guessing.

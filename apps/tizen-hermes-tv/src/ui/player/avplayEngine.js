@@ -179,10 +179,25 @@
         }
       }
 
-      // HLS rebuffer setting.
-      try {
-        av.setStreamingProperty('HLS_REBUFFER_PERCENTAGE', '0');
-      } catch (e) {}
+      // Enhanced-tier stream configuration for QN-class QLED TVs (QN85, QN95).
+      // Higher bitrate ceiling and larger buffer for 4K/HDR streaming preference.
+      if (window.HERMES_CAP && window.HERMES_CAP.isEnhancedTier) {
+        try {
+          av.setStreamingProperty('ADAPTIVE_INFO', 'BITRATE_LIMIT=20000|BUFFER_SIZE=30');
+        } catch (e) {}
+        try {
+          av.setStreamingProperty('HLS_REBUFFER_PERCENTAGE', '10');
+        } catch (e) {}
+        // Apply quality preference from stream config profile if supplied.
+        if (_currentConfig.profile) {
+          player.setQualityPreference(_currentConfig.profile);
+        }
+      } else {
+        // UN-class degraded: conservative rebuffer, no high-bitrate limit.
+        try {
+          av.setStreamingProperty('HLS_REBUFFER_PERCENTAGE', '0');
+        } catch (e) {}
+      }
 
       // Listeners.
       try {
@@ -296,6 +311,48 @@
 
     onStatsUpdate: function(callback) {
       _statsCallback = typeof callback === 'function' ? callback : null;
+    },
+
+    // preferHDR — registers an ON_HDR_DETECTED listener when enabled (QN-class only).
+    // No-op on UN-class or when AVPlay HDR events are unsupported.
+    preferHDR: function(enabled) {
+      if (!enabled) return;
+      var av = _avplay();
+      try {
+        av.setStreamingProperty('ON_HDR_DETECTED', 'true');
+      } catch (e) {
+        if (typeof console !== 'undefined') {
+          console.warn('[avplayEngine] preferHDR: ON_HDR_DETECTED not supported on this device:', e);
+        }
+      }
+    },
+
+    // setQualityPreference — applies bitrate caps from a profile quality_preference object.
+    // enhanced (QN-class): prefer_4k → 20 Mbps max (4K HDR budget).
+    // degraded (UN-class): cap at 8 Mbps to avoid overloading Crystal UHD hardware.
+    setQualityPreference: function(profile) {
+      if (!profile) return;
+      var qp = profile.quality_preference || {};
+      var av = _avplay();
+
+      var isEnhanced = window.HERMES_CAP && window.HERMES_CAP.isEnhancedTier;
+      var bitrateKbps;
+
+      if (isEnhanced && qp.prefer_4k) {
+        bitrateKbps = 20000; // 20 Mbps — 4K HDR budget for QN85/QN95
+      } else if (!isEnhanced) {
+        bitrateKbps = 8000;  // 8 Mbps cap — UN-class degraded ceiling
+      }
+
+      if (bitrateKbps) {
+        try {
+          av.setStreamingProperty('ADAPTIVE_INFO', 'BITRATE_LIMIT=' + bitrateKbps + '|BUFFER_SIZE=30');
+        } catch (e) {
+          if (typeof console !== 'undefined') {
+            console.warn('[avplayEngine] setQualityPreference: ADAPTIVE_INFO failed:', e);
+          }
+        }
+      }
     },
 
     destroy: function() {

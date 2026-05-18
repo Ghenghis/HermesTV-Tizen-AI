@@ -1,8 +1,8 @@
 {
   "preset_id": "provider_dashboard",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Provider Dashboard",
-  "intent": "Grouped by provider with quality bars and stream slot status",
+  "intent": "Grouped by provider with quality bars and stream slot status — animated focus and motion for QN-class",
   "tier_floor": "baseline",
   "grid": {
     "columns": 3,
@@ -13,8 +13,11 @@
   "regions": ["top_bar", "provider_section_apollo", "provider_section_xtremehd"],
   "focus_order": ["provider_section_apollo", "provider_section_xtremehd", "top_bar"],
   "safe_area_pct": 5,
-  "animation_density_default": "low",
-  "dave_variant": {
+  "animation_density_default": "medium",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "ambient_motion_01",
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
     "font_scale": 1.0,
     "tile_density": "medium",
     "focus_ring": "static_thick",
@@ -27,14 +30,10 @@
     "animation_density": "off",
     "audio_feedback": true
   },
-  "enhanced_overrides": {
-    "animation_density": "medium",
-    "focus_ring": "animated_glow",
-    "background_pack_default": "ambient_motion_01"
-  },
   "proof_required": [
-    "screenshot_dave",
+    "screenshot_qn",
     "screenshot_mom",
+    "screenshot_un_degraded",
     "focus_traversal_log",
     "frame_budget_proof"
   ]

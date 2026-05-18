@@ -14,22 +14,40 @@
   // Profile presets (doc 12)
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // Profile presets (doc 12)
+  //
+  // QN85/QN95 QLED is the PRIMARY design target. The 'mom_tv' (enhanced) preset
+  // is the design reference. 'dave_tv' (UN-class) receives graceful degradation
+  // only — UN-class performance is not guaranteed to be smooth.
+  // ---------------------------------------------------------------------------
+
   var PRESETS = {
-    dave_tv: {
-      row_height:    72,
-      logo_size:     48,
-      title_font:    20,
-      time_window_h: 2,
-      visible_rows:  8,
-      channel_col_w: 180
-    },
+    // mom_tv — QN85Q7FAAFXZA (85" QLED), QN95-class parity.
+    // PRIMARY TARGET: all enhanced specs are defaults, not overrides.
+    // Smooth scroll animation enabled for QN-class GPU compositing.
     mom_tv: {
-      row_height:    96,
-      logo_size:     64,
-      title_font:    26,
-      time_window_h: 2.5,
-      visible_rows:  6,
-      channel_col_w: 200
+      row_height:         108,   // enlarged for 85" viewing distance
+      logo_size:          80,
+      title_font:         30,
+      time_window_h:      3,
+      visible_rows:       8,     // QN85 GPU headroom supports 8 visible rows
+      channel_col_w:      200,
+      smooth_scroll:      true,  // CSS transition on scroll position (QN-class only)
+      scroll_transition:  'top 0.18s cubic-bezier(0.25,0.46,0.45,0.94)'
+    },
+    // dave_tv — UN55CU8000BXZA (55" Crystal UHD). Graceful degradation.
+    // NOTE: UN-class performance is NOT guaranteed to be smooth. These specs
+    // are conservative to avoid jank on constrained Crystal UHD hardware.
+    dave_tv: {
+      row_height:         72,    // degraded spec — UN-class budget
+      logo_size:          48,
+      title_font:         18,
+      time_window_h:      2,
+      visible_rows:       6,
+      channel_col_w:      180,
+      smooth_scroll:      false,
+      scroll_transition:  null
     }
   };
 
@@ -458,6 +476,8 @@
 
       row.style.display = 'block';
       row.style.top     = topOffset + 'px';
+      // Smooth scroll animation for QN-class enhanced tier.
+      row.style.transition = _preset.smooth_scroll ? (_preset.scroll_transition || '') : '';
 
       // Channel cell.
       row._chanNum.textContent  = ch.channel_number ? String(ch.channel_number) : '';
@@ -524,9 +544,11 @@
       return;
     }
 
-    _profile = profile || 'dave_tv';
+    // Default to mom_tv (enhanced/QN-class primary target).
+    // UN-class callers should explicitly pass 'dave_tv' to get degraded spec.
+    _profile = profile || 'mom_tv';
     var pid = (typeof _profile === 'object' && _profile.profile_id) ? _profile.profile_id : _profile;
-    _preset  = PRESETS[pid] || PRESETS['dave_tv'];
+    _preset  = PRESETS[pid] || PRESETS['mom_tv'];
 
     _recalcWindow();
     _recalcTimeArea();

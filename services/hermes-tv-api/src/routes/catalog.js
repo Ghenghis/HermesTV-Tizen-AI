@@ -76,6 +76,31 @@ const CATALOG_ITEMS = [
   },
 ];
 
+// Resolution sort order for quality-aware sorting (higher index = higher quality)
+const RESOLUTION_ORDER = {
+  '4K': 4,
+  '2160p': 4,
+  '1080p': 3,
+  '720p': 2,
+  '480p': 1,
+};
+
+// Quality preference map per profile (mirrors profiles.js quality_preference)
+const PROFILE_QUALITY_PREFS = {
+  mom_tv: {
+    resolution_floor: '1080p',
+    prefer_4k: true,
+    hdr_preferred: true,
+    bitrate_floor_kbps: 4000,
+  },
+  dave_tv: {
+    resolution_floor: '720p',
+    prefer_4k: false,
+    hdr_preferred: false,
+    bitrate_floor_kbps: 2000,
+  },
+};
+
 // GET /api/catalog
 // Optional query param: ?profile_id=dave_tv|mom_tv — filters by profile_access
 router.get('/api/catalog', (req, res) => {
@@ -88,15 +113,36 @@ router.get('/api/catalog', (req, res) => {
     });
   }
 
-  let items = CATALOG_ITEMS;
+  let items = [...CATALOG_ITEMS];
 
   if (profile_id) {
-    items = CATALOG_ITEMS.filter((item) =>
+    items = items.filter((item) =>
       item.profile_access.includes(profile_id)
     );
   }
 
-  res.json({ catalog: items, total: items.length });
+  // Quality sorting for mom_tv: 4K first (resolution DESC), HDR-flagged items higher
+  if (profile_id === 'mom_tv') {
+    items.sort((a, b) => {
+      const resA = RESOLUTION_ORDER[a.metadata?.resolution] || 0;
+      const resB = RESOLUTION_ORDER[b.metadata?.resolution] || 0;
+      if (resB !== resA) { return resB - resA; }
+
+      // Secondary: HDR items sorted higher
+      const hdrA = a.metadata?.hdr_format ? 1 : 0;
+      const hdrB = b.metadata?.hdr_format ? 1 : 0;
+      return hdrB - hdrA;
+    });
+  }
+
+  const quality_preference = profile_id ? (PROFILE_QUALITY_PREFS[profile_id] || null) : null;
+
+  const _meta = {
+    sorted_for_profile: profile_id || null,
+    quality_preference,
+  };
+
+  res.json({ catalog: items, total: items.length, _meta });
 });
 
 module.exports = router;

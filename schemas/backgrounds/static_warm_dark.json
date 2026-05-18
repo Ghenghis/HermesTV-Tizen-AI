@@ -1,15 +1,16 @@
 {
   "pack_id": "static_warm_dark",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Warm Dark",
-  "intent": "Solid warm dark color for cozy evening viewing on baseline devices",
+  "intent": "Solid warm dark color — UN-class fallback for warm ambient and candlelight motion packs",
   "tier_required": "baseline",
   "type": "solid_color",
+  "motion_enabled": false,
   "color": "#120E0A",
   "static_frame_src": null,
   "motion_src": null,
   "motion_type": null,
   "reduced_motion_fallback_src": null,
   "default_for_themes": ["obsidian_warm", "ember_charcoal"],
-  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+  "proof_required": ["screenshot_qn", "screenshot_un_fallback"]
 }

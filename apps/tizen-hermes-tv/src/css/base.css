@@ -1,6 +1,33 @@
 /* HermesTV — TV-safe base styles */
+/* PRIMARY TARGET: QN85Q7FAAFXZA / QN95-class QLED.                        */
+/* UN-class (UN55CU8000BXZA) inherits .un-degraded overrides below.        */
 @import 'layout.css';
 
+/* ==========================================================================
+   QN-class enhanced capability vars (primary/default)
+   ========================================================================== */
+:root {
+  --enhanced-blur: 12px;
+  --enhanced-parallax: enabled;
+  --animation-budget: high;
+  --grid-max-columns: 8;
+  --image-cache-multiplier: 2;
+  --focus-ring-glow: 0 0 12px var(--focus-ring, #FFD86B);
+}
+
+/* UN-class degraded overrides — applied when body.un-degraded is set by capabilities.js */
+.un-degraded :root,
+body.un-degraded {
+  --enhanced-blur: 0px;
+  --animation-budget: low;
+  --grid-max-columns: 4;
+  --image-cache-multiplier: 1;
+  --focus-ring-glow: none;
+}
+
+/* ==========================================================================
+   Box model + document base
+   ========================================================================== */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg-0, #0B0D10); color: var(--text-primary, #F2F4F7); }
 body { font-family: 'Samsung One', 'Malgun Gothic', system-ui, sans-serif; font-size: calc(22px * var(--font-scale, 1)); }
@@ -8,11 +35,38 @@ body { font-family: 'Samsung One', 'Malgun Gothic', system-ui, sans-serif; font-
 /* TV overscan safe area (5%) */
 #app-root { padding: 5% 5%; min-height: 100vh; }
 
-/* Focus ring */
-.focus-active { outline: 4px solid var(--focus-ring, #FFD86B); outline-offset: 2px; }
-body.reduced-motion * { animation: none !important; transition: none !important; }
+/* ==========================================================================
+   Focus ring — animated glow for QN-class; plain outline on UN-degraded or Mom explicit
+   ========================================================================== */
+.focus-active {
+  outline: 4px solid var(--focus-ring, #FFD86B);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring-glow);
+}
 
-/* EPG color vars */
+/* Reduced-motion applies ONLY to UN-degraded or explicit Mom Mode reduced-motion,
+   NOT as a blanket rule for all devices. QN-class animations are intentional. */
+body.un-degraded * { animation: none !important; transition: none !important; }
+body.profile--mom_tv.reduced-motion * { animation: none !important; transition: none !important; }
+
+/* ==========================================================================
+   Overlay backdrop — frosted glass for QN QLED GPU; opaque on UN-degraded
+   ========================================================================== */
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(var(--enhanced-blur));
+  z-index: 100;
+}
+
+body.un-degraded .overlay-backdrop {
+  backdrop-filter: none;
+}
+
+/* ==========================================================================
+   EPG color vars
+   ========================================================================== */
 :root {
   --epg-past-bg: #1A1A2E; --epg-past-text: #666680;
   --epg-current-bg: #0F3460; --epg-current-text: #E0E0FF;
@@ -21,7 +75,9 @@ body.reduced-motion * { animation: none !important; transition: none !important;
   --epg-now-hairline: #E53935;
 }
 
-/* Quality badge styles */
+/* ==========================================================================
+   Quality badge styles
+   ========================================================================== */
 .quality-badge { display: inline-flex; align-items: center; gap: 4px; font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; padding: 2px 6px; border-radius: 4px; }
 .quality-badge--4k { background: #9F7CFF; color: #fff; }
 .quality-badge--1440p { background: #7C66EE; color: #fff; }
@@ -31,16 +87,17 @@ body.reduced-motion * { animation: none !important; transition: none !important;
 .quality-badge--hdr { background: #FFB300; color: #111; margin-left: 4px; }
 .quality-badge--upscale-warn { color: #F5A524; margin-left: 2px; }
 
-/* Bitrate dot */
+/* ==========================================================================
+   Bitrate dot
+   ========================================================================== */
 .bitrate-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .bitrate-dot--low { background: #6B7280; }
 .bitrate-dot--medium { background: #F5A524; }
 .bitrate-dot--high { background: #3EC97A; }
 .bitrate-dot--ultra { background: #9F7CFF; }
 
-/* Overlay backdrop */
-.overlay-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; }
-
-/* Boot splash */
+/* ==========================================================================
+   Boot splash
+   ========================================================================== */
 .boot-splash { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 16px; }
 .boot-splash p { margin: 0; font-size: calc(24px * var(--font-scale, 1)); color: var(--text-primary, #F2F4F7); }
