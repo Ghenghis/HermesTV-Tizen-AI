@@ -1,32 +1,35 @@
 'use strict';
 
 const express = require('express');
+const azureVoices = require('../lib/azureVoices');
 const router = express.Router();
 
 // ── Voice catalog ─────────────────────────────────────────────────────────────
-// Curated, Mom-friendly voices. Each entry has display name, gender, locale,
-// and a short sample line used by the GET /voices preview UI.
-const VOICE_CATALOG = [
-  { id: 'en-US-AriaNeural',    name: 'Aria',    gender: 'female', locale: 'en-US', tone: 'warm',       sample: 'Hi Sherri! What would you like to watch tonight?' },
-  { id: 'en-US-JennyNeural',   name: 'Jenny',   gender: 'female', locale: 'en-US', tone: 'friendly',   sample: 'Hello! I am here to help you find something great.' },
-  { id: 'en-US-SaraNeural',    name: 'Sara',    gender: 'female', locale: 'en-US', tone: 'cheerful',   sample: 'Movie night! Let me know what mood you are in.' },
-  { id: 'en-US-NancyNeural',   name: 'Nancy',   gender: 'female', locale: 'en-US', tone: 'calm',       sample: 'Just relax. I will queue something nice for you.' },
-  { id: 'en-US-AmberNeural',   name: 'Amber',   gender: 'female', locale: 'en-US', tone: 'confident',  sample: 'Ready when you are. Pick a category to begin.' },
-  { id: 'en-US-AshleyNeural',  name: 'Ashley',  gender: 'female', locale: 'en-US', tone: 'gentle',     sample: 'Whenever you are ready, I am right here.' },
-  { id: 'en-GB-SoniaNeural',   name: 'Sonia',   gender: 'female', locale: 'en-GB', tone: 'british',    sample: 'Good evening. Shall we look at the films?' },
-  { id: 'en-AU-NatashaNeural', name: 'Natasha', gender: 'female', locale: 'en-AU', tone: 'australian', sample: 'G\'day! Which channel takes your fancy?' },
-  { id: 'en-US-GuyNeural',     name: 'Guy',     gender: 'male',   locale: 'en-US', tone: 'casual',     sample: 'Hey Dave, what are we watching?' },
-  { id: 'en-US-DavisNeural',   name: 'Davis',   gender: 'male',   locale: 'en-US', tone: 'professional', sample: 'Good evening. Your library is ready.' },
-  { id: 'en-US-TonyNeural',    name: 'Tony',    gender: 'male',   locale: 'en-US', tone: 'energetic',  sample: 'Movie night! Lets find a winner.' },
-  { id: 'en-GB-RyanNeural',    name: 'Ryan',    gender: 'male',   locale: 'en-GB', tone: 'british',    sample: 'Right then, what is on tonight?' },
-];
-
-const VOICE_IDS = new Set(VOICE_CATALOG.map(v => v.id));
+// The 12 hand-curated Mom-friendly voices live in lib/azureVoices.js. The full
+// English-only Azure catalog (~99-110 voices) is fetched live and cached for
+// 24h by that module. We keep a local reference to the curated list here for
+// the dev fallback (when AZURE_TTS_KEY is missing) and for the voice_id
+// allowlist used by /speak when the live catalog has not finished loading yet.
+const VOICE_CATALOG = azureVoices.CURATED_VOICES;
 
 const PROFILE_DEFAULT_VOICE = {
   mom_tv:  'en-US-AriaNeural',
   dave_tv: 'en-US-GuyNeural',
 };
+
+// Resolve a voice id to the live English catalog (Promise) so the /speak
+// allowlist tracks whatever Azure currently offers. Falls back to the
+// 12 curated voices when Azure is unreachable.
+function isVoiceAllowed(voiceId) {
+  return azureVoices.getAllVoices().then(function(result) {
+    for (let i = 0; i < result.voices.length; i++) {
+      if (result.voices[i].id === voiceId) return true;
+    }
+    // Defensive: also accept any curated voice in case the live catalog
+    // failed to load and we have not yet warmed the curated fallback.
+    return azureVoices.isCurated(voiceId);
+  });
+}
 
 // ── In-memory profile voice overrides (B2 — replace with profile store later) ─
 const PROFILE_VOICE_OVERRIDES = {};
@@ -52,41 +55,78 @@ function azureConfigured() {
 }
 
 // ── GET /api/tts/voices ──────────────────────────────────────────────────────
-router.get('/api/tts/voices', (req, res) => {
-  res.json({
-    voices: VOICE_CATALOG,
-    count: VOICE_CATALOG.length,
-    azure_configured: azureConfigured(),
-    profile_defaults: PROFILE_DEFAULT_VOICE,
-  });
+// Returns the live English-only Azure catalog (~99-110 voices) when AZURE_TTS_KEY
+// is configured, otherwise the 12 curated fallback voices. The `source` field
+// lets the UI tell apart 'azure_live' (real catalog) from 'fallback_curated'
+// (dev / Azure unreachable).
+router.get('/api/tts/voices', async (req, res) => {
+  try {
+    const result = await azureVoices.getAllVoices();
+    res.json({
+      voices: result.voices,
+      count: result.voices.length,
+      source: result.source,
+      cached_at: result.cachedAt,
+      azure_configured: azureConfigured(),
+      profile_defaults: PROFILE_DEFAULT_VOICE,
+    });
+  } catch (e) {
+    // Last-ditch — getAllVoices already swallows its own errors, but be
+    // defensive so a bug never bricks the picker UI.
+    res.json({
+      voices: VOICE_CATALOG,
+      count: VOICE_CATALOG.length,
+      source: 'fallback_curated_on_error',
+      azure_configured: azureConfigured(),
+      profile_defaults: PROFILE_DEFAULT_VOICE,
+    });
+  }
 });
 
 // ── GET /api/tts/voice/:profile_id ────────────────────────────────────────────
-router.get('/api/tts/voice/:profile_id', (req, res) => {
+router.get('/api/tts/voice/:profile_id', async (req, res) => {
   const pid = req.params.profile_id;
   const voiceId = PROFILE_VOICE_OVERRIDES[pid] || PROFILE_DEFAULT_VOICE[pid] || PROFILE_DEFAULT_VOICE.mom_tv;
-  const voice = VOICE_CATALOG.find(v => v.id === voiceId);
-  res.json({ profile_id: pid, voice_id: voiceId, voice: voice || null });
+  let voice = null;
+  try {
+    voice = await azureVoices.getVoiceById(voiceId);
+  } catch (_) { /* fall through to curated */ }
+  if (!voice) {
+    voice = VOICE_CATALOG.find(v => v.id === voiceId) || null;
+  }
+  res.json({ profile_id: pid, voice_id: voiceId, voice: voice });
 });
 
 // ── PATCH /api/tts/voice/:profile_id  body: { voice_id } ─────────────────────
-router.patch('/api/tts/voice/:profile_id', (req, res) => {
+router.patch('/api/tts/voice/:profile_id', async (req, res) => {
   const pid = req.params.profile_id;
   const body = req.body || {};
-  if (!body.voice_id || !VOICE_IDS.has(body.voice_id)) {
+  if (!body.voice_id || typeof body.voice_id !== 'string') {
+    return res.status(400).json({
+      error: 'invalid_voice_id',
+      message: 'voice_id is required and must be a string from GET /api/tts/voices.',
+    });
+  }
+  const allowed = await isVoiceAllowed(body.voice_id);
+  if (!allowed) {
     return res.status(400).json({
       error: 'invalid_voice_id',
       message: 'voice_id must be one of the catalog IDs from GET /api/tts/voices.',
-      allowed: Array.from(VOICE_IDS),
     });
   }
   PROFILE_VOICE_OVERRIDES[pid] = body.voice_id;
-  const voice = VOICE_CATALOG.find(v => v.id === body.voice_id);
+  let voice = null;
+  try {
+    voice = await azureVoices.getVoiceById(body.voice_id);
+  } catch (_) { /* fall through */ }
+  if (!voice) {
+    voice = VOICE_CATALOG.find(v => v.id === body.voice_id) || null;
+  }
   res.json({ profile_id: pid, voice_id: body.voice_id, voice: voice });
 });
 
 // ── POST /api/tts/speak  body: { text, profile_id, voice_id? } ───────────────
-router.post('/api/tts/speak', (req, res) => {
+router.post('/api/tts/speak', async (req, res) => {
   const body = req.body || {};
   const text = body.text;
   const profileId = body.profile_id;
@@ -110,10 +150,10 @@ router.post('/api/tts/speak', (req, res) => {
 
   let selectedVoice = PROFILE_VOICE_OVERRIDES[profileId] || PROFILE_DEFAULT_VOICE[profileId] || PROFILE_DEFAULT_VOICE.mom_tv;
   if (voiceOverride !== undefined && voiceOverride !== null) {
-    if (!VOICE_IDS.has(voiceOverride)) {
+    const allowed = await isVoiceAllowed(voiceOverride);
+    if (!allowed) {
       return res.status(400).json({
         error: 'voice_id is not in the permitted catalog',
-        allowed: Array.from(VOICE_IDS),
       });
     }
     selectedVoice = voiceOverride;
