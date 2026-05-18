@@ -6,7 +6,11 @@ const fs = require('fs');
 
 const router = Router();
 
-const CATALOG_PATH = path.resolve(__dirname, '../../../../upstream/apps-catalog.json');
+// Docker container doesn't have upstream/ in its filesystem; the Dockerfile
+// bakes the catalog at a fixed location and sets HERMES_UPSTREAM_CATALOG.
+// Local dev falls back to the repo-relative path.
+const CATALOG_PATH = process.env.HERMES_UPSTREAM_CATALOG
+  || path.resolve(__dirname, '../../../../upstream/apps-catalog.json');
 
 // GET /api/upstream-apps — serve upstream apps catalog for Extensions panel
 router.get('/api/upstream-apps', (req, res) => {

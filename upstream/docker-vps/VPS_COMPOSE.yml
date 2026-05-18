@@ -122,8 +122,11 @@ services:
   # ---------------------------------------------------------------------------
   hermes-tv-api:
     build:
-      context: ../../services/hermes-tv-api
-      dockerfile: Dockerfile
+      # Build context is the repo root so the Dockerfile can COPY
+      # apps/hermes-web-tv/src/layouts/manifests/ and upstream/apps-catalog.json
+      # — both of which the API serves (see /api/layouts, /api/upstream-apps).
+      context: ../..
+      dockerfile: services/hermes-tv-api/Dockerfile
     container_name: hermestv-vps-api
     environment:
       NODE_ENV: production
