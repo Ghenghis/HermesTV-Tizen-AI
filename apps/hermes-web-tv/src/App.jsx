@@ -62,6 +62,15 @@ function applyDocumentTheme(profile) {
   }
 }
 
+function applyThemeByName(themeName) {
+  var htmlEl = document.documentElement;
+  var classList = htmlEl.className.split(' ').filter(function(c) {
+    return c.indexOf('theme-') !== 0;
+  });
+  classList.push('theme-' + themeName);
+  htmlEl.className = classList.join(' ').trim();
+}
+
 // ── FilterBar (inline component) ──────────────────────────────────────────────
 // A horizontal row of dropdowns for provider, content type, and quality.
 function FilterBar(props) {
@@ -286,6 +295,7 @@ var INITIAL_STATE = {
   providerFilter: 'all',
   contentFilter: 'all',
   qualityFilter: 'all',
+  activeLayout: '',
   // Selected item for detail panel
   selectedItem: null,
   selectedProviderId: null,
@@ -454,6 +464,42 @@ function App() {
       tier: resolveTier('QN85Q7FAAFXZA'),
     });
     applyTierClasses(resolveTier('QN85Q7FAAFXZA'));
+  }
+
+  function handleChatbotCommand(commandResult) {
+    var action = commandResult.action;
+    var params = commandResult.params || {};
+
+    if (action === 'filter_provider') {
+      patchState({ providerFilter: params.provider_id || 'all' });
+    } else if (action === 'filter_content') {
+      patchState({ contentFilter: params.content_type || 'all' });
+    } else if (action === 'filter_quality') {
+      patchState({ qualityFilter: params.quality || 'all' });
+    } else if (action === 'switch_profile') {
+      if (params.profile_id) {
+        profileStore.setActiveProfileId(params.profile_id);
+        bootWithProfileId(params.profile_id);
+      }
+    } else if (action === 'update_layout') {
+      patchState({ activeLayout: params.layout || '' });
+    } else if (action === 'update_theme') {
+      if (params.theme) {
+        applyThemeByName(params.theme);
+        patchState({ profile: Object.assign({}, state.profile, { active_theme: params.theme }) });
+      }
+    } else if (action === 'update_motion') {
+      if (params.density === 'off') {
+        document.body.classList.add('motion-reduced');
+        patchState({ profile: Object.assign({}, state.profile, { reduced_motion: true }) });
+      } else {
+        document.body.classList.remove('motion-reduced');
+        patchState({ profile: Object.assign({}, state.profile, { reduced_motion: false }) });
+      }
+    } else if (action === 'reset_filters') {
+      patchState({ providerFilter: 'all', contentFilter: 'all', qualityFilter: 'all' });
+    }
+    // show_detail and find_similar_actor: no state mutation needed (chatbot response text handles UX)
   }
 
   // ── Profile picker ──
@@ -754,7 +800,7 @@ function App() {
         </main>
 
         {/* Floating chatbot */}
-        <FloatingChatbot profile={profile} online={state.online} />
+        <FloatingChatbot profile={profile} online={state.online} onCommand={handleChatbotCommand} />
 
         {/* QR onboarding modal */}
         <QROnboarding isOpen={state.showQR} onClose={handleCloseQR} />

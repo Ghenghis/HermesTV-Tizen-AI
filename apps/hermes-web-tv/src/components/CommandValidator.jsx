@@ -14,6 +14,15 @@ var ALLOWED_ACTIONS = [
   'dismiss_overlay',
   'recall_memory',
   'save_memory',
+  // Actions returned by /api/ui-command/validate
+  'filter_provider',
+  'filter_content',
+  'filter_quality',
+  'switch_profile',
+  'update_motion',
+  'show_detail',
+  'find_similar_actor',
+  'reset_filters',
 ];
 
 var VALID_PROFILE_IDS = ['dave_tv', 'mom_tv'];

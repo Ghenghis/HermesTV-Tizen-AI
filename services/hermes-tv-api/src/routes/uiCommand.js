@@ -4,7 +4,7 @@ const { Router } = require('express');
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// Command table — 15 safe mock commands, no real provider calls.
+// Command table — 22 safe mock commands, no real provider calls.
 // Each entry: { patterns: string[], action: string, params: object }
 // Matching is case-insensitive, input is trimmed before comparison.
 // ---------------------------------------------------------------------------
@@ -92,12 +92,50 @@ const COMMAND_TABLE = [
     action: 'find_similar_actor',
     params: { target: 'focused_actor' },
   },
+  // --- Content type filters (additional) ---
+  {
+    patterns: ['show sports', 'sports channels'],
+    action: 'filter_content',
+    params: { content_type: 'sports' },
+  },
+  {
+    patterns: ['show action', 'show action movies'],
+    action: 'filter_content',
+    params: { content_type: 'action' },
+  },
+  {
+    patterns: ['show family', 'family movies'],
+    action: 'filter_content',
+    params: { content_type: 'family' },
+  },
+  {
+    patterns: ['show mysteries', 'show mystery'],
+    action: 'filter_content',
+    params: { content_type: 'mysteries' },
+  },
+  {
+    patterns: ['show hallmark', 'hallmark channel'],
+    action: 'filter_content',
+    params: { content_type: 'hallmark' },
+  },
+  // --- Theme updates (additional) ---
+  {
+    patterns: ['light theme', 'light mode'],
+    action: 'update_theme',
+    params: { theme: 'mom-calm' },
+  },
+  // --- Reset ---
+  {
+    patterns: ['reset filters', 'clear filters', 'show everything'],
+    action: 'reset_filters',
+    params: {},
+  },
 ];
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
 const NO_MATCH_ERROR =
-  'Command not recognized. Try: show movies, mom mode, dark theme, show 4K';
+  'Command not recognized. Try: show movies, mom mode, dark theme, show 4K, show sports, reset filters';
 
 /**
  * Resolve a trimmed, lowercased command string against the command table.

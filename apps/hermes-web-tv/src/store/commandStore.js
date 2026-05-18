@@ -16,4 +16,15 @@ function clear() {
   _log = [];
 }
 
-export { record, getLog, clear };
+function getRecentByAction(action, limit) {
+  var n = limit || 10;
+  var matches = [];
+  for (var i = _log.length - 1; i >= 0 && matches.length < n; i--) {
+    if (_log[i].action === action) {
+      matches.push(_log[i]);
+    }
+  }
+  return matches;
+}
+
+export { record, getLog, clear, getRecentByAction };

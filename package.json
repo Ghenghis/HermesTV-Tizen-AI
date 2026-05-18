@@ -10,7 +10,8 @@
     "install:all": "npm install --prefix apps/hermes-web-tv && npm install --include=dev --prefix apps/hermes-web-tv && npm install --prefix services/hermes-tv-api",
     "validate:schemas": "node tools/schema-validate.js",
     "audit:secrets": "node -e \"const {execSync}=require('child_process');try{execSync('bash tools/secret-scan.sh',{stdio:'inherit'})}catch(e){process.exit(1)}\"",
-    "test:tiers": "node tools/tier-detect-test.js"
+    "test:tiers": "node tools/tier-detect-test.js",
+    "test:chatbot": "node tools/test-chatbot-commands.js"
   },
   "engines": { "node": ">=20.0.0" },
   "workspaces": ["apps/hermes-web-tv", "services/hermes-tv-api"]

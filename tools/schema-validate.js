@@ -197,5 +197,21 @@ srcDirs.forEach(function(dir) {
 });
 if (!secretFound) pass('No raw credential assignments found in source files');
 
+// --- uiCommand table size check ---
+console.log('\n--- uiCommand table (>= 20 commands) ---');
+var uiCommandPath = path.join(REPO, 'services/hermes-tv-api/src/routes/uiCommand.js');
+if (fs.existsSync(uiCommandPath)) {
+  var uiCommandText = fs.readFileSync(uiCommandPath, 'utf8');
+  var actionMatches = uiCommandText.match(/action:\s*['"][a-z_]+['"]/g) || [];
+  var cmdCount = actionMatches.length;
+  if (cmdCount >= 20) {
+    pass('uiCommand.js command table has ' + cmdCount + ' entries (>= 20)');
+  } else {
+    fail('uiCommand.js command table has only ' + cmdCount + ' entries, expected >= 20');
+  }
+} else {
+  fail('uiCommand.js not found');
+}
+
 console.log('\n=== Results: ' + totalPass + ' PASS, ' + totalFail + ' FAIL ===');
 process.exit(totalFail > 0 ? 1 : 0);

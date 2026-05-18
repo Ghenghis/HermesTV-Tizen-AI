@@ -1,4 +1,6 @@
-var BASE_URL = 'http://hermestv.local';
+var BASE_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+  ? 'http://localhost:3001'
+  : 'http://hermestv.local';
 var DEFAULT_TIMEOUT = 8000;
 var HEALTH_TIMEOUT = 3000;
 
@@ -83,4 +85,17 @@ function submitCommand(commandEnvelope) {
   });
 }
 
-export { isReachable, getProfile, getProviders, getCatalog, getEpg, submitCommand };
+function validateCommand(payload) {
+  return fetchWithTimeout(BASE_URL + '/api/ui-command/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(function(response) {
+    if (!response.ok) {
+      throw makeNetworkError('Command validation failed: HTTP ' + response.status);
+    }
+    return response.json();
+  });
+}
+
+export { isReachable, getProfile, getProviders, getCatalog, getEpg, submitCommand, validateCommand };

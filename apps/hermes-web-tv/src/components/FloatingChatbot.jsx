@@ -2,12 +2,15 @@ import React from 'react';
 import { validateCommand, generateCommandId } from './CommandValidator.jsx';
 import * as commandStore from '../store/commandStore.js';
 import * as hermesApi from '../api/hermesApi.js';
-// mockApi used indirectly via App-level online flag
+import * as mockApi from '../api/mockApi.js';
+import { getResponseText } from '../utils/commandResponseText.js';
+import CommandChips from './CommandChips.jsx';
+import CommandHelpModal from './CommandHelpModal.jsx';
 
 var STATES = { minimized: 'minimized', compact: 'compact', expanded: 'expanded', walkie: 'walkie-talkie' };
 
 var MOCK_HISTORY = [
-  { role: 'agent', text: 'Hi! I\'m Hermes. How can I help you today?' },
+  { role: 'agent', text: 'Hi! I\'m Hermes. Type a command or tap a chip below. Try: show movies, mom mode, dark theme, show 4K.' },
 ];
 
 function FloatingChatbot(props) {
@@ -39,6 +42,10 @@ function FloatingChatbot(props) {
   var errorText = errorState[0];
   var setErrorText = errorState[1];
 
+  var helpResult = React.useState(false);
+  var showHelp = helpResult[0];
+  var setShowHelp = helpResult[1];
+
   function handleMinimizedKey(e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -50,7 +57,6 @@ function FloatingChatbot(props) {
     var text = inputText.trim();
     if (!text) { return; }
 
-    // Never accept credentials — rudimentary check
     var lowerText = text.toLowerCase();
     if (
       lowerText.indexOf('password') !== -1 ||
@@ -65,7 +71,12 @@ function FloatingChatbot(props) {
 
     setErrorText('');
 
-    // Build a mock command envelope for non-credential text commands
+    // Add user message immediately
+    setHistory(function(prev) { return prev.concat([{ role: 'user', text: text }]); });
+    setInputText('');
+    setSubmitting(true);
+
+    // Build audit log envelope (show_notification is valid in CommandValidator)
     var envelope = {
       schema: 'hermestv.ui.v1',
       command_id: generateCommandId(),
@@ -74,39 +85,68 @@ function FloatingChatbot(props) {
       payload: { message: text },
       issued_at: new Date().toISOString(),
     };
-
-    var validation = validateCommand(envelope);
-    if (!validation.valid) {
-      setErrorText('Command validation failed: ' + validation.errors.join('; '));
-      return;
-    }
-
-    // Record in audit log
     commandStore.record(envelope);
 
-    // Add user message to history
-    setHistory(function(prev) {
-      return prev.concat([{ role: 'user', text: text }]);
-    });
-    setInputText('');
-    setSubmitting(true);
+    // Use API when online, local matcher when offline
+    var validatePromise = online
+      ? hermesApi.validateCommand({ command_text: text, profile_id: profileId })
+      : mockApi.validateCommand({ command_text: text, profile_id: profileId });
 
-    var submitPromise = online
-      ? hermesApi.submitCommand(envelope)
-      : Promise.resolve({ status: 'mock_ack', offline: true });
-
-    submitPromise.then(function(result) {
+    validatePromise.then(function(result) {
       setSubmitting(false);
-      var responseText = result && result.offline
-        ? agentName + ' is in offline mode. Your command was recorded locally.'
-        : agentName + ' received your message.';
-      setHistory(function(prev) {
-        return prev.concat([{ role: 'agent', text: responseText }]);
-      });
+      if (result.valid) {
+        if (props.onCommand) {
+          props.onCommand({ action: result.action, params: result.params });
+        }
+        var responseText = getResponseText(result.action, result.params);
+        setHistory(function(prev) {
+          return prev.concat([{ role: 'agent', text: responseText }]);
+        });
+      } else {
+        setHistory(function(prev) {
+          return prev.concat([{ role: 'agent', text: result.error || 'Command not recognized.' }]);
+        });
+      }
     }).catch(function() {
       setSubmitting(false);
       setHistory(function(prev) {
-        return prev.concat([{ role: 'agent', text: 'I couldn\'t reach the server right now. Your message was saved locally.' }]);
+        return prev.concat([{ role: 'agent', text: 'Couldn\'t reach the server. Try again in a moment.' }]);
+      });
+    });
+  }
+
+  function handleChipSend(commandText) {
+    setInputText(commandText);
+    // Directly trigger send with this text
+    setErrorText('');
+    setHistory(function(prev) { return prev.concat([{ role: 'user', text: commandText }]); });
+    setSubmitting(true);
+
+    var validatePromise = online
+      ? hermesApi.validateCommand({ command_text: commandText, profile_id: profileId })
+      : mockApi.validateCommand({ command_text: commandText, profile_id: profileId });
+
+    validatePromise.then(function(result) {
+      setSubmitting(false);
+      setInputText('');
+      if (result.valid) {
+        if (props.onCommand) {
+          props.onCommand({ action: result.action, params: result.params });
+        }
+        var responseText = getResponseText(result.action, result.params);
+        setHistory(function(prev) {
+          return prev.concat([{ role: 'agent', text: responseText }]);
+        });
+      } else {
+        setHistory(function(prev) {
+          return prev.concat([{ role: 'agent', text: result.error || 'Command not recognized.' }]);
+        });
+      }
+    }).catch(function() {
+      setSubmitting(false);
+      setInputText('');
+      setHistory(function(prev) {
+        return prev.concat([{ role: 'agent', text: 'Couldn\'t reach the server. Try again.' }]);
       });
     });
   }
@@ -363,6 +403,15 @@ function FloatingChatbot(props) {
         <div style={{ display: 'flex', gap: '0.3rem' }}>
           <button
             tabIndex={0}
+            onClick={function() { setShowHelp(true); }}
+            title="Command help"
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
+            aria-label="Show command help"
+          >
+            ?
+          </button>
+          <button
+            tabIndex={0}
             onClick={function() { setChatState(STATES.walkie); }}
             title="Walkie-talkie mode"
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
@@ -460,6 +509,9 @@ function FloatingChatbot(props) {
         </div>
       )}
 
+      {/* Command chips */}
+      <CommandChips onSend={handleChipSend} />
+
       {/* Input area */}
       <div
         style={{
@@ -525,6 +577,8 @@ function FloatingChatbot(props) {
           Send
         </button>
       </div>
+
+      <CommandHelpModal isOpen={showHelp} onClose={function() { setShowHelp(false); }} />
     </div>
   );
 }
