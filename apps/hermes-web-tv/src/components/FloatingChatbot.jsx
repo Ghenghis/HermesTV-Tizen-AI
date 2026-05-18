@@ -197,7 +197,7 @@ function FloatingChatbot(props) {
           borderRadius: '50%',
           backgroundColor: 'var(--accent)',
           border: 'none',
-          color: '#ffffff',
+          color: '#1a1410',
           fontSize: '1.5rem',
           fontWeight: '800',
           cursor: 'pointer',

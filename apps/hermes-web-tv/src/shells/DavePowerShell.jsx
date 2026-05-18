@@ -48,13 +48,20 @@ function DavePowerShell(props) {
   var qualityFilter = props.qualityFilter;
 
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
-  var fontScale = (profile && profile.font_scale) || 0.9;
+  var fontScale = (profile && profile.font_scale) || 1.0;
   var activeIconResult = React.useState(0);
   var activeIcon = activeIconResult[0];
   var setActiveIcon = activeIconResult[1];
   var searchResult = React.useState('');
   var searchQuery = searchResult[0];
   var setSearchQuery = searchResult[1];
+
+  React.useEffect(function() {
+    var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   var displayItems = searchQuery
     ? filtered.filter(function(i) { return (i.title || '').toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1; })
@@ -93,7 +100,7 @@ function DavePowerShell(props) {
                 borderRadius: '8px',
                 border: 'none',
                 background: activeIcon === i ? 'rgba(0,212,170,0.15)' : 'transparent',
-                color: activeIcon === i ? '#00d4aa' : '#6b7a8d',
+                color: activeIcon === i ? '#00d4aa' : '#8a98ab',
                 fontSize: '20px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -116,7 +123,7 @@ function DavePowerShell(props) {
           <div style={{ fontWeight: 700, fontSize: 'calc(15px * ' + fontScale + ')', color: '#e0e8f0' }}>
             Hermes<span style={{ color: '#00d4aa' }}>TV</span>
           </div>
-          <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', color: '#6b7a8d', flex: 1 }}>{filterLabel}</div>
+          <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', color: '#8a98ab', flex: 1 }}>{filterLabel}</div>
           <input
             type="text"
             value={searchQuery}
@@ -133,7 +140,7 @@ function DavePowerShell(props) {
               width: '160px',
             }}
           />
-          <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6b7a8d' }}>Ctrl+L: layout</div>
+          <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab' }}>Ctrl+L: layout</div>
         </div>
 
         {/* Grid */}
@@ -167,7 +174,7 @@ function DavePowerShell(props) {
                   </div>
                   <div style={{ padding: '5px 6px', background: '#0d1120' }}>
                     <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 600, color: '#e0e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                    <div style={{ fontSize: 'calc(9px * ' + fontScale + ')', color: '#6b7a8d', marginTop: '2px' }}>
+                    <div style={{ fontSize: 'calc(9px * ' + fontScale + ')', color: '#8a98ab', marginTop: '2px' }}>
                       {(item.provider_id || '') + (item.year ? ' · ' + item.year : '')}
                     </div>
                   </div>
@@ -176,7 +183,7 @@ function DavePowerShell(props) {
             })}
           </div>
           {displayItems.length === 0 && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7a8d', fontSize: 'calc(13px * ' + fontScale + ')' }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#8a98ab', fontSize: 'calc(13px * ' + fontScale + ')' }}>
               No results{searchQuery ? ' for "' + searchQuery + '"' : ''}.
             </div>
           )}
@@ -189,12 +196,12 @@ function DavePowerShell(props) {
           <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, color: '#00d4aa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Catalog Stats</div>
 
           <div>
-            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6b7a8d', marginBottom: '6px' }}>TOTAL</div>
+            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginBottom: '6px' }}>TOTAL</div>
             <div style={{ fontSize: 'calc(24px * ' + fontScale + ')', fontWeight: 700, color: '#e0e8f0' }}>{(catalog || []).length}</div>
           </div>
 
           <div>
-            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6b7a8d', marginBottom: '6px' }}>BY TYPE</div>
+            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginBottom: '6px' }}>BY TYPE</div>
             {[
               { label: 'Live', count: liveCount, color: '#e50914' },
               { label: 'Movies', count: movieCount, color: '#e5a00d' },
@@ -210,7 +217,7 @@ function DavePowerShell(props) {
           </div>
 
           <div>
-            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6b7a8d', marginBottom: '6px' }}>QUALITY</div>
+            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginBottom: '6px' }}>QUALITY</div>
             {Object.keys(qualityBreakdown).slice(0, 5).map(function(q) {
               return (
                 <div key={q} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: 'calc(11px * ' + fontScale + ')' }}>
@@ -222,9 +229,9 @@ function DavePowerShell(props) {
           </div>
 
           <div>
-            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6b7a8d', marginBottom: '6px' }}>FILTERED</div>
+            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginBottom: '6px' }}>FILTERED</div>
             <div style={{ fontSize: 'calc(18px * ' + fontScale + ')', fontWeight: 700, color: '#00d4aa' }}>{displayItems.length}</div>
-            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6b7a8d', marginTop: '2px' }}>of {(catalog || []).length}</div>
+            <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginTop: '2px' }}>of {(catalog || []).length}</div>
           </div>
         </div>
       )}

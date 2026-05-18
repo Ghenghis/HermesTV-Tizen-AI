@@ -81,7 +81,7 @@ function GridSection(props) {
               </div>
               <div style={{ padding: '8px', background: '#191b1d' }}>
                 <div style={{ fontSize: 'calc(12px * ' + fontScale + ')', fontWeight: 600, color: '#eaeaea', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                {item.year && <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6c7177', marginTop: '2px' }}>{item.year}</div>}
+                {item.year && <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', marginTop: '2px' }}>{item.year}</div>}
               </div>
             </div>
           );
@@ -112,6 +112,13 @@ function PlexShell(props) {
   var activeSection = activeSectionResult[0];
   var setActiveSection = activeSectionResult[1];
 
+  React.useEffect(function() {
+    var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', height: '100%', background: '#1f2326', color: '#eaeaea', overflow: 'hidden', fontFamily: "'Open Sans', 'Inter', sans-serif" }}>
 
@@ -120,7 +127,7 @@ function PlexShell(props) {
         <div style={{ padding: '18px 22px 14px', fontWeight: 800, color: '#e5a00d', fontSize: 'calc(20px * ' + fontScale + ')', flexShrink: 0 }}>PLEX</div>
 
         <div style={{ overflowY: 'auto', flex: 1 }}>
-          <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#6c7177', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Library</div>
+          <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Library</div>
           {SIDEBAR_SECTIONS.map(function(s, i) {
             var isActive = activeSection === i;
             return (
@@ -160,7 +167,7 @@ function PlexShell(props) {
 
           {providers && providers.length > 0 && (
             <div>
-              <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#6c7177', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Providers</div>
+              <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Providers</div>
               {providers.map(function(p) {
                 return (
                   <div key={p.id} style={{ padding: '7px 22px', fontSize: 'calc(12px * ' + fontScale + ')', color: '#b2b9c1', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -203,7 +210,7 @@ function PlexShell(props) {
         <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, 8)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
 
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#6c7177', fontSize: 'calc(14px * ' + fontScale + ')' }}>
+          <div style={{ textAlign: 'center', padding: '60px', color: '#8b8f95', fontSize: 'calc(14px * ' + fontScale + ')' }}>
             No content matches your current filters.
           </div>
         )}

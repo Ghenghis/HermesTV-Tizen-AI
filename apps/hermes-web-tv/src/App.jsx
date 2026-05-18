@@ -840,21 +840,27 @@ function App() {
         </header>
 
         {/* Shell renderer — active shell layout OR default grid */}
-        {state.activeLayout && ['tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen', 'mom-mode', 'dave-power'].indexOf(state.activeLayout) !== -1 ? (
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <ShellRenderer
-              layout={state.activeLayout}
-              catalog={filteredCatalog}
-              profile={profile}
-              tier={state.tier}
-              providers={state.providers}
-              onItemSelect={handleItemClick}
-              contentFilter={state.contentFilter}
-              providerFilter={state.providerFilter}
-              qualityFilter={state.qualityFilter}
-            />
-          </div>
-        ) : (
+        {(function() {
+          var resolvedLayout = state.activeLayout || (profile.mom_mode ? 'mom-mode' : '');
+          var validShells = ['tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen', 'mom-mode', 'dave-power'];
+          if (resolvedLayout && validShells.indexOf(resolvedLayout) !== -1) {
+            return (
+              <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <ShellRenderer
+                  layout={resolvedLayout}
+                  catalog={filteredCatalog}
+                  profile={profile}
+                  tier={state.tier}
+                  providers={state.providers}
+                  onItemSelect={handleItemClick}
+                  contentFilter={state.contentFilter}
+                  providerFilter={state.providerFilter}
+                  qualityFilter={state.qualityFilter}
+                />
+              </div>
+            );
+          }
+          return (
           <React.Fragment>
             {/* Filter bar */}
             <FilterBar
@@ -890,7 +896,8 @@ function App() {
               />
             </main>
           </React.Fragment>
-        )}
+          );
+        })()}
 
         {/* Floating chatbot */}
         <FloatingChatbot profile={profile} online={state.online} onCommand={handleChatbotCommand} />

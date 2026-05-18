@@ -79,6 +79,13 @@ function MomModeShell(props) {
     return function() { clearInterval(interval); };
   }, []);
 
+  React.useEffect(function() {
+    var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   var activeType = MOM_TABS[activeTab].type;
   var tabItems = activeType === 'live'
     ? filtered.filter(function(i) { return i.type === 'live'; })
@@ -94,12 +101,12 @@ function MomModeShell(props) {
 
       {/* Greeting banner */}
       <div style={{ background: 'linear-gradient(135deg, #1e2a4a, #2a1a3e)', padding: '20px 28px', flexShrink: 0, borderBottom: '1px solid #2a2a4a' }}>
-        <div style={{ fontSize: 'calc(24px * ' + fontScale + ')', fontWeight: 700, color: '#f0e6ff', letterSpacing: '-0.01em' }}>
+        <h1 style={{ fontSize: 'calc(24px * ' + fontScale + ')', fontWeight: 700, color: '#f0e6ff', letterSpacing: '-0.01em', margin: 0 }}>
           {getGreeting()}, <span style={{ color: '#ff7eb3' }}>{displayName}</span>! 👋
-        </div>
-        <div style={{ fontSize: 'calc(14px * ' + fontScale + ')', color: '#c8b8e8', marginTop: '6px' }}>
+        </h1>
+        <h2 style={{ fontSize: 'calc(14px * ' + fontScale + ')', color: '#c8b8e8', marginTop: '6px', marginBottom: 0, fontWeight: 'normal' }}>
           What would you like to watch today?
-        </div>
+        </h2>
       </div>
 
       {/* Category tabs */}

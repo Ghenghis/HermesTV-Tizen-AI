@@ -114,6 +114,13 @@ function NetflixShell(props) {
   var movies = filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
   var fontScale = (profile && profile.font_scale) || 1;
 
+  React.useEffect(function() {
+    var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div style={{ background: '#141414', color: '#fff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
 

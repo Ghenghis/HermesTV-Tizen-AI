@@ -56,6 +56,13 @@ function TiviMateShell(props) {
   var activeIdx = activeIdxResult[0];
   var setActiveIdx = activeIdxResult[1];
 
+  React.useEffect(function() {
+    var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   var fontScale = (profile && profile.font_scale) || 1;
 
   return (
@@ -99,7 +106,7 @@ function TiviMateShell(props) {
                 onFocus={function(e) { e.currentTarget.style.borderLeft = '3px solid #ff7d3a'; e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(255,125,58,0.35)'; e.currentTarget.style.color = '#fff'; }}
                 onBlur={function(e) { e.currentTarget.style.borderLeft = isActive ? '3px solid #ff7d3a' : '3px solid transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.color = isActive ? '#fff' : '#8b95a5'; }}
               >
-                <span style={{ color: '#6b7484', fontSize: 'calc(11px * ' + fontScale + ')', width: '26px', fontWeight: 600 }}>{idx + 1}</span>
+                <span style={{ color: '#8c95a5', fontSize: 'calc(11px * ' + fontScale + ')', width: '26px', fontWeight: 600 }}>{idx + 1}</span>
                 <span style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#1d2330', display: 'grid', placeItems: 'center', fontSize: '14px', flexShrink: 0 }}>📺</span>
                 <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Channel ' + (idx + 1)}</span>
               </button>
@@ -111,7 +118,7 @@ function TiviMateShell(props) {
         <div style={{ borderTop: '1px solid #1b1f27', padding: '8px 0', flexShrink: 0 }}>
           {NAV_ITEMS.map(function(n) {
             return (
-              <div key={n.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', fontSize: 'calc(12px * ' + fontScale + ')', color: '#6b7484', cursor: 'pointer' }}>
+              <div key={n.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', fontSize: 'calc(12px * ' + fontScale + ')', color: '#8c95a5', cursor: 'pointer' }}>
                 <span>{n.icon}</span><span>{n.label}</span>
               </div>
             );
@@ -122,10 +129,10 @@ function TiviMateShell(props) {
       {/* Main EPG area */}
       <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', overflow: 'hidden' }}>
         {/* Time header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '200px repeat(5, 1fr)', background: '#13171f', borderBottom: '1px solid #1b1f27', padding: '10px 0', fontSize: 'calc(11px * ' + fontScale + ')', color: '#6b7484', fontWeight: 600, flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '200px repeat(5, 1fr)', background: '#13171f', borderBottom: '1px solid #1b1f27', padding: '10px 0', fontSize: 'calc(11px * ' + fontScale + ')', color: '#8c95a5', fontWeight: 600, flexShrink: 0 }}>
           <div style={{ padding: '0 12px' }}>Channel</div>
           {TIME_SLOTS.map(function(t, i) {
-            return <div key={t} style={{ padding: '0 12px', color: i === 0 ? '#ff7d3a' : '#6b7484' }}>{t}</div>;
+            return <div key={t} style={{ padding: '0 12px', color: i === 0 ? '#ff7d3a' : '#8c95a5' }}>{t}</div>;
           })}
         </div>
 
@@ -138,7 +145,7 @@ function TiviMateShell(props) {
             return (
               <div key={item.id || idx} style={{ display: 'grid', gridTemplateColumns: '200px repeat(5, 1fr)', borderBottom: '1px solid #161a22', height: '64px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 12px', background: '#10131a' }}>
-                  <span style={{ color: '#6b7484', fontSize: 'calc(11px * ' + fontScale + ')', width: '26px', fontWeight: 600 }}>{idx + 1}</span>
+                  <span style={{ color: '#8c95a5', fontSize: 'calc(11px * ' + fontScale + ')', width: '26px', fontWeight: 600 }}>{idx + 1}</span>
                   <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#1d2330', display: 'grid', placeItems: 'center', fontSize: '14px' }}>📺</div>
                   <span style={{ fontSize: 'calc(13px * ' + fontScale + ')', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
                 </div>
@@ -174,7 +181,7 @@ function TiviMateShell(props) {
                       <div style={{ fontSize: 'calc(12px * ' + fontScale + ')', fontWeight: 600, color: '#e6e9ef', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(prog && prog.title) || '—'}
                       </div>
-                      <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#6b7484', marginTop: '3px' }}>
+                      <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8c95a5', marginTop: '3px' }}>
                         {isLive ? '🔴 LIVE' : (prog && prog.genre) || ''}
                       </div>
                     </div>
@@ -184,7 +191,7 @@ function TiviMateShell(props) {
             );
           })}
           {channelList.length === 0 && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7484', fontSize: 'calc(14px * ' + fontScale + ')' }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#8c95a5', fontSize: 'calc(14px * ' + fontScale + ')' }}>
               No channels match your current filters.
             </div>
           )}
