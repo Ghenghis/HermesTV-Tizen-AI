@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const jellyfin = require('../lib/jellyfin');
+const { SEED_CATALOG } = require('../data/seedCatalog');
 const router = Router();
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
@@ -56,126 +57,13 @@ const ACTORS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Catalog items — providers array format.
-// Each provider entry: { provider_id, source_id, source_health }
-// Backward-compat: top-level `provider` string is preserved where it existed.
-// source_health mirrors catalog.mock.json provider_health shape.
-// ---------------------------------------------------------------------------
-const CATALOG_ITEMS = [
-  {
-    id: 'ch-001',
-    type: 'live',
-    title: 'ESPN',
-    // backward-compat legacy field
-    provider: 'apollo_group',
-    category: 'sports',
-    logo_url: 'https://hermestv.local/assets/logos/espn.png',
-    profile_access: ['dave_tv', 'mom_tv'],
-    providers: [
-      {
-        provider_id: 'apollo_group',
-        source_id: 'apl-live-espn',
-        source_health: { status: 'ok', latency_ms: 42, checked_utc: '2026-05-17T04:00:00Z' },
-      },
-      {
-        provider_id: 'xtremehd',
-        source_id: 'xhd-live-espn',
-        source_health: { status: 'ok', latency_ms: 58, checked_utc: '2026-05-17T04:02:00Z' },
-      },
-    ],
-    metadata: {
-      resolution: '1080p',
-      has_catchup: true,
-    },
-  },
-  {
-    id: 'ch-002',
-    type: 'live',
-    title: 'HGTV',
-    provider: 'apollo_group',
-    category: 'lifestyle',
-    logo_url: 'https://hermestv.local/assets/logos/hgtv.png',
-    profile_access: ['dave_tv', 'mom_tv'],
-    providers: [
-      {
-        provider_id: 'apollo_group',
-        source_id: 'apl-live-hgtv',
-        source_health: { status: 'ok', latency_ms: 38, checked_utc: '2026-05-17T04:00:00Z' },
-      },
-    ],
-    metadata: {
-      resolution: '1080p',
-      has_catchup: true,
-    },
-  },
-  {
-    id: 'ch-003',
-    type: 'live',
-    title: 'NFL RedZone',
-    provider: 'xtremehd',
-    category: 'sports',
-    logo_url: 'https://hermestv.local/assets/logos/nfl-redzone.png',
-    profile_access: ['dave_tv'],
-    providers: [
-      {
-        provider_id: 'xtremehd',
-        source_id: 'xhd-live-nfl-redzone',
-        source_health: { status: 'ok', latency_ms: 61, checked_utc: '2026-05-17T04:02:00Z' },
-      },
-    ],
-    metadata: {
-      resolution: '1080p',
-      has_catchup: false,
-    },
-  },
-  {
-    id: 'ch-004',
-    type: 'live',
-    title: 'Hallmark Channel',
-    provider: 'apollo_group',
-    category: 'entertainment',
-    logo_url: 'https://hermestv.local/assets/logos/hallmark.png',
-    profile_access: ['mom_tv'],
-    providers: [
-      {
-        provider_id: 'apollo_group',
-        source_id: 'apl-live-hallmark',
-        source_health: { status: 'ok', latency_ms: 35, checked_utc: '2026-05-17T04:00:00Z' },
-      },
-    ],
-    metadata: {
-      resolution: '1080p',
-      has_catchup: true,
-    },
-  },
-  {
-    id: 'vod-001',
-    type: 'vod',
-    title: 'Top Gun: Maverick',
-    provider: 'xtremehd',
-    category: 'movies',
-    logo_url: 'https://hermestv.local/assets/logos/top-gun-maverick.png',
-    profile_access: ['dave_tv', 'mom_tv'],
-    providers: [
-      {
-        provider_id: 'xtremehd',
-        source_id: 'xhd-vod-top-gun-maverick',
-        source_health: { status: 'ok', latency_ms: 55, checked_utc: '2026-05-17T04:02:00Z' },
-      },
-      {
-        provider_id: 'apollo_group',
-        source_id: 'apl-vod-top-gun-maverick',
-        source_health: { status: 'ok', latency_ms: 48, checked_utc: '2026-05-17T04:00:00Z' },
-      },
-    ],
-    metadata: {
-      resolution: '4K',
-      duration_min: 130,
-      year: 2022,
-    },
-    actors: ['actor-001'],
-  },
-];
+// Catalog items — populated from data/seedCatalog.js so every shell (Netflix,
+// TiviMate, Plex, Apple TV, Samsung, Mom Mode, Dave Power) renders a full
+// catalog (~135 live channels + VOD + series) when no real provider has
+// been wired yet. When the operator pastes Jellyfin / Apollo / xTremeHD
+// credentials the corresponding lib (lib/jellyfin.js, future Threadfin
+// client) replaces this seed at runtime.
+const CATALOG_ITEMS = SEED_CATALOG;
 
 // Resolution sort order for quality-aware sorting (higher index = higher quality)
 const RESOLUTION_ORDER = {
