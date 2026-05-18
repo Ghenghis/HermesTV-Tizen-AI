@@ -222,9 +222,6 @@ function ModelSelector(props) {
         <option value="UN55CU8000BXZA">UN55CU8000BXZA</option>
         <option value="custom">Custom</option>
       </select>
-      <span style={tierBadgeStyle}>
-        {tier === 'enhanced' ? 'ENHANCED' : 'DEGRADED'}
-      </span>
     </div>
   );
 }
