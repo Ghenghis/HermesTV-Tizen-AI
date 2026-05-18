@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermestv.local/schemas/layout.engine.schema.json",
+  "title": "HermesTV Layout Manifest",
+  "type": "object",
+  "required": ["id", "name", "cat", "description", "accent", "nav_style", "hero_style", "grid_style", "tier_required", "best_for", "tizen_safe", "mom_friendly", "dave_power"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "name": { "type": "string" },
+    "cat": { "type": "string", "enum": ["IPTV Players", "Streaming Services", "Smart TV Shells", "Special Modes"] },
+    "description": { "type": "string" },
+    "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "nav_style": { "type": "string", "enum": ["sidebar", "top-nav", "icon-rail", "none"] },
+    "hero_style": { "type": "string", "enum": ["epg-timebar", "cinematic-hero", "landscape-hero", "minimal-hero", "grid-header", "greeting-banner", "power-bar"] },
+    "grid_style": { "type": "string", "enum": ["channel-list", "card-rows", "tile-grid", "dense-grid", "large-grid", "portrait-grid", "landscape-grid"] },
+    "tier_required": { "type": "string", "enum": ["any", "enhanced"] },
+    "best_for": { "type": "array", "items": { "type": "string" } },
+    "tizen_safe": { "type": "boolean" },
+    "mom_friendly": { "type": "boolean" },
+    "dave_power": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

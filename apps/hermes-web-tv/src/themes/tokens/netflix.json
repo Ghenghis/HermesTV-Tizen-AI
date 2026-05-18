@@ -1,0 +1,15 @@
+{
+  "id": "netflix",
+  "name": "Netflix Dark",
+  "layout_id": "netflix",
+  "tokens": {
+    "--bg": "#141414",
+    "--surface": "#1a1a1a",
+    "--surface-raised": "#222222",
+    "--text": "#ffffff",
+    "--muted": "#a3a3a3",
+    "--accent": "#e50914",
+    "--border": "#333333",
+    "--font-scale": "1"
+  }
+}

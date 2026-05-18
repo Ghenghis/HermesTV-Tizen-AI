@@ -11,6 +11,9 @@ import FloatingChatbot from './components/FloatingChatbot.jsx';
 import QROnboarding from './components/QROnboarding.jsx';
 import MediaDetailPanel from './components/MediaDetailPanel.jsx';
 import StreamingQualityBar from './components/StreamingQualityBar.jsx';
+import ShellRenderer from './engine/ShellRenderer.jsx';
+import LayoutSwitcher from './components/LayoutSwitcher.jsx';
+import VoicePickerModal from './components/VoicePickerModal.jsx';
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -296,6 +299,9 @@ var INITIAL_STATE = {
   contentFilter: 'all',
   qualityFilter: 'all',
   activeLayout: '',
+  showLayoutSwitcher: false,
+  showVoicePicker: false,
+  activeVoiceId: '',
   // Selected item for detail panel
   selectedItem: null,
   selectedProviderId: null,
@@ -312,6 +318,17 @@ function App() {
       return Object.assign({}, prev, patch);
     });
   }
+
+  React.useEffect(function() {
+    function onCtrlL(e) {
+      if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
+      }
+    }
+    document.addEventListener('keydown', onCtrlL);
+    return function() { document.removeEventListener('keydown', onCtrlL); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
@@ -500,6 +517,13 @@ function App() {
       patchState({ providerFilter: 'all', contentFilter: 'all', qualityFilter: 'all' });
     }
     // show_detail and find_similar_actor: no state mutation needed (chatbot response text handles UX)
+  }
+
+  function handleLayoutChange(layoutId) {
+    patchState({ activeLayout: layoutId || '', showLayoutSwitcher: false });
+    if (layoutId) {
+      applyThemeByName(layoutId);
+    }
   }
 
   // ── Profile picker ──
@@ -762,42 +786,90 @@ function App() {
             >
               &#x2699;
             </button>
+
+            {/* Layout switcher button */}
+            <button
+              tabIndex={0}
+              onClick={function() { patchState({ showLayoutSwitcher: true }); }}
+              title="Change visual layout (Ctrl+L)"
+              style={{
+                padding: '0.35rem 0.75rem',
+                backgroundColor: 'var(--accent)',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#000',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+                letterSpacing: '0.03em',
+                flexShrink: 0,
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid #fff';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) {
+                e.currentTarget.style.outline = 'none';
+              }}
+            >
+              &#x1F3A8; Look
+            </button>
           </div>
         </header>
 
-        {/* Filter bar */}
-        <FilterBar
-          providerFilter={state.providerFilter}
-          contentFilter={state.contentFilter}
-          qualityFilter={state.qualityFilter}
-          onProviderChange={function(v) { patchState({ providerFilter: v }); }}
-          onContentChange={function(v) { patchState({ contentFilter: v }); }}
-          onQualityChange={function(v) { patchState({ qualityFilter: v }); }}
-        />
+        {/* Shell renderer — active shell layout OR default grid */}
+        {state.activeLayout && ['tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen', 'mom-mode', 'dave-power'].indexOf(state.activeLayout) !== -1 ? (
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <ShellRenderer
+              layout={state.activeLayout}
+              catalog={filteredCatalog}
+              profile={profile}
+              tier={state.tier}
+              providers={state.providers}
+              onItemSelect={handleItemClick}
+              contentFilter={state.contentFilter}
+              providerFilter={state.providerFilter}
+              qualityFilter={state.qualityFilter}
+            />
+          </div>
+        ) : (
+          <React.Fragment>
+            {/* Filter bar */}
+            <FilterBar
+              providerFilter={state.providerFilter}
+              contentFilter={state.contentFilter}
+              qualityFilter={state.qualityFilter}
+              onProviderChange={function(v) { patchState({ providerFilter: v }); }}
+              onContentChange={function(v) { patchState({ contentFilter: v }); }}
+              onQualityChange={function(v) { patchState({ qualityFilter: v }); }}
+            />
 
-        {/* Provider filter tabs */}
-        <ProviderFilter
-          activeTab={state.activeTab}
-          onTabChange={handleTabChange}
-        />
+            {/* Provider filter tabs */}
+            <ProviderFilter
+              activeTab={state.activeTab}
+              onTabChange={handleTabChange}
+            />
 
-        {/* Catalog grid — scrollable main content area */}
-        <main
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            backgroundColor: 'var(--bg)',
-          }}
-        >
-          <CatalogGrid
-            items={filteredCatalog}
-            activeTab={state.activeTab}
-            profile={profile}
-            tier={state.tier}
-            columns={state.activeTab === 'discovery' ? (state.tier === 'enhanced' ? 8 : 4) : (state.tier === 'enhanced' ? 5 : 3)}
-            onItemClick={handleItemClick}
-          />
-        </main>
+            {/* Catalog grid — scrollable main content area */}
+            <main
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                backgroundColor: 'var(--bg)',
+              }}
+            >
+              <CatalogGrid
+                items={filteredCatalog}
+                activeTab={state.activeTab}
+                profile={profile}
+                tier={state.tier}
+                columns={state.activeTab === 'discovery' ? (state.tier === 'enhanced' ? 8 : 4) : (state.tier === 'enhanced' ? 5 : 3)}
+                onItemClick={handleItemClick}
+              />
+            </main>
+          </React.Fragment>
+        )}
 
         {/* Floating chatbot */}
         <FloatingChatbot profile={profile} online={state.online} onCommand={handleChatbotCommand} />
@@ -922,6 +994,60 @@ function App() {
                 </div>
               </div>
 
+              {/* Change voice button */}
+              <button
+                tabIndex={0}
+                onClick={function() { patchState({ showSettings: false, showVoicePicker: true }); }}
+                style={{
+                  marginTop: '0.25rem',
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--accent)',
+                  borderRadius: '6px',
+                  color: 'var(--accent)',
+                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid var(--accent)';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.outline = 'none';
+                }}
+              >
+                &#x1F509; Change Voice
+              </button>
+
+              {/* Change layout button */}
+              <button
+                tabIndex={0}
+                onClick={function() { patchState({ showSettings: false, showLayoutSwitcher: true }); }}
+                style={{
+                  marginTop: '0.25rem',
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'var(--accent)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#000',
+                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid var(--accent)';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.outline = 'none';
+                }}
+              >
+                &#x1F3A8; Change Layout
+              </button>
+
               {/* Reset button */}
               <button
                 tabIndex={0}
@@ -950,6 +1076,24 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* Layout switcher modal */}
+        <LayoutSwitcher
+          isOpen={state.showLayoutSwitcher}
+          activeLayout={state.activeLayout}
+          tier={state.tier}
+          onSelect={handleLayoutChange}
+          onClose={function() { patchState({ showLayoutSwitcher: false }); }}
+        />
+
+        {/* Voice picker modal — Mom can switch Azure voices seamlessly */}
+        <VoicePickerModal
+          isOpen={state.showVoicePicker}
+          profileId={profile.profile_id || 'mom_tv'}
+          currentVoiceId={state.activeVoiceId}
+          onClose={function() { patchState({ showVoicePicker: false }); }}
+          onVoiceChange={function(voiceId) { patchState({ activeVoiceId: voiceId }); }}
+        />
 
       </LayoutShell>
     </ThemeProvider>

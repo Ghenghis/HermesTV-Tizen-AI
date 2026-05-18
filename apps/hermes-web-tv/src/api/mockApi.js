@@ -71,4 +71,34 @@ function validateCommand(payload) {
   });
 }
 
-export { getProfile, getProviders, getCatalog, getEpg, validateCommand };
+// ── Mock voice catalog (offline) ──────────────────────────────────────────────
+var MOCK_VOICE_CATALOG = [
+  { id: 'en-US-AriaNeural',  name: 'Aria (mock)',  gender: 'female', locale: 'en-US', tone: 'warm',     sample: 'Hi Sherri! Welcome back.' },
+  { id: 'en-US-JennyNeural', name: 'Jenny (mock)', gender: 'female', locale: 'en-US', tone: 'friendly', sample: 'Hello! Ready to find a show?' },
+  { id: 'en-US-GuyNeural',   name: 'Guy (mock)',   gender: 'male',   locale: 'en-US', tone: 'casual',   sample: 'Hey Dave, what are we watching?' },
+];
+
+function listVoices() {
+  return Promise.resolve({
+    voices: MOCK_VOICE_CATALOG,
+    count: MOCK_VOICE_CATALOG.length,
+    azure_configured: false,
+    profile_defaults: { mom_tv: 'en-US-AriaNeural', dave_tv: 'en-US-GuyNeural' },
+  });
+}
+
+function getProfileVoice(profileId) {
+  var defaults = { mom_tv: 'en-US-AriaNeural', dave_tv: 'en-US-GuyNeural' };
+  var vid = defaults[profileId] || 'en-US-AriaNeural';
+  return Promise.resolve({ profile_id: profileId, voice_id: vid, voice: MOCK_VOICE_CATALOG.find(function(v) { return v.id === vid; }) || null });
+}
+
+function setProfileVoice(profileId, voiceId) {
+  return Promise.resolve({ profile_id: profileId, voice_id: voiceId });
+}
+
+function speakStub(text, profileId, voiceId) {
+  return Promise.resolve({ played: false, status: 'mock_mode', message: 'Mock mode — speech disabled offline.' });
+}
+
+export { getProfile, getProviders, getCatalog, getEpg, validateCommand, listVoices, getProfileVoice, setProfileVoice, speakStub };

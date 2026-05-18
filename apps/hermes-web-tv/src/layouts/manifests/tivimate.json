@@ -1,0 +1,15 @@
+{
+  "id": "tivimate",
+  "name": "TiviMate",
+  "cat": "IPTV Players",
+  "description": "EPG guide with orange sidebar and channel grid",
+  "accent": "#ff7d3a",
+  "nav_style": "sidebar",
+  "hero_style": "epg-timebar",
+  "grid_style": "channel-list",
+  "tier_required": "any",
+  "best_for": ["live", "epg"],
+  "tizen_safe": true,
+  "mom_friendly": false,
+  "dave_power": false
+}

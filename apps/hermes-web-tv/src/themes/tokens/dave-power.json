@@ -1,0 +1,15 @@
+{
+  "id": "dave-power",
+  "name": "Dave Power Cyan",
+  "layout_id": "dave-power",
+  "tokens": {
+    "--bg": "#0a0e1a",
+    "--surface": "#0d1120",
+    "--surface-raised": "#131827",
+    "--text": "#e0e8f0",
+    "--muted": "#6b7a8d",
+    "--accent": "#00d4aa",
+    "--border": "#1a2030",
+    "--font-scale": "0.9"
+  }
+}

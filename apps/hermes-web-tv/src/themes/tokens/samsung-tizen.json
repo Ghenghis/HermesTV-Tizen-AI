@@ -1,0 +1,15 @@
+{
+  "id": "samsung-tizen",
+  "name": "Samsung Blue",
+  "layout_id": "samsung-tizen",
+  "tokens": {
+    "--bg": "#0d0d0d",
+    "--surface": "#111111",
+    "--surface-raised": "#1c1c1c",
+    "--text": "#ffffff",
+    "--muted": "#888888",
+    "--accent": "#1428a0",
+    "--border": "#222222",
+    "--font-scale": "1"
+  }
+}

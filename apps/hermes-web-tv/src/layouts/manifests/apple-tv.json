@@ -1,0 +1,15 @@
+{
+  "id": "apple-tv",
+  "name": "Apple TV",
+  "cat": "Streaming Services",
+  "description": "Minimal clean top-nav with large hero and card rows",
+  "accent": "#0071e3",
+  "nav_style": "top-nav",
+  "hero_style": "cinematic-hero",
+  "grid_style": "landscape-grid",
+  "tier_required": "any",
+  "best_for": ["movies", "series"],
+  "tizen_safe": true,
+  "mom_friendly": false,
+  "dave_power": false
+}

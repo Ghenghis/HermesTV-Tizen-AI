@@ -1,0 +1,15 @@
+{
+  "id": "dave-power",
+  "name": "Dave Power",
+  "cat": "Special Modes",
+  "description": "Dense compact grid with stats panel and all filters visible",
+  "accent": "#00d4aa",
+  "nav_style": "icon-rail",
+  "hero_style": "power-bar",
+  "grid_style": "dense-grid",
+  "tier_required": "any",
+  "best_for": ["movies", "series", "live"],
+  "tizen_safe": false,
+  "mom_friendly": false,
+  "dave_power": true
+}

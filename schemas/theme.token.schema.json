@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermestv.local/schemas/theme.token.schema.json",
+  "title": "HermesTV Theme Token Manifest",
+  "type": "object",
+  "required": ["id", "name", "layout_id", "tokens"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "layout_id": { "type": "string" },
+    "tokens": {
+      "type": "object",
+      "required": ["--bg", "--surface", "--surface-raised", "--text", "--muted", "--accent", "--border", "--font-scale"],
+      "properties": {
+        "--bg": { "type": "string" },
+        "--surface": { "type": "string" },
+        "--surface-raised": { "type": "string" },
+        "--text": { "type": "string" },
+        "--muted": { "type": "string" },
+        "--accent": { "type": "string" },
+        "--border": { "type": "string" },
+        "--font-scale": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}
