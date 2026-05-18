@@ -1076,6 +1076,41 @@ function App() {
                 &#x1F3A8; Change Layout
               </button>
 
+              {/* Switch profile button — Sherri ↔ Dave without going through the
+                  fatal-error screen. Clears the persisted profile_id and re-shows
+                  the picker so the next pick re-runs bootWithProfileId(). */}
+              <button
+                tabIndex={0}
+                onClick={function() {
+                  profileStore.clearActiveProfileId();
+                  patchState(Object.assign({}, INITIAL_STATE, {
+                    loading: false,
+                    showProfilePicker: true,
+                    showSettings: false,
+                  }));
+                }}
+                style={{
+                  marginTop: '0.25rem',
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--border, #30363d)',
+                  borderRadius: '6px',
+                  color: 'var(--text)',
+                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid var(--accent)';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.outline = 'none';
+                }}
+              >
+                &#x1F464; Switch Profile
+              </button>
+
               {/* Reset button */}
               <button
                 tabIndex={0}
