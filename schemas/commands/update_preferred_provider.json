@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:update_preferred_provider",
+  "title": "update_preferred_provider params",
+  "description": "Set the preferred IPTV provider for deduplication tie-breaking.",
+  "type": "object",
+  "required": ["provider_id"],
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "type": "string",
+      "enum": ["apollo", "xtremehd"],
+      "description": "Must be a known provider. Backend validates provider is enabled for this profile."
+    }
+  }
+}

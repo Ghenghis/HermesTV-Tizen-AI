@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:update_agent_name",
+  "title": "update_agent_name params",
+  "description": "Set the AI agent's display name (default: Hermes). User can rename their agent.",
+  "type": "object",
+  "required": ["agent_name"],
+  "additionalProperties": false,
+  "properties": {
+    "agent_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9 _'-]+$",
+      "description": "Agent name: letters, numbers, spaces, underscores, hyphens, apostrophes. Max 32 chars."
+    }
+  }
+}

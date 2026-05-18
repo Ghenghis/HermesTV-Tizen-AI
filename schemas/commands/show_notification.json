@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:show_notification",
+  "title": "show_notification params",
+  "description": "Display a transient notification overlay on the TV.",
+  "type": "object",
+  "required": ["title", "level"],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "level": {
+      "type": "string",
+      "enum": ["info", "success", "warning", "error"],
+      "description": "Notification severity. 'error' triggers audio feedback regardless of profile setting."
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 30000,
+      "default": 5000,
+      "description": "Auto-dismiss after this many ms. 0 = no auto-dismiss."
+    }
+  }
+}

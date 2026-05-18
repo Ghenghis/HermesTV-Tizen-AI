@@ -1,0 +1,86 @@
+# docker/workstation/compose.yml — HermesTV workstation heavy services
+# Project: hermestv-workstation
+# Run: docker compose -p hermestv-workstation up -d
+# Credentials: All secrets are in G:\private\ — never add keys to this file
+# GPU: Operator must add Ollama GPU config manually for their hardware
+
+services:
+  hermes-tv-api:
+    image: node:20-alpine
+    working_dir: /app
+    volumes: ['../../services/hermes-tv-api:/app']
+    command: npm start
+    ports: ['3001:3001']
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+    restart: unless-stopped
+    networks: [hermestv-internal]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    volumes:
+      - jellyfin-config:/config
+      - jellyfin-cache:/cache
+      # Media paths are mounted by operator — not hardcoded here
+    ports: ['8096:8096']
+    restart: unless-stopped
+    networks: [hermestv-internal]
+    environment:
+      JELLYFIN_PublishedServerUrl: http://hermestv.local:8096
+
+  tunarr:
+    image: ghcr.io/chrisbenincasa/tunarr:edge
+    volumes:
+      - tunarr-data:/home/node/app/.tunarr
+    ports: ['8000:8000']
+    restart: unless-stopped
+    networks: [hermestv-internal]
+    depends_on: [jellyfin]
+
+  dispatcharr:
+    image: ghcr.io/dispatcharr/dispatcharr:latest
+    volumes:
+      - dispatcharr-data:/app/data
+    ports: ['9191:9191']
+    restart: unless-stopped
+    networks: [hermestv-internal]
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    volumes:
+      - open-webui-data:/app/backend/data
+    ports: ['3000:8080']
+    restart: unless-stopped
+    networks: [hermestv-internal]
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_AUTH: 'true'
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    ports: ['11434:11434']
+    restart: unless-stopped
+    networks: [hermestv-internal]
+    # GPU passthrough: operator adds 'deploy.resources.reservations.devices' if GPU available
+
+networks:
+  hermestv-internal:
+    driver: bridge
+    internal: false
+
+volumes:
+  jellyfin-config:
+  jellyfin-cache:
+  tunarr-data:
+  dispatcharr-data:
+  open-webui-data:
+  ollama-data:

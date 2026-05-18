@@ -1,0 +1,16 @@
+{
+  "pack_id": "neon_grid_01",
+  "version": "1.0.0",
+  "name": "Neon Grid",
+  "intent": "Animated neon grid lines on near-black for synthwave cinema aesthetic",
+  "tier_required": "enhanced",
+  "type": "css_animation",
+  "static_frame_src": "assets/bg/neon_grid_01_static.jpg",
+  "motion_src": null,
+  "motion_type": "css_keyframes",
+  "css_animation_class": "bg-neon-grid",
+  "reduced_motion_fallback_pack_id": "static_dark_default",
+  "reduced_motion_fallback_src": "assets/bg/neon_grid_01_static.jpg",
+  "default_for_themes": ["cinema_neon"],
+  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+}

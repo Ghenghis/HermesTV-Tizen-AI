@@ -1,0 +1,43 @@
+{
+  "preset_id": "epg_strip",
+  "version": "1.0.0",
+  "name": "EPG Strip",
+  "intent": "Horizontal time-grid EPG with mini preview pane",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 2,
+    "rows": 1,
+    "card_shape": "rounded_16_9"
+  },
+  "grid_note": "columns: epg 65%, preview 35%",
+  "regions": ["top_bar", "epg_grid", "preview_pane"],
+  "focus_order": ["epg_grid", "preview_pane", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "low",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "focus_ring": "static_thick",
+    "animation_density": "low",
+    "time_window_hours": 2,
+    "visible_rows": 8
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "time_window_hours": 2.5,
+    "visible_rows": 6,
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "animation_density": "medium",
+    "focus_ring": "animated_glow",
+    "background_pack_default": "ambient_motion_01"
+  },
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

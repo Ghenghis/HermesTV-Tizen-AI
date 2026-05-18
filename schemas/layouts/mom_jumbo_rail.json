@@ -1,0 +1,39 @@
+{
+  "preset_id": "mom_jumbo_rail",
+  "version": "1.0.0",
+  "name": "Mom Jumbo Rail",
+  "intent": "Giant tiles on a single horizontal rail, senior-friendly large targets",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 1,
+    "rows": 1,
+    "card_shape": "rounded_jumbo"
+  },
+  "regions": ["top_bar", "main_rail", "now_playing_strip"],
+  "focus_order": ["main_rail", "now_playing_strip", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "low",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "tile_density": "jumbo",
+    "animation_density": "low"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "tile_density": "jumbo",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "animation_density": "standard",
+    "background_pack_default": "warm_ambient_01"
+  },
+  "default_for": ["mom_tv"],
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

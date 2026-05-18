@@ -1,0 +1,41 @@
+{
+  "preset_id": "recents_resume",
+  "version": "1.0.0",
+  "name": "Recents and Resume",
+  "intent": "Resume watching rail + recent activity rail for returning viewers",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 6,
+    "rows": 2,
+    "card_shape": "rounded_16_9"
+  },
+  "grid_note": "rows: resume + recent",
+  "regions": ["top_bar", "resume_rail", "recent_rail"],
+  "focus_order": ["resume_rail", "recent_rail", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "low",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "tile_density": "medium",
+    "focus_ring": "static_thick",
+    "animation_density": "low"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "tile_density": "large",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "animation_density": "medium",
+    "focus_ring": "animated_glow",
+    "background_pack_default": "ambient_motion_01"
+  },
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

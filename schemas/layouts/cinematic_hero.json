@@ -1,0 +1,43 @@
+{
+  "preset_id": "cinematic_hero",
+  "version": "1.0.0",
+  "name": "Cinematic Hero",
+  "intent": "Big rotating hero section + content rails below, showcase mode",
+  "tier_floor": "enhanced",
+  "tier_floor_note": "baseline shows static hero",
+  "grid": {
+    "columns": 4,
+    "rows": 3,
+    "card_shape": "rounded_16_9"
+  },
+  "grid_note": "rows: 1 hero full-width + 2 rails",
+  "regions": ["hero_banner", "content_rails"],
+  "focus_order": ["hero_banner", "content_rails"],
+  "safe_area_pct": 5,
+  "animation_density_default": "low",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "hero_mode": "static",
+    "focus_ring": "static_thick",
+    "animation_density": "low"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "hero_mode": "static",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "hero_mode": "rotating_with_preview",
+    "animation_density": "medium_high",
+    "focus_ring": "animated_glow",
+    "background_pack_default": "ambient_motion_01"
+  },
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

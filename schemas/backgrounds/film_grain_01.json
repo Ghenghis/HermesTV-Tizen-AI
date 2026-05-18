@@ -1,0 +1,17 @@
+{
+  "pack_id": "film_grain_01",
+  "version": "1.0.0",
+  "name": "Film Grain",
+  "intent": "Subtle film grain overlay on deep red-black for a theatrical texture",
+  "tier_required": "enhanced",
+  "type": "subtle_grain_overlay",
+  "base_bg": "#110005",
+  "grain_opacity": 0.12,
+  "static_frame_src": "assets/bg/film_grain_01_static.jpg",
+  "motion_src": "assets/bg/film_grain_01_overlay.mp4",
+  "motion_type": "overlay_loop",
+  "reduced_motion_fallback_pack_id": "static_dark_default",
+  "reduced_motion_fallback_src": "assets/bg/film_grain_01_static.jpg",
+  "default_for_themes": ["cinema_velvet"],
+  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+}

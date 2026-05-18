@@ -1,0 +1,90 @@
+# docker/vps/compose.yml — HermesTV VPS control plane services
+# Project: hermestv-vps
+# Run: docker compose -p hermestv-vps up -d
+# VPS role: Postgres, Redis, Caddy (TLS termination), hermes-tv-api (VPS instance)
+# VPS does NOT run: Jellyfin, Tunarr, Dispatcharr, Ollama, Open WebUI
+# All AI and media stay on the workstation
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    environment:
+      POSTGRES_DB: hermestv
+      POSTGRES_USER: hermestv
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    secrets: [pg_password]
+    restart: unless-stopped
+    networks: [hermestv-vps-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermestv"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    restart: unless-stopped
+    networks: [hermestv-vps-internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  hermes-tv-api:
+    image: node:20-alpine
+    working_dir: /app
+    volumes: ['./hermes-tv-api:/app:ro']
+    command: node src/index.js
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+      # Credentials injected at runtime — never in image or compose file
+    restart: unless-stopped
+    networks: [hermestv-vps-internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2-alpine
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - '80:80'
+      - '443:443'
+    restart: unless-stopped
+    networks: [hermestv-vps-internal, hermestv-vps-external]
+    depends_on:
+      hermes-tv-api: { condition: service_healthy }
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password.txt
+
+networks:
+  hermestv-vps-internal:
+    driver: bridge
+    internal: true
+  hermestv-vps-external:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

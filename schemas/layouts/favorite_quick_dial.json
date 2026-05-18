@@ -1,0 +1,40 @@
+{
+  "preset_id": "favorite_quick_dial",
+  "version": "1.0.0",
+  "name": "Favorite Quick Dial",
+  "intent": "12 oversized favorite tiles for one-tap access",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 4,
+    "rows": 3,
+    "card_shape": "rounded_square"
+  },
+  "regions": ["top_bar", "quick_dial_grid"],
+  "focus_order": ["quick_dial_grid", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "low",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "tile_density": "jumbo",
+    "focus_ring": "static_thick",
+    "animation_density": "low"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "tile_density": "jumbo",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "animation_density": "medium",
+    "focus_ring": "animated_glow",
+    "background_pack_default": "ambient_motion_01"
+  },
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

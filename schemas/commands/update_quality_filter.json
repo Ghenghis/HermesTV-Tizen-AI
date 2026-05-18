@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:update_quality_filter",
+  "title": "update_quality_filter params",
+  "description": "Set minimum quality thresholds for catalog display.",
+  "type": "object",
+  "additionalProperties": false,
+  "minProperties": 1,
+  "properties": {
+    "min_resolution": {
+      "type": "string",
+      "enum": ["480p", "720p", "1080p", "1440p", "4K", "unknown"],
+      "description": "Hide catalog items below this resolution. 'unknown' means no filter."
+    },
+    "min_bitrate_bucket": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "ultra"],
+      "description": "Hide items below this bitrate bucket."
+    },
+    "hide_possible_upscale": {
+      "type": "boolean",
+      "description": "If true, hide items flagged possible_upscale=true."
+    },
+    "content_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["live", "movie", "series"]
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Restrict catalog to these content types."
+    }
+  }
+}

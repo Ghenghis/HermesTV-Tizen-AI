@@ -1,0 +1,9 @@
+hermestv.local {
+    reverse_proxy hermes-tv-api:3001
+    tls internal
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+    }
+}

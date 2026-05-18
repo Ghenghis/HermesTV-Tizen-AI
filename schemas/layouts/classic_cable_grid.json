@@ -1,0 +1,41 @@
+{
+  "preset_id": "classic_cable_grid",
+  "version": "1.0.0",
+  "name": "Classic Cable Grid",
+  "intent": "Familiar 4-up live channel grid for IPTV browsing",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 4,
+    "rows": 3,
+    "card_shape": "rounded_16_9"
+  },
+  "regions": ["top_bar", "side_nav", "main_grid", "now_playing_strip"],
+  "focus_order": ["side_nav", "main_grid", "now_playing_strip", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "low",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "tile_density": "medium",
+    "focus_ring": "static_thick",
+    "animation_density": "low"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "tile_density": "large",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "animation_density": "medium",
+    "focus_ring": "animated_glow",
+    "background_pack_default": "ambient_motion_01"
+  },
+  "default_for": ["dave_tv"],
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "pack_id": "static_gradient_blue",
+  "version": "1.0.0",
+  "name": "Deep Space Gradient",
+  "intent": "Radial gradient from near-black to deep navy for a space-like depth",
+  "tier_required": "baseline",
+  "type": "static_gradient",
+  "direction": "radial",
+  "colors": ["#0B0D10", "#0D1A2E"],
+  "static_frame_src": "assets/bg/static_gradient_blue_static.jpg",
+  "motion_src": null,
+  "motion_type": null,
+  "reduced_motion_fallback_src": "assets/bg/static_gradient_blue_static.jpg",
+  "default_for_themes": ["deep_ocean", "cosmic_indigo"],
+  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+}

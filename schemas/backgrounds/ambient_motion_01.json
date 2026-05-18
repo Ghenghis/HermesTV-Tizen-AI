@@ -1,0 +1,16 @@
+{
+  "pack_id": "ambient_motion_01",
+  "version": "1.0.0",
+  "name": "Ambient Motion 1",
+  "intent": "Slow-fading dark ambient animation for enhanced-tier devices",
+  "tier_required": "enhanced",
+  "type": "slow_fade",
+  "static_frame_src": "assets/bg/ambient_motion_01_static.jpg",
+  "motion_src": "assets/bg/ambient_motion_01.mp4",
+  "motion_type": "video_loop",
+  "motion_cycle_ms": 8000,
+  "reduced_motion_fallback_pack_id": "static_dark_default",
+  "reduced_motion_fallback_src": "assets/bg/ambient_motion_01_static.jpg",
+  "default_for_themes": [],
+  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+}

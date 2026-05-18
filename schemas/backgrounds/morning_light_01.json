@@ -1,0 +1,16 @@
+{
+  "pack_id": "morning_light_01",
+  "version": "1.0.0",
+  "name": "Morning Light",
+  "intent": "Linear gradient from warm off-white to soft grey for daytime light themes",
+  "tier_required": "baseline",
+  "type": "static_gradient",
+  "direction": "linear",
+  "colors": ["#F9F6F0", "#E8E0D5"],
+  "static_frame_src": "assets/bg/morning_light_01_static.jpg",
+  "motion_src": null,
+  "motion_type": null,
+  "reduced_motion_fallback_src": "assets/bg/morning_light_01_static.jpg",
+  "default_for_themes": ["morning_paper", "kitchen_window", "sunday_silver", "clinic_clear", "hc_light"],
+  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+}

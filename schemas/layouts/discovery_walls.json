@@ -1,0 +1,49 @@
+{
+  "preset_id": "discovery_walls",
+  "version": "1.0.0",
+  "name": "Discovery Walls",
+  "intent": "Dense poster wall with filters for VOD/series browsing",
+  "tier_floor": "enhanced",
+  "tier_floor_note": "baseline allowed at 4-wide grid",
+  "grid": {
+    "columns": 6,
+    "rows": 4,
+    "card_shape": "poster_2_3"
+  },
+  "grid_baseline_fallback": {
+    "columns": 4,
+    "rows": 4,
+    "card_shape": "poster_2_3"
+  },
+  "regions": ["top_bar", "filter_bar", "poster_wall"],
+  "focus_order": ["filter_bar", "poster_wall", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "low",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "columns": 4,
+    "tile_density": "medium",
+    "focus_ring": "static_thick",
+    "animation_density": "low"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "columns": 3,
+    "tile_density": "large",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "columns": 6,
+    "animation_density": "medium",
+    "focus_ring": "animated_glow",
+    "background_pack_default": "ambient_motion_01"
+  },
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "theme_id": "cosmic_indigo",
+  "version": "1.0.0",
+  "name": "Cosmic Indigo",
+  "family": "dark",
+  "intent": "Deep indigo background with cyan accent evoking outer space",
+  "tokens": {
+    "bg_0": "#0A0A1F",
+    "bg_1": "#0E0E2A",
+    "bg_2": "#141435",
+    "surface_0": "#181840",
+    "surface_1": "#1E1E4C",
+    "text_primary": "#EAF0FF",
+    "text_secondary": "#9AAACE",
+    "text_disabled": "#4A5080",
+    "accent": "#00E5FF",
+    "accent_hover": "#18EBFF",
+    "accent_pressed": "#00B8D4",
+    "focus_ring": "#FFD86B",
+    "focus_ring_pressed": "#FFB300",
+    "ok": "#3EC97A",
+    "warn": "#F5A524",
+    "danger": "#FF5A5A",
+    "badge_quality_4k": "#9F7CFF",
+    "badge_quality_1080": "#00E5FF",
+    "badge_quality_720": "#9CB0C9",
+    "badge_quality_low": "#4A5080",
+    "badge_provider": "#3EC97A",
+    "shadow_strong": "rgba(0,0,0,0.65)"
+  },
+  "typography": {
+    "font_family_primary": "Inter, Samsung One, system-ui",
+    "font_family_display": "Inter, Samsung One, system-ui",
+    "scale_base_px": 22,
+    "scale_step": 1.125
+  },
+  "focus_ring": {
+    "style": "static_thick",
+    "thickness_px": 4,
+    "glow_enhanced_only": true
+  },
+  "high_contrast_partner": "hc_dark",
+  "mom_mode_partner": "mom_calm",
+  "default_background_pack": "static_gradient_blue",
+  "proof_required": ["contrast_audit", "screenshot_per_layout", "focus_ring_visibility"]
+}

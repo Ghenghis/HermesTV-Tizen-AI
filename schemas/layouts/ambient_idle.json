@@ -1,0 +1,41 @@
+{
+  "preset_id": "ambient_idle",
+  "version": "1.0.0",
+  "name": "Ambient Idle",
+  "intent": "Screensaver/idle with rotating quiet preview and clock",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 1,
+    "rows": 1,
+    "card_shape": "fullbleed"
+  },
+  "regions": ["ambient_canvas", "clock_overlay", "mini_rail"],
+  "focus_order": ["mini_rail", "clock_overlay"],
+  "safe_area_pct": 5,
+  "animation_density_default": "off",
+  "dave_variant": {
+    "font_scale": 1.0,
+    "background_mode": "static_gradient",
+    "clock_visible": true,
+    "animation_density": "off"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "background_mode": "static_gradient",
+    "clock_visible": true,
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "enhanced_overrides": {
+    "background_mode": "slow_fade_cinematic",
+    "animation_density": "low",
+    "background_pack_default": "ambient_motion_01"
+  },
+  "proof_required": [
+    "screenshot_dave",
+    "screenshot_mom",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

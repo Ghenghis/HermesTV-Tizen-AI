@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:update_display_name",
+  "title": "update_display_name params",
+  "description": "Set the user's display name shown in greetings. Does not change profile_id.",
+  "type": "object",
+  "required": ["display_name"],
+  "additionalProperties": false,
+  "properties": {
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9 _'-]+$"
+    }
+  }
+}

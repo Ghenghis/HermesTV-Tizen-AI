@@ -1,0 +1,46 @@
+/* HermesTV — TV-safe base styles */
+@import 'layout.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg-0, #0B0D10); color: var(--text-primary, #F2F4F7); }
+body { font-family: 'Samsung One', 'Malgun Gothic', system-ui, sans-serif; font-size: calc(22px * var(--font-scale, 1)); }
+
+/* TV overscan safe area (5%) */
+#app-root { padding: 5% 5%; min-height: 100vh; }
+
+/* Focus ring */
+.focus-active { outline: 4px solid var(--focus-ring, #FFD86B); outline-offset: 2px; }
+body.reduced-motion * { animation: none !important; transition: none !important; }
+
+/* EPG color vars */
+:root {
+  --epg-past-bg: #1A1A2E; --epg-past-text: #666680;
+  --epg-current-bg: #0F3460; --epg-current-text: #E0E0FF;
+  --epg-future-bg: #16213E; --epg-future-text: #C0C0D8;
+  --epg-focus-bg: #533483; --epg-focus-text: #FFFFFF;
+  --epg-now-hairline: #E53935;
+}
+
+/* Quality badge styles */
+.quality-badge { display: inline-flex; align-items: center; gap: 4px; font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.quality-badge--4k { background: #9F7CFF; color: #fff; }
+.quality-badge--1440p { background: #7C66EE; color: #fff; }
+.quality-badge--1080p { background: #5AA1FF; color: #fff; }
+.quality-badge--720p { background: #9CB0C9; color: #111; }
+.quality-badge--480p { background: #6B7280; color: #fff; }
+.quality-badge--hdr { background: #FFB300; color: #111; margin-left: 4px; }
+.quality-badge--upscale-warn { color: #F5A524; margin-left: 2px; }
+
+/* Bitrate dot */
+.bitrate-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.bitrate-dot--low { background: #6B7280; }
+.bitrate-dot--medium { background: #F5A524; }
+.bitrate-dot--high { background: #3EC97A; }
+.bitrate-dot--ultra { background: #9F7CFF; }
+
+/* Overlay backdrop */
+.overlay-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; }
+
+/* Boot splash */
+.boot-splash { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 16px; }
+.boot-splash p { margin: 0; font-size: calc(24px * var(--font-scale, 1)); color: var(--text-primary, #F2F4F7); }

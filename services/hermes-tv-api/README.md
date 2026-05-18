@@ -1,6 +1,8 @@
-# services/hermes-tv-api
+# hermes-tv-api
 
-HermesTV backend API — the brain of the system.
+HermesTV backend API — the brain of the household IPTV experience.
+
+Holds all credentials and provider secrets, runs AI routing, processes IPTV catalog and EPG data, and returns only TV-safe data to Tizen TV apps. TVs never receive credentials, stream tokens, or raw provider URLs.
 
 ## Role
 
@@ -19,28 +21,66 @@ Responsibilities:
 - QR pairing endpoint (credential onboarding)
 - Update manifest endpoint
 
+## Running locally
+
+```bash
+cd services/hermes-tv-api
+npm install
+npm run dev       # node --watch (auto-restart on file change)
+# or
+npm start         # plain node
+```
+
+Server listens on `PORT` env var, defaulting to **3001**.
+
+Copy `.env.example` to `.env` and fill in paths (never credentials).
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness check — returns service name, version, timestamp |
+| GET | `/api/profile/:id` | TV-safe profile for `dave_tv` or `mom_tv` |
+| PATCH | `/api/profile/:id` | Partial profile update (in-memory; resets on restart) |
+| GET | `/api/providers` | TV-safe provider summaries (no credentials) |
+| GET | `/api/catalog` | TV-safe catalog items; `?profile_id=` to filter |
+| GET | `/api/epg/:channelId` | EPG stub (pending B4 phase) |
+| POST | `/api/commands` | Validated command envelope dispatch |
+| GET | `/api/versions/manifest` | Schema and Tizen compatibility manifest |
+| GET | `/setup/provider` | QR-based provider onboarding HTML page |
+| POST | `/setup/provider/submit` | Provider save (501 — pending B4 phase) |
+
+## Security
+
+- **Credentials never leave this service.** All secrets live in `G:\private\` (configured via `HERMESTV_VAULT_PATH`). No credential fields are included in any API response.
+- CORS is restricted to `http://hermestv.local` and `http://localhost:5173` (dev only).
+- Request bodies are never logged — they may contain credentials from setup flows.
+- Mom Mode (`mom_tv`) enforces a `font_scale >= 1.25` floor on all update paths.
+- `mom_tv` performance and quality caps are never applied — only `dave_tv` carries baseline caps.
+
 ## Credential rules
 
 - Provider credentials are NEVER returned to the TV app
 - Credentials live in `G:\private\` and are loaded at startup via env vars
 - The API returns only catalog-safe data (provider IDs, display labels, quality badges, EPG)
 
-## Target
+## Profiles
 
-- Python (FastAPI) or Node.js (Express/Fastify) — TBD at B2 kickoff
-- Docker container: `ghcr.io/ghenghis/hermestv-api:latest`
-- Runs on Windows workstation primarily; thin gateway instance may run on Hostinger VPS
+| Profile | Display name | TV model | Tier |
+|---------|-------------|----------|------|
+| `dave_tv` | Dave | UN55CU8000BXZA | baseline |
+| `mom_tv` | Sherri | QN85Q7FAAFXZA | enhanced |
 
-## Key endpoints (planned)
+## AI routing
 
-- `GET /health` — liveness probe
-- `GET /api/profile/:id` — profile state (dave_tv / mom_tv)
-- `GET /api/providers` — TV-safe provider list
-- `GET /api/catalog` — unified catalog
-- `GET /api/epg/:channel_id` — EPG data
-- `POST /api/commands` — safe JSON UI command ingestion
-- `GET /setup/provider` — QR pairing page (Tailscale only)
-- `GET /api/versions/manifest` — update manifest
+| Model | Use case |
+|-------|----------|
+| MiniMax Highspeed 2.7 | Standard queries |
+| DeepSeek V4 | Complex reasoning |
+| SiliconFlow uncensored | Auto-switch for sensitive queries |
+| Ollama / LM Studio | Local fallback |
+
+TTS: **Azure TTS only** (never Bixby AI or any Samsung AI output path).
 
 ## See also
 

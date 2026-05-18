@@ -1,0 +1,15 @@
+{
+  "pack_id": "static_warm_dark",
+  "version": "1.0.0",
+  "name": "Warm Dark",
+  "intent": "Solid warm dark color for cozy evening viewing on baseline devices",
+  "tier_required": "baseline",
+  "type": "solid_color",
+  "color": "#120E0A",
+  "static_frame_src": null,
+  "motion_src": null,
+  "motion_type": null,
+  "reduced_motion_fallback_src": null,
+  "default_for_themes": ["obsidian_warm", "ember_charcoal"],
+  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+}

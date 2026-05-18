@@ -1,0 +1,46 @@
+{
+  "theme_id": "royal_violet",
+  "version": "1.0.0",
+  "name": "Royal Violet",
+  "family": "dark",
+  "intent": "Deep purple background with lavender accent for regal atmosphere",
+  "tokens": {
+    "bg_0": "#0D0A1A",
+    "bg_1": "#130F22",
+    "bg_2": "#1A152E",
+    "surface_0": "#1F1A38",
+    "surface_1": "#261F44",
+    "text_primary": "#EEE8F8",
+    "text_secondary": "#B8A8D4",
+    "text_disabled": "#665880",
+    "accent": "#AB47BC",
+    "accent_hover": "#BA68C8",
+    "accent_pressed": "#8E24AA",
+    "focus_ring": "#FFD86B",
+    "focus_ring_pressed": "#FFB300",
+    "ok": "#3EC97A",
+    "warn": "#F5A524",
+    "danger": "#FF5A5A",
+    "badge_quality_4k": "#AB47BC",
+    "badge_quality_1080": "#7C4DFF",
+    "badge_quality_720": "#9CB0C9",
+    "badge_quality_low": "#665880",
+    "badge_provider": "#3EC97A",
+    "shadow_strong": "rgba(0,0,0,0.60)"
+  },
+  "typography": {
+    "font_family_primary": "Inter, Samsung One, system-ui",
+    "font_family_display": "Inter, Samsung One, system-ui",
+    "scale_base_px": 22,
+    "scale_step": 1.125
+  },
+  "focus_ring": {
+    "style": "static_thick",
+    "thickness_px": 4,
+    "glow_enhanced_only": true
+  },
+  "high_contrast_partner": "hc_dark",
+  "mom_mode_partner": "mom_calm",
+  "default_background_pack": "static_dark_default",
+  "proof_required": ["contrast_audit", "screenshot_per_layout", "focus_ring_visibility"]
+}

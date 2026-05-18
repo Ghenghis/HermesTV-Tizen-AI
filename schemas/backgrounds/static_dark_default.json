@@ -1,0 +1,15 @@
+{
+  "pack_id": "static_dark_default",
+  "version": "1.0.0",
+  "name": "Dark Void",
+  "intent": "Pure solid dark color for minimal distraction on baseline devices",
+  "tier_required": "baseline",
+  "type": "solid_color",
+  "color": "#0B0D10",
+  "static_frame_src": null,
+  "motion_src": null,
+  "motion_type": null,
+  "reduced_motion_fallback_src": null,
+  "default_for_themes": ["midnight_steel"],
+  "proof_required": ["screenshot_baseline", "screenshot_enhanced"]
+}
