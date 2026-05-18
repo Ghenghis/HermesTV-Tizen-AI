@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>HermesTV API Contract Matrix</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; margin: 1.5rem; line-height: 1.45; max-width: 1600px; }
+  h1, h2 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 0.3em; }
+  h1 { margin-top: 0; }
+  h3 { color: #79c0ff; margin-top: 1.6em; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.85rem; }
+  th, td { border: 1px solid #30363d; padding: 6px 10px; vertical-align: top; }
+  th { background: #161b22; text-align: left; position: sticky; top: 0; }
+  code { background: #161b22; padding: 1px 5px; border-radius: 3px; font-size: 0.85em; color: #79c0ff; font-family: 'Menlo', 'Consolas', monospace; }
+  pre { background: #161b22; padding: 8px 10px; border-radius: 4px; overflow-x: auto; font-size: 0.78rem; margin: 0; }
+  .method { font-weight: 700; padding: 2px 8px; border-radius: 3px; font-size: 0.75em; display: inline-block; min-width: 48px; text-align: center; }
+  .GET { background: #1f6feb; color: #fff; }
+  .POST { background: #56d364; color: #000; }
+  .PATCH { background: #e3b341; color: #000; }
+  .DELETE { background: #f85149; color: #fff; }
+  .ok { color: #56d364; font-weight: 600; }
+  .gap { color: #e3b341; font-weight: 600; }
+  .missing { color: #f85149; font-weight: 600; }
+  details { background: #161b22; padding: 0.5em 1em; margin: 0.5em 0; border-radius: 6px; border: 1px solid #30363d; }
+  summary { cursor: pointer; font-weight: 600; color: #79c0ff; }
+  p { color: #c9d1d9; }
+  ul li { margin: 0.2em 0; }
+  .footnote { color: #8b949e; font-size: 0.85em; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>HermesTV API Contract Matrix</h1>
+<p>Generated <strong>2026-05-18</strong> from <code>services/hermes-tv-api/src/routes/</code>. Each row is one endpoint with the frontend file(s) that consume it. <span class="missing">no caller</span> means the endpoint is unused by any frontend and should either be wired or removed. <strong>credentialGuard middleware</strong> is mounted globally in <code>src/index.js</code> and wraps <code>res.json</code> on every route — so the column below reads "global" for every endpoint.</p>
+
+<h2>Summary</h2>
+<table>
+  <tr><th>Stat</th><th>Count</th></tr>
+  <tr><td>Route files scanned</td><td>17 (note: no <code>actors.js</code> — <code>GET /api/actors</code> lives inside <code>catalog.js</code>)</td></tr>
+  <tr><td>Total endpoints declared</td><td>26</td></tr>
+  <tr><td>Endpoints with at least one frontend caller (web or Tizen)</td><td>15</td></tr>
+  <tr><td>Endpoints with NO caller (dead or operator-only)</td><td>11</td></tr>
+  <tr><td>Endpoints serving hardcoded / mock data</td><td>17</td></tr>
+  <tr><td>Endpoints guarded by global credentialGuard middleware</td><td>26 / 26</td></tr>
+</table>
+
+<h2>Endpoint matrix</h2>
+<table>
+<tr>
+  <th>Method</th>
+  <th>Path</th>
+  <th>Source file</th>
+  <th>Body / query / params</th>
+  <th>Response shape</th>
+  <th>Frontend caller</th>
+  <th>Notes</th>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/health</code></td>
+  <td><code>routes/health.js</code></td>
+  <td>none</td>
+  <td><code>{ status, service, version, ts }</code><br>200 only.</td>
+  <td><code>api/hermesApi.js</code> <code>isReachable()</code></td>
+  <td>Hard-coded version <code>0.1.0</code>. Mounted at <code>/health</code> (not <code>/api/health</code>). Tizen native <code>core/api.js</code> calls <code>/api/health</code> — drift.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/profiles</code></td>
+  <td><code>routes/profiles.js</code></td>
+  <td>none</td>
+  <td><code>{ profiles: [...], total }</code></td>
+  <td class="missing">no caller</td>
+  <td>Profile list endpoint is unused. Web fetches single profile by id.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/profile/:id</code></td>
+  <td><code>routes/profiles.js</code></td>
+  <td>params: <code>id</code> ∈ {dave_tv, mom_tv}</td>
+  <td>200 full profile object; 404 <code>{ error: "not_found", message }</code>.</td>
+  <td><code>api/hermesApi.js</code> <code>getProfile()</code>; Tizen <code>core/api.js</code> <code>getProfile()</code></td>
+  <td>In-memory store. Resets on restart.</td>
+</tr>
+
+<tr>
+  <td><span class="method PATCH">PATCH</span></td>
+  <td><code>/api/profile/:id</code></td>
+  <td><code>routes/profiles.js</code></td>
+  <td>JSON body, partial profile. Mom-mode <code>font_scale</code> floor 1.25 enforced.</td>
+  <td>200 merged profile; 400 <code>{ error: "validation_failed" | "mom_mode_floor_violation" }</code>; 404.</td>
+  <td class="missing">no caller (web)</td>
+  <td>Tizen <code>updateProfile()</code> POSTs to <code>/api/profile/:id/update</code> which does not exist — drift.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/providers</code></td>
+  <td><code>routes/providers.js</code></td>
+  <td>none</td>
+  <td><code>{ providers: [{ provider_id, display_name, health, capabilities, connection_slots }] }</code></td>
+  <td><code>api/hermesApi.js</code> <code>getProviders()</code></td>
+  <td>Hardcoded list (apollo, xtremehd). Provider ids here use <code>apollo</code> (no suffix) — drift vs catalog.js which uses <code>apollo_group</code>.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/actors</code></td>
+  <td><code>routes/catalog.js</code> (no separate <code>actors.js</code>)</td>
+  <td>none</td>
+  <td><code>{ actors: [{ actor_id, name, photo_url }], total }</code></td>
+  <td class="missing">no caller</td>
+  <td>5 hardcoded actors. Mentioned in spec but file <code>routes/actors.js</code> does not exist.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/catalog</code></td>
+  <td><code>routes/catalog.js</code></td>
+  <td>query: <code>profile_id?</code> ∈ {dave_tv, mom_tv}; <code>provider_id?</code> ∈ {apollo_group, xtremehd, iptv-org, jellyfin, all}</td>
+  <td>200 <code>{ catalog: [...], total, _meta: { sorted_for_profile, quality_preference, provider_filter, source } }</code>; 400 <code>{ error: "validation_failed", message }</code>. <strong>Header:</strong> <code>X-Catalog-Source</code>.</td>
+  <td><code>api/hermesApi.js</code> <code>getCatalog()</code> → reads <code>X-Catalog-Source</code> header into <code>body._source_header</code> → <code>App.jsx</code> state <code>catalogSource</code></td>
+  <td>Resolves: Jellyfin → mock-fallback / mock-no-jellyfin → merged-with-iptv-org. Mom_tv: 4K/HDR sort. Filters skipped for jellyfin source.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/channels</code></td>
+  <td><code>routes/channels.js</code> (mounted at <code>/api/channels</code>)</td>
+  <td>query: <code>profile_id</code> (required) ∈ {dave_tv, mom_tv}</td>
+  <td>200 <code>{ channels: [...], _note }</code>; 400 <code>{ error }</code> when missing/invalid profile_id.</td>
+  <td>Tizen <code>core/api.js</code> <code>getChannels()</code></td>
+  <td>Tizen native call passes no <code>profile_id</code> — will 400. Web does not call this; web uses <code>/api/catalog</code> exclusively.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/channels/:channel_id</code></td>
+  <td><code>routes/channels.js</code></td>
+  <td>params: <code>channel_id</code></td>
+  <td>200 single channel object; 404 <code>{ error, channel_id }</code>.</td>
+  <td class="missing">no caller</td>
+  <td>Detail lookup unused.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/epg/:channelId</code></td>
+  <td><code>routes/epg.js</code></td>
+  <td>params: <code>channelId</code></td>
+  <td>200 stub <code>{ channel_id, status: "not_implemented", programs: [], message }</code>.</td>
+  <td><code>api/hermesApi.js</code> <code>getEpg()</code></td>
+  <td>B4-phase stub. Always returns empty programs.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/epg/grid</code></td>
+  <td><code>routes/epgGrid.js</code></td>
+  <td>query: <code>profile_id</code>, <code>start</code> (ISO 8601), <code>end</code> (ISO 8601). Window ≤ 4 h.</td>
+  <td>200 <code>{ window_start, window_end, server_time, programs, _note }</code>; 400 on missing/invalid/over-window.</td>
+  <td>Tizen <code>core/api.js</code> <code>getEpgGrid()</code></td>
+  <td>Two hardcoded mock programs. B3 path uses Jellyfin Live TV API server-side.</td>
+</tr>
+
+<tr>
+  <td><span class="method POST">POST</span></td>
+  <td><code>/api/commands</code></td>
+  <td><code>routes/commands.js</code></td>
+  <td>JSON: <code>{ schema: "hermestv.ui.v1", action, target: { profile_id }, command_id (ULID), params?, dry_run? }</code>. 15-action allowlist.</td>
+  <td>200 <code>{ accepted: true, command_id, dry_run_diff: null }</code> or <code>{ accepted, dry_run: true, command_id, would_apply }</code>; 400 <code>{ accepted: false, errors: [...] }</code>.</td>
+  <td><code>api/hermesApi.js</code> <code>submitCommand()</code></td>
+  <td>Mom mode font_scale floor 1.25 enforced here too. ULID pattern strict.</td>
+</tr>
+
+<tr>
+  <td><span class="method POST">POST</span></td>
+  <td><code>/api/ui-command/validate</code></td>
+  <td><code>routes/uiCommand.js</code></td>
+  <td>JSON: <code>{ command_text, profile_id? }</code></td>
+  <td>200 <code>{ valid, action, params, error, source: "regex"|"llm"|"no_match", llm_skipped? }</code>; 400 on invalid input.</td>
+  <td><code>api/hermesApi.js</code> <code>validateCommand()</code> → <code>components/CommandValidator.jsx</code> + <code>FloatingChatbot.jsx</code></td>
+  <td>22-entry regex table; LLM fallback only when <code>OPENAI_API_KEY</code> set.</td>
+</tr>
+
+<tr>
+  <td><span class="method POST">POST</span></td>
+  <td><code>/api/play</code></td>
+  <td><code>routes/play.js</code></td>
+  <td>JSON: <code>{ item_id, profile_id, provider_id? }</code></td>
+  <td>200 ticket <code>{ ticket, item, provider, profile_id, issued_at, expires_at, stream_endpoint, _note }</code>; 400 <code>validation_failed</code>/<code>provider_not_available</code>; 404 <code>item_not_found</code>; 503 <code>no_provider_configured</code>.</td>
+  <td><code>api/hermesApi.js</code> <code>startPlayback()</code> → <code>components/MediaDetailPanel.jsx</code> → <code>components/PlayerModal.jsx</code></td>
+  <td>5-minute ticket TTL. Stream URL never returned — only <code>stream_endpoint</code> pointer.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/play/:ticket</code></td>
+  <td><code>routes/play.js</code></td>
+  <td>params: <code>ticket</code></td>
+  <td>200 ticket; 404 <code>ticket_not_found</code>; 410 <code>ticket_expired</code>.</td>
+  <td class="missing">no caller</td>
+  <td>Debug-only inspection.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/play/:ticket/stream</code></td>
+  <td><code>routes/play.js</code></td>
+  <td>params: <code>ticket</code></td>
+  <td>503 <code>{ status: "player_pipeline_not_implemented", message, ticket, provider, item, expires_at }</code>; 404; 410.</td>
+  <td><code>components/PlayerModal.jsx</code> (<code>fetch(ticket.stream_endpoint)</code>)</td>
+  <td>Phase-4 stub. Surface only — real streaming proxy pending.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/tts/voices</code></td>
+  <td><code>routes/tts.js</code></td>
+  <td>none</td>
+  <td>200 <code>{ voices, count, source: "azure_live"|"fallback_curated"|"fallback_curated_on_error", cached_at?, azure_configured, profile_defaults }</code>.</td>
+  <td><code>api/azureVoiceClient.js</code> → <code>VoicePickerModal.jsx</code></td>
+  <td>Live Azure catalog cached 24 h.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/tts/voice/:profile_id</code></td>
+  <td><code>routes/tts.js</code></td>
+  <td>params: <code>profile_id</code></td>
+  <td>200 <code>{ profile_id, voice_id, voice }</code>.</td>
+  <td><code>api/azureVoiceClient.js</code> → <code>VoicePickerModal.jsx</code></td>
+  <td>Falls back to mom_tv default if unknown.</td>
+</tr>
+
+<tr>
+  <td><span class="method PATCH">PATCH</span></td>
+  <td><code>/api/tts/voice/:profile_id</code></td>
+  <td><code>routes/tts.js</code></td>
+  <td>JSON: <code>{ voice_id }</code></td>
+  <td>200 <code>{ profile_id, voice_id, voice }</code>; 400 <code>{ error: "invalid_voice_id", message }</code>.</td>
+  <td><code>api/azureVoiceClient.js</code> → <code>VoicePickerModal.jsx</code></td>
+  <td>In-memory override (no profile store hookup yet).</td>
+</tr>
+
+<tr>
+  <td><span class="method POST">POST</span></td>
+  <td><code>/api/tts/speak</code></td>
+  <td><code>routes/tts.js</code></td>
+  <td>JSON: <code>{ text, profile_id, voice_id? }</code>. Text ≤ 800 chars. Credential-pattern blocked.</td>
+  <td>200 binary <code>audio/mpeg</code> (headers <code>X-Voice</code>, <code>X-Profile-Id</code>); 202 <code>azure_not_configured</code>; 400 input errors; 502 synthesis failure; 503 sdk_missing.</td>
+  <td><code>api/azureVoiceClient.js</code> → <code>FloatingChatbot.jsx</code></td>
+  <td>Output: Audio24Khz96KBitRateMonoMp3. Bixby forbidden — Azure only.</td>
+</tr>
+
+<tr>
+  <td><span class="method POST">POST</span></td>
+  <td><code>/api/tts</code> (alias)</td>
+  <td><code>routes/tts.js</code></td>
+  <td>Internal redirect to <code>/api/tts/speak</code>.</td>
+  <td>Same as <code>/api/tts/speak</code>.</td>
+  <td>Tizen <code>core/api.js</code> <code>getTts()</code></td>
+  <td>Backwards-compat alias.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/tts</code> (alias)</td>
+  <td><code>routes/tts.js</code></td>
+  <td>Internal redirect to <code>/api/tts/voices</code>.</td>
+  <td>Same as <code>/api/tts/voices</code>.</td>
+  <td class="missing">no caller</td>
+  <td>Backwards-compat alias.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/settings</code></td>
+  <td><code>routes/settings.js</code></td>
+  <td>query: <code>profile_id?</code></td>
+  <td>200 merged <code>{ version, phase, features, ui: { default_*, active_layout, active_theme }, providers, profile_id?, profile? }</code>; 400 validation_failed.</td>
+  <td class="missing">no caller</td>
+  <td>File-backed via <code>lib/settingsStore.js</code>. Web Settings panel does not call this endpoint yet.</td>
+</tr>
+
+<tr>
+  <td><span class="method PATCH">PATCH</span></td>
+  <td><code>/api/settings</code></td>
+  <td><code>routes/settings.js</code></td>
+  <td>JSON: <code>{ active_layout?, active_theme?, profile_id?, ...rest }</code>. Layout/theme allow-lists.</td>
+  <td>200 merged response; 400 <code>{ error: "validation_failed", fields: {...} }</code>.</td>
+  <td class="missing">no caller</td>
+  <td>Per-profile fields written to file store when <code>profile_id</code> present.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/source-health/:provider_id/:item_id</code></td>
+  <td><code>routes/sourceHealth.js</code></td>
+  <td>params: <code>provider_id</code> ∈ {apollo_group, xtremehd}, <code>item_id</code> (≤128 char ASCII).</td>
+  <td>200 <code>{ provider_id, item_id, stream_url_hint, probe: { reachable, reason?, latency_ms? }, quality, checked_at, mock? }</code>; 400 validation_failed.</td>
+  <td class="missing">no caller</td>
+  <td>HEAD probe via <code>lib/streamProbe.js</code>, 60-s server-side cache. Stream URL never exposed — only redacted hint.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/upstream-apps</code></td>
+  <td><code>routes/upstreamApps.js</code></td>
+  <td>query: <code>priority?</code>, <code>platform?</code>, <code>category?</code></td>
+  <td>200 <code>{ version, generated, total, apps: [...] }</code>; 503 <code>catalog_unavailable</code>; 500 <code>catalog_parse_error</code>.</td>
+  <td class="missing">no caller</td>
+  <td>Reads from <code>upstream/apps-catalog.json</code>. Extensions panel UI not wired.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/layouts</code></td>
+  <td><code>routes/layouts.js</code></td>
+  <td>none</td>
+  <td>200 <code>{ layouts: [...], count }</code>; 503 <code>manifests_unavailable</code>.</td>
+  <td class="missing">no caller</td>
+  <td>Reads layout JSON manifests from <code>apps/hermes-web-tv/src/layouts/manifests</code> (or <code>HERMES_MANIFESTS_DIR</code>).</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/api/versions/manifest</code></td>
+  <td><code>routes/versions.js</code></td>
+  <td>none</td>
+  <td>200 <code>{ api, schema, tizen_min_required, build_ts }</code>.</td>
+  <td class="missing">no caller</td>
+  <td>Hardcoded api 0.1.0, schema hermestv.ui.v1, tizen 6.5.</td>
+</tr>
+
+<tr>
+  <td><span class="method GET">GET</span></td>
+  <td><code>/setup/provider</code></td>
+  <td><code>routes/setup.js</code></td>
+  <td>none</td>
+  <td>200 <code>text/html; charset=utf-8</code> — standalone provider onboarding form.</td>
+  <td>Operator-only (QR onboarding)</td>
+  <td>Self-contained HTML page; not consumed by SPA.</td>
+</tr>
+
+<tr>
+  <td><span class="method POST">POST</span></td>
+  <td><code>/setup/provider/submit</code></td>
+  <td><code>routes/setup.js</code></td>
+  <td>HTML form submit.</td>
+  <td>501 <code>{ error: "not_implemented", message }</code>.</td>
+  <td class="missing">no caller</td>
+  <td>B4-phase stub.</td>
+</tr>
+
+</table>
+
+<h2>Response header surfacing</h2>
+<table>
+  <tr><th>Header</th><th>Emitted by</th><th>Consumed by</th><th>Status</th></tr>
+  <tr>
+    <td><code>X-Catalog-Source</code></td>
+    <td><code>routes/catalog.js</code> (<code>jellyfin</code> / <code>mock-fallback</code> / <code>mock-no-jellyfin</code> / <code>merged-with-iptv-org</code>)</td>
+    <td><code>api/hermesApi.js</code> <code>getCatalog()</code> reads header → attaches as <code>body._source_header</code> → <code>App.jsx</code> state <code>catalogSource</code> → Settings panel data-source badge</td>
+    <td class="ok">wired end-to-end</td>
+  </tr>
+  <tr>
+    <td><code>X-Voice</code></td>
+    <td><code>routes/tts.js</code> <code>/api/tts/speak</code></td>
+    <td>not read by frontend</td>
+    <td class="gap">emitted but unread</td>
+  </tr>
+  <tr>
+    <td><code>X-Profile-Id</code></td>
+    <td><code>routes/tts.js</code> <code>/api/tts/speak</code></td>
+    <td>not read by frontend</td>
+    <td class="gap">emitted but unread</td>
+  </tr>
+  <tr>
+    <td><code>Cache-Control: no-store</code></td>
+    <td><code>routes/tts.js</code> <code>/api/tts/speak</code></td>
+    <td>browser cache layer only</td>
+    <td class="ok">wired (browser)</td>
+  </tr>
+  <tr>
+    <td><code>Content-Type: text/html</code></td>
+    <td><code>routes/setup.js</code> <code>/setup/provider</code></td>
+    <td>browser render only</td>
+    <td class="ok">wired (browser)</td>
+  </tr>
+</table>
+
+<h2>credentialGuard coverage</h2>
+<p>The credential guard middleware lives at <code>src/middleware/credentialGuard.js</code> and is mounted globally in <code>src/index.js</code> with <code>app.use(credentialGuard)</code> AFTER request logging and BEFORE the route routers. It wraps <code>res.json</code> on every request, scanning the serialized body for forbidden patterns and replacing the body with a generic 500 security error when any match:</p>
+<ul>
+  <li><code>/get.php?username=</code> — Xtreme Codes M3U credential URL</li>
+  <li><code>/player_api.php</code> — Xtreme Codes player API endpoint</li>
+  <li><code>x-ui-token</code> — 3X-UI panel session token</li>
+  <li><code>client_secret</code> — OAuth client secret</li>
+  <li><code>AZURE_TTS_KEY</code> — Azure TTS env var name</li>
+  <li><code>DEEPSEEK_API_KEY</code> — DeepSeek env var name</li>
+  <li><code>api[_\-]?key\s*[:=]</code> — generic API key assignment</li>
+  <li><code>password\s*[:=]</code> — generic password assignment</li>
+  <li><code>bearer\s+[A-Za-z0-9...]+</code> — Bearer token value</li>
+</ul>
+<p>The binary audio response from <code>/api/tts/speak</code> does <strong>not</strong> pass through <code>res.json</code> — it uses <code>res.send(Buffer)</code> directly, so credentialGuard does not scan it. That endpoint enforces credential safety inline via the <code>CREDENTIAL_PATTERN</code> regex applied to the request <code>text</code> body before synthesis.</p>
+
+<h2>Endpoints with no frontend caller (dead or operator-only)</h2>
+<ul>
+  <li><code>GET /api/profiles</code> — list endpoint never called; web fetches single profile.</li>
+  <li><code>PATCH /api/profile/:id</code> — web Settings panel reads only; Tizen calls non-existent <code>/api/profile/:id/update</code>.</li>
+  <li><code>GET /api/actors</code> — five hardcoded actors, no caller.</li>
+  <li><code>GET /api/channels/:channel_id</code> — detail lookup unused.</li>
+  <li><code>GET /api/play/:ticket</code> — debug ticket inspection.</li>
+  <li><code>GET /api/tts</code> alias — only the explicit <code>/api/tts/voices</code> is used.</li>
+  <li><code>GET /api/settings</code> — file-backed but no caller wires it.</li>
+  <li><code>PATCH /api/settings</code> — same, also unused.</li>
+  <li><code>GET /api/source-health/:provider_id/:item_id</code> — Settings panel does not consume health probe.</li>
+  <li><code>GET /api/upstream-apps</code> — Extensions panel UI not wired.</li>
+  <li><code>GET /api/layouts</code> — layout manifests served but not fetched (shells import them directly via Vite at build time).</li>
+  <li><code>GET /api/versions/manifest</code> — never queried.</li>
+  <li><code>POST /setup/provider/submit</code> — onboarding form submit (501 stub).</li>
+</ul>
+
+<h2>Drift / inconsistencies</h2>
+
+<details><summary>Provider ID enum drift</summary>
+<table>
+  <tr><th>File</th><th>Provider IDs in use</th></tr>
+  <tr><td><code>routes/providers.js</code></td><td><code>apollo</code>, <code>xtremehd</code></td></tr>
+  <tr><td><code>routes/catalog.js</code></td><td><code>apollo_group</code>, <code>xtremehd</code>, <code>iptv-org</code>, <code>jellyfin</code>, <code>all</code></td></tr>
+  <tr><td><code>routes/sourceHealth.js</code></td><td><code>apollo_group</code>, <code>xtremehd</code></td></tr>
+  <tr><td><code>routes/channels.js</code></td><td>Maps <code>apollo_group</code> → <code>apollo</code> in <code>provider_tags</code> for back-compat.</td></tr>
+</table>
+<p>The 2026-05 rename moved <code>apollo</code> → <code>apollo_group</code> but <code>routes/providers.js</code> was not updated.</p>
+</details>
+
+<details><summary>Error response shape variance</summary>
+<table>
+  <tr><th>Pattern</th><th>Used by</th></tr>
+  <tr><td><code>{ error: &lt;string code&gt;, message: &lt;human&gt; }</code></td><td>catalog, profiles, play, sourceHealth, settings (partial), setup, tts, upstreamApps, layouts</td></tr>
+  <tr><td><code>{ error: &lt;human message&gt; }</code> (no code)</td><td>channels, epgGrid, tts (some branches)</td></tr>
+  <tr><td><code>{ accepted: false, errors: [&lt;string&gt;] }</code></td><td>commands (unique to that route)</td></tr>
+  <tr><td><code>{ error: "validation_failed", fields: { &lt;field&gt;: &lt;msg&gt; } }</code></td><td>settings PATCH</td></tr>
+</table>
+</details>
+
+<details><summary>Mount-path drift between web and Tizen native</summary>
+<ul>
+  <li><code>/health</code> (no <code>/api</code> prefix) — Tizen <code>getHealth()</code> calls <code>/api/health</code> → 404.</li>
+  <li><code>/api/profile/:id/update</code> — Tizen <code>updateProfile()</code> POSTs to a path the backend does not declare → 404.</li>
+  <li><code>/api/cmd</code>, <code>/api/cmd/audit</code> — Tizen <code>sendCommand()</code>/<code>getAuditLog()</code> reference endpoints with no source file.</li>
+  <li><code>/api/quality/*</code>, <code>/api/jellyfin/*</code> — Tizen native client references routes that do not exist in <code>services/hermes-tv-api/src/routes/</code> at all.</li>
+</ul>
+</details>
+
+<details><summary>Endpoints that should drop mock data when real providers wired</summary>
+<ul>
+  <li><code>/api/actors</code> — 5 hardcoded actors.</li>
+  <li><code>/api/channels</code> — derived from <code>SEED_CATALOG</code> via <code>LIVE_DEFS</code>.</li>
+  <li><code>/api/catalog</code> — seed unless Jellyfin reachable + iptv-org enabled.</li>
+  <li><code>/api/epg/:channelId</code> — stub always returns empty programs.</li>
+  <li><code>/api/epg/grid</code> — two hardcoded mock programs.</li>
+  <li><code>/api/providers</code> — hardcoded health <code>ok</code>, slots <code>0/2</code>.</li>
+  <li><code>/api/play</code> — operates on seed items; ticket valid but <code>/api/play/:ticket/stream</code> returns 503.</li>
+  <li><code>/api/source-health/:provider_id/:item_id</code> — returns <code>not_configured</code> until provider env vars set.</li>
+</ul>
+</details>
+
+<details><summary>Routes vs spec-listed file names</summary>
+<ul>
+  <li>Spec listed <code>actors.js</code> as a route file. There is no <code>routes/actors.js</code> — the <code>GET /api/actors</code> endpoint is defined inside <code>routes/catalog.js</code>.</li>
+  <li>All other 17 spec file names map 1-to-1 to files in <code>services/hermes-tv-api/src/routes/</code>.</li>
+</ul>
+</details>
+
+<p class="footnote">Source: <code>services/hermes-tv-api/src/routes/*.js</code>, <code>services/hermes-tv-api/src/index.js</code>, <code>services/hermes-tv-api/src/middleware/credentialGuard.js</code>, <code>apps/hermes-web-tv/src/api/hermesApi.js</code>, <code>apps/hermes-web-tv/src/api/azureVoiceClient.js</code>, <code>apps/hermes-tv-tizen-native/src/core/api.js</code>. No credential values are reproduced in this matrix.</p>
+
+</body>
+</html>
