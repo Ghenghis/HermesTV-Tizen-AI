@@ -27,50 +27,65 @@ apply quality caps only to Dave's TV.
 ## Shared infrastructure
 
 ```
+                       Cloudflare (proxied, Flexible TLS at edge)
+                                  │   https://hermestv.daveai.tech
+                                  ▼
                        ┌────────────────────────────────────────┐
-                       │   Hostinger Linux VPS                  │
-                       │   hermestv.example.com  (Caddy + TLS)  │
+                       │   Hostinger Linux VPS  (Ubuntu 24.04)  │
                        │                                        │
-                       │   ┌──────────────┐  ┌──────────────┐   │
-                       │   │ hermes-tv-api│  │  threadfin   │   │
-                       │   │   :3011 (VPS)│  │   :34400     │   │
-                       │   └──────┬───────┘  └──────┬───────┘   │
-                       │          │                 │           │
-                       │          ▼                 │           │
-                       │   ┌──────────────┐         │           │
-                       │   │  Azure TTS   │         │           │
-                       │   │ (api.cognit. │         │           │
-                       │   │  microsoft)  │         │           │
-                       │   └──────────────┘         │           │
-                       │          │                 │           │
-                       │   ┌──────┴─────────────────┴───────┐   │
-                       │   │ IPTV providers (Apollo, XHD)   │   │
-                       │   └────────────────────────────────┘   │
-                       │          │                             │
-                       │          ▼  (Tailscale)                │
-                       └──────────┼─────────────────────────────┘
-                                  │
-                       ┌──────────▼──────────────┐
-                       │  Workstation Jellyfin   │
-                       │  (reached over Tailnet) │
+                       │   host nginx :80  (edge for all sites) │
+                       │   ───────────────────────────────────  │
+                       │   /etc/nginx/sites-enabled/            │
+                       │     hermestv.daveai.tech    ─┐         │
+                       │     daveai.tech              │         │
+                       │     diy. fleet. game. ...    │         │
+                       │     hermes. hermes3d. ...    │ (KEEP)  │
+                       │                              │         │
+                       │   ┌──────────────────────────▼──────┐  │
+                       │   │ /api/*  → 127.0.0.1:3011        │  │
+                       │   │ /       → 127.0.0.1:3080        │  │
+                       │   └────────┬───────────────┬────────┘  │
+                       │            │               │           │
+                       │   ┌────────▼───────┐ ┌────▼─────────┐  │
+                       │   │ hermes-tv-api  │ │ hermes-web-tv│  │
+                       │   │   :3011        │ │   :3080      │  │
+                       │   └────────┬───────┘ └──────────────┘  │
+                       │            │ outbound only             │
+                       │            ▼                           │
+                       │   ┌────────────────┐                   │
+                       │   │  Azure TTS     │ (Phase 2.5)       │
+                       │   └────────────────┘                   │
+                       │            │ Tailscale                 │
+                       └────────────┼───────────────────────────┘
+                                    │
+                       ┌────────────▼────────────┐
+                       │  Workstation Jellyfin   │ (Phase 3)
                        └─────────────────────────┘
 
-       https://hermestv.example.com/*  (HTTPS, public)
-       ┌──────────────┴──────────────┐
-       ▼                             ▼
-┌─────────────────┐          ┌──────────────────┐
-│ Tizen app (Mom) │          │ Web app (Dave)   │
-│  QN85 QLED      │          │  Browser / QN85  │
-│  mom-mode dflt  │          │  dave-power dflt │
-└─────────────────┘          └──────────────────┘
+       Public access:  https://hermestv.daveai.tech/*
+       ┌──────────────────────┴──────────────────────┐
+       ▼                                             ▼
+┌─────────────────┐                       ┌──────────────────┐
+│ Tizen app (Mom) │                       │ Web app (Dave)   │
+│  QN85 QLED      │                       │  Browser / QN85  │
+│  mom-mode dflt  │                       │  dave-power dflt │
+└─────────────────┘                       └──────────────────┘
 ```
 
-The web app is served by an nginx container (`hermes-web-tv:80`) behind the
-same Caddy that proxies `/api/*` to `hermes-tv-api:3011` on the VPS (Phase 1.5
-moved this off 3001 — see [20_VPS_PHASE_1_AUDIT_FINDINGS.md](20_VPS_PHASE_1_AUDIT_FINDINGS.md)).
-Local dev still uses 3001. The Tizen app is served from inside the TV itself
-(the `.wgt` is sideloaded) and reaches the same Caddy across the open
-internet.
+The web app is served by an nginx container (`hermes-web-tv` on host port
+3080) which serves the Vite-built SPA. The **host nginx** (NOT an in-stack
+Caddy) is the public edge; it terminates HTTP on port 80 and proxies
+`hermestv.daveai.tech` to the container loopback ports. Cloudflare proxies
+the public HTTPS:443 to the VPS port 80 (Flexible mode, matching every other
+daveai.tech site).
+
+Phase 1.5 moved the API off port 3001 (already bound by Dave's next-server)
+to **3011**, and moved the web upstream off 8081 (kilocode-python) to
+**3080**. Local dev still uses 3001. See
+[20_VPS_PHASE_1_AUDIT_FINDINGS.md](20_VPS_PHASE_1_AUDIT_FINDINGS.md) and
+[28_VPS_PHASE_2_DEPLOY_PLAN.md](28_VPS_PHASE_2_DEPLOY_PLAN.md). The Tizen
+app is sideloaded as a `.wgt` and reaches the same public endpoint over
+the open internet.
 
 ---
 

@@ -48,6 +48,10 @@ services:
       # next-server. See docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md.
       PORT: '3011'
       # Credentials injected at runtime — never in image or compose file
+    # Phase 2: bind 127.0.0.1:3011 so host nginx can reach us. 127.0.0.1
+    # only — never 0.0.0.0 — the public internet must go through host nginx.
+    ports:
+      - '127.0.0.1:3011:3011'
     restart: unless-stopped
     networks: [hermestv-vps-internal]
     depends_on:
@@ -60,19 +64,17 @@ services:
       retries: 3
       start_period: 30s
 
-  caddy:
-    image: caddy:2-alpine
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    ports:
-      - '80:80'
-      - '443:443'
-    restart: unless-stopped
-    networks: [hermestv-vps-internal, hermestv-vps-external]
-    depends_on:
-      hermes-tv-api: { condition: service_healthy }
+  # Caddy — REMOVED in Phase 2.
+  #
+  # The host already runs nginx on 80/443 with 10 daveai.tech sites under
+  # Cloudflare-Flexible (origin HTTP-only, edge TLS at Cloudflare). Running
+  # another reverse proxy here would compete for those ports and break the
+  # public sites. HermesTV's edge is the operator-installed host nginx site
+  # at /etc/nginx/sites-enabled/hermestv.daveai.tech (deployed in Phase 1.5,
+  # template at upstream/nginx/hermestv.daveai.tech.conf.example).
+  #
+  # If you ever migrate this VPS off host nginx, the Caddyfile at
+  # upstream/docker-vps/Caddyfile is still here as a reference starter.
 
 secrets:
   pg_password:
@@ -82,11 +84,10 @@ networks:
   hermestv-vps-internal:
     driver: bridge
     internal: true
-  hermestv-vps-external:
-    driver: bridge
+  # hermestv-vps-external network removed in Phase 2 — only Caddy used it,
+  # and Caddy is gone (host nginx is the edge).
 
 volumes:
   postgres-data:
   redis-data:
-  caddy-data:
-  caddy-config:
+  # caddy-data and caddy-config volumes removed in Phase 2 (Caddy gone).

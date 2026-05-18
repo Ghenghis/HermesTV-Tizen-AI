@@ -1,6 +1,15 @@
-var BASE_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-  ? 'http://localhost:3001'
-  : 'http://hermestv.local';
+// Local dev (Vite at localhost:5173) → cross-origin to the API on :3001.
+// LAN mirror (Mom's QN85 hitting workstation by IP) → same auto-detect.
+// Production (https://hermestv.daveai.tech served by host nginx that also
+// proxies /api/ to the API container) → same-origin, so BASE_URL is empty.
+var BASE_URL = (function() {
+  if (typeof window === 'undefined') return '';
+  var h = window.location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:3001';
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return 'http://' + h + ':3001';
+  if (h === 'hermestv.local') return 'http://hermestv.local';
+  return '';
+})();
 var DEFAULT_TIMEOUT = 8000;
 var HEALTH_TIMEOUT = 3000;
 
