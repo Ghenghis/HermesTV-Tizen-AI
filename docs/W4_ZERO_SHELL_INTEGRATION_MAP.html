@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>W4: Zero Shell Integration Map</title>
+<style>body{font-family:sans-serif;background:#0d1117;color:#e6edf3;padding:2rem}h1{color:#1f6feb;font-size:2.5rem}h2{color:#79c0ff;border-bottom:2px solid #30363d;padding-bottom:0.5rem}section{background:#161b22;border:1px solid #30363d;padding:2rem;margin:2rem 0;border-radius:8px}.code-block{background:#0d1117;border-left:4px solid #1f6feb;padding:1rem;margin:1rem 0;font-family:monospace;white-space:pre-wrap;word-wrap:break-word;overflow-x:auto}.file-ref{background:#0d1117;border:1px solid #30363d;padding:0.25rem 0.6rem;font-family:monospace;color:#79c0ff;border-radius:4px;font-size:0.85rem}.action-item{background:#1c2128;border-left:4px solid #ff7eb3;padding:1rem;margin:1rem 0}.summary-box{background:#0d1117;border:2px solid #1f6feb;padding:1.5rem;margin:2rem 0;border-radius:8px}table{width:100%;border-collapse:collapse;margin:1rem 0}th,td{border:1px solid #30363d;padding:0.75rem}.warning{background:#ff9f00;color:#000;padding:0.2rem 0.4rem;font-weight:bold}.success{background:#238636;color:#fff;padding:0.2rem 0.4rem;font-weight:bold}</style></head>
+<body><div style="max-width:1400px;margin:0 auto">
+
+<h1>Zero Shell Integration Map</h1>
+<p style="color:#8b949e;font-size:1.1rem">Complete architectural audit for adding 8th shell without breaking 7 existing layouts</p>
+
+<section><h2>1. Shell Registry Mapping</h2>
+<p><strong>File:</strong> G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\engine\layoutRegistry.js (lines 1-29)</p>
+<div class="code-block">var SHELL_REGISTRY = {
+  'tivimate': TiviMateShell,
+  'netflix': NetflixShell,
+  'plex': PlexShell,
+  'apple-tv': AppleTVShell,
+  'samsung-tizen': SamsungShell,
+  'mom-mode': MomModeShell,
+  'dave-power': DavePowerShell,
+};</div>
+<h3>To Add for Zero Shell:</h3>
+<div class="action-item"><strong>Step 1:</strong> Line 7: import ZeroShell from '../shells/ZeroShell.jsx';<br><strong>Step 2:</strong> Line 16: 'zero': ZeroShell,<br><strong>Step 3:</strong> Update App.jsx line 1046 validShells array to include 'zero'</div>
+</section>
+
+<section><h2>2. Shell Component Template (DavePowerShell)</h2>
+<p><strong>File:</strong> G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\shells\DavePowerShell.jsx (lines 40-49)</p>
+<div class="code-block">function DavePowerShell(props) {
+  var catalog = props.catalog;
+  var profile = props.profile;
+  var tier = props.tier;
+  var providers = props.providers;
+  var onItemSelect = props.onItemSelect;
+  var contentFilter = props.contentFilter;
+  var providerFilter = props.providerFilter;
+  var qualityFilter = props.qualityFilter;</div>
+<h3>Prop Contract (Standard for all shells):</h3>
+<table><tr><th>Prop</th><th>Type</th><th>Purpose</th></tr>
+<tr><td>catalog</td><td>Array</td><td>Items: id, title, poster_url, type, providers[], metadata</td></tr>
+<tr><td>profile</td><td>Object</td><td>profile_id, display_name, font_scale, mom_mode, tier</td></tr>
+<tr><td>tier</td><td>String</td><td>'enhanced' (QN) or 'degraded' (UN)</td></tr>
+<tr><td>onItemSelect</td><td>Function</td><td>Callback when user clicks item</td></tr>
+<tr><td>contentFilter</td><td>String</td><td>'all', 'live', 'movies', 'series'</td></tr>
+<tr><td>providerFilter</td><td>String</td><td>'all', 'apollo_group', 'xtremehd'</td></tr>
+<tr><td>qualityFilter</td><td>String</td><td>'all', '720p+', '1080p+', '4K'</td></tr></table>
+<p><strong>KEY:</strong> Root div must have height: 100%; overflow: hidden; (see index.css lines 167-178)</p>
+</section>
+
+<section><h2>3. Layout Switcher Discovery</h2>
+<p><strong>File:</strong> G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\layouts\manifests\index.js</p>
+<div class="code-block">import zero from './zero.json';
+export const ALL_LAYOUTS = [tivimate, netflix, plex, appleTv, samsungTizen, momMode, davePower, zero];</div>
+<h3>To Add for Zero Shell:</h3>
+<div class="action-item"><strong>1.</strong> Create: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\layouts\manifests\zero.json<br><strong>2.</strong> Update manifests/index.js to import and export zero</div>
+</section>
+
+<section><h2>4. Theme System - Add 6 New Themes</h2>
+<p><strong>File:</strong> G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\index.css (append after line 81)</p>
+<h3>CSS Variable Contract (8 per theme):</h3>
+<table><tr><th>Variable</th><th>Purpose</th></tr>
+<tr><td>--bg</td><td>Page background</td></tr>
+<tr><td>--surface</td><td>Card/panel background</td></tr>
+<tr><td>--surface-raised</td><td>Elevated elements</td></tr>
+<tr><td>--accent</td><td>Primary interactive color</td></tr>
+<tr><td>--accent-hover</td><td>Accent on hover/focus</td></tr>
+<tr><td>--text</td><td>Foreground text</td></tr>
+<tr><td>--muted</td><td>Secondary/disabled text</td></tr>
+<tr><td>--border</td><td>Dividers, outlines</td></tr></table>
+<div class="code-block">.theme-sky-blue { --bg: #0a1628; --surface: #112240; --surface-raised: #1a334d; --accent: #00d4ff; --accent-hover: #33e0ff; --text: #e0f2fe; --muted: #7dd3fc; --border: #0369a1; }
+.theme-zone { --bg: #1a1a2e; --surface: #16213e; --surface-raised: #0f3460; --accent: #e94560; --accent-hover: #f07080; --text: #eaeaea; --muted: #b8b8b8; --border: #e94560; }
+.theme-flix { --bg: #0a0e27; --surface: #1a1f3a; --surface-raised: #252d47; --accent: #ff0000; --accent-hover: #ff3333; --text: #ffffff; --muted: #b0b0b0; --border: #ff0000; }
+.theme-mary { --bg: #0d000d; --surface: #2b0845; --surface-raised: #3d0f5c; --accent: #d946ef; --accent-hover: #e879f9; --text: #f3e8ff; --muted: #d8b4fe; --border: #d946ef; }
+.theme-luna { --bg: #0f1620; --surface: #1a2d42; --surface-raised: #254158; --accent: #06b6d4; --accent-hover: #2dd4de; --text: #cffafe; --muted: #7ee8f6; --border: #06b6d4; }
+.theme-hula { --bg: #001f0f; --surface: #0d3d28; --surface-raised: #16543d; --accent: #10b981; --accent-hover: #34d399; --text: #d1fae5; --muted: #6ee7b7; --border: #10b981; }</div>
+</section>
+
+<section><h2>5. Catalog API & Data Structure</h2>
+<p><strong>File:</strong> G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\api\hermesApi.js (lines 66-79)</p>
+<h3>Current Item Fields:</h3>
+<table><tr><th>Field</th><th>Type</th><th>Status</th></tr>
+<tr><td>id</td><td>String</td><td><span class="success">present</span></td></tr>
+<tr><td>title</td><td>String</td><td><span class="success">present</span></td></tr>
+<tr><td>poster_url</td><td>String</td><td><span class="success">present</span></td></tr>
+<tr><td>resolution</td><td>'720p'|'1080p'|'4k'</td><td><span class="success">present</span></td></tr>
+<tr><td>rating_mpaa</td><td>'G'|'PG'|'R'|'NR'</td><td><span class="success">present</span></td></tr>
+<tr><td>metadata.year</td><td>Integer</td><td><span class="success">present</span></td></tr>
+<tr><td>metadata.cast_ids</td><td>Array</td><td><span class="success">present</span></td></tr>
+<tr><td>providers[]</td><td>Array</td><td><span class="success">present</span></td></tr>
+<tr><td>user_rating</td><td>Float 0-10</td><td><span class="warning">MISSING</span></td></tr></table>
+<p><strong>For Zero Shell:</strong> Fake star ratings client-side: var starRating = (parseInt(item.id.charCodeAt(0)) % 100) / 10;</p>
+</section>
+
+<section><h2>6. Settings Panel Structure</h2>
+<p><strong>File:</strong> G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\App.jsx (lines 1135-1418)</p>
+<p><strong>Status:</strong> Linear panel (right-side dropdown), NO tab navigation. Has 5 buttons: Change Voice, Change Layout, Switch Profile, Reset Defaults, plus info rows.</p>
+<p><strong>For Zero-specific settings:</strong> Option 1 (inline buttons - simplest) | Option 2 (extract SettingsPanel.jsx with tabs) | Option 3 (new SettingsPanelZero.jsx modal)</p>
+</section>
+
+<section><h2>7. Download/Recording Surface</h2>
+<p><span class="warning">Status: NOT IMPLEMENTED</span> - Zero matches in codebase</p>
+<p><strong>Phase 2:</strong> Add POST /api/download, POST /api/record, GET /api/downloads, GET /api/recordings to backend. Wire via hermesApi.js + DownloadModal.jsx</p>
+</section>
+
+<section><h2>8. Trakt/TMDb/TVMaze Integration</h2>
+<p><span class="warning">Status: NOT IMPLEMENTED</span> - Zero matches in codebase</p>
+<p><strong>Phase 2 (Optional):</strong> Backend enrichment with external ratings. Frontend badges in MediaDetailPanel.</p>
+</section>
+
+<section><h2>9. Parental Controls</h2>
+<p><span class="warning">Status: PARTIAL</span> - rating_mpaa exists, no PIN gate</p>
+<h3>To Implement:</h3>
+<div class="action-item"><strong>1.</strong> Add to profile: parental_level, parental_pin, parental_enabled<br><strong>2.</strong> Create ParentalPinModal.jsx for 4-digit input<br><strong>3.</strong> Gate Play/Download by rating_mpaa<br><strong>4.</strong> Add Parental Controls tab to Settings</div>
+</section>
+
+<section><h2>10. Voice/TTS Integration</h2>
+<p><strong>File:</strong> G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\api\azureVoiceClient.js</p>
+<h3>Use in Zero Shell:</h3>
+<div class="code-block">React.useEffect(() => {
+  if (profile.audio_feedback && profile.agent_voice) {
+    azureVoiceClient.speak('Welcome to Zero', profile.profile_id, profile.agent_voice);
+  }
+}, []);</div>
+</section>
+
+<section><h2>11. MVP Checklist - Phase 1</h2>
+<div class="summary-box"><h3>5-Bullet Summary:</h3>
+<ol style="font-size:1.05rem;line-height:2">
+<li><strong>Shell Registry:</strong> Add 'zero' import + key to SHELL_REGISTRY (layoutRegistry.js); update validShells (App.jsx:1046)</li>
+<li><strong>ZeroShell.jsx:</strong> Create component with standard props; copy DavePowerShell structure</li>
+<li><strong>Layout Manifest:</strong> Create zero.json, import in manifests/index.js. LayoutSwitcher auto-discovers via ALL_LAYOUTS.</li>
+<li><strong>6 Themes:</strong> Add theme-sky-blue, theme-zone, theme-flix, theme-mary, theme-luna, theme-hula to index.css</li>
+<li><strong>Catalog Data:</strong> All items have id, title, poster_url, resolution, rating_mpaa, providers[], metadata.year, metadata.cast_ids. Fake star ratings client-side.</li>
+</ol></div>
+
+<h3>Critical File Paths:</h3>
+<div class="code-block">CORE: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\engine\layoutRegistry.js
+CORE: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\App.jsx
+NEW SHELL: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\shells\ZeroShell.jsx
+REFERENCE: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\shells\DavePowerShell.jsx
+LAYOUT: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\layouts\manifests\zero.json
+LAYOUT: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\layouts\manifests\index.js
+THEMES: G:\Github\HermesTV-Tizen-AI\apps\hermes-web-tv\src\index.css (append after line 81)</div>
+
+<h3>No Breaking Changes:</h3>
+<ul><li>SHELL_REGISTRY remains unchanged (add key only)</li>
+<li>layoutRegistry.js exports unchanged</li>
+<li>ShellRenderer accepts any shell component</li>
+<li>CSS variable fallbacks ensure backward compatibility</li>
+<li>All shell props stable across all 8 shells</li></ul>
+</section>
+
+</div></body></html>

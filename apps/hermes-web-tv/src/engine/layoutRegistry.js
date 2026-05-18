@@ -5,6 +5,7 @@ import AppleTVShell from '../shells/AppleTVShell.jsx';
 import SamsungShell from '../shells/SamsungShell.jsx';
 import MomModeShell from '../shells/MomModeShell.jsx';
 import DavePowerShell from '../shells/DavePowerShell.jsx';
+import ZeroShell from '../shells/ZeroShell.jsx';
 
 var SHELL_REGISTRY = {
   'tivimate': TiviMateShell,
@@ -14,6 +15,7 @@ var SHELL_REGISTRY = {
   'samsung-tizen': SamsungShell,
   'mom-mode': MomModeShell,
   'dave-power': DavePowerShell,
+  'zero': ZeroShell,
 };
 
 var LAYOUT_IDS = Object.keys(SHELL_REGISTRY);

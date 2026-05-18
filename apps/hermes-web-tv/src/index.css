@@ -80,6 +80,84 @@
   --font-scale: 1.0;
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+ * Zero-shell theme palette (sky-blue, zone, flix, mary, luna, hula).
+ * These mirror the names visible in the IPTV Player Zero appearance picker
+ * so the layout switcher offers familiar choices. All values were derived
+ * from the screenshots — no copied assets.
+ * ─────────────────────────────────────────────────────────────────────── */
+.theme-sky-blue {
+  --bg: #0a1628;
+  --surface: #112240;
+  --surface-raised: #1a334d;
+  --accent: #00d4ff;
+  --accent-hover: #33e0ff;
+  --text: #e0f2fe;
+  --muted: #7dd3fc;
+  --border: #1c3a5e;
+  --font-scale: 1.0;
+}
+
+.theme-zone {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface-raised: #0f3460;
+  --accent: #e94560;
+  --accent-hover: #f07080;
+  --text: #eaeaea;
+  --muted: #b8b8b8;
+  --border: #2a2a4e;
+  --font-scale: 1.0;
+}
+
+.theme-flix {
+  --bg: #0a0e27;
+  --surface: #1a1f3a;
+  --surface-raised: #252d47;
+  --accent: #ff2230;
+  --accent-hover: #ff4d58;
+  --text: #ffffff;
+  --muted: #b0b0b0;
+  --border: #2a2f4a;
+  --font-scale: 1.0;
+}
+
+.theme-mary {
+  --bg: #0d000d;
+  --surface: #2b0845;
+  --surface-raised: #3d0f5c;
+  --accent: #d946ef;
+  --accent-hover: #e879f9;
+  --text: #f3e8ff;
+  --muted: #d8b4fe;
+  --border: #3a1456;
+  --font-scale: 1.0;
+}
+
+.theme-luna {
+  --bg: #0f1620;
+  --surface: #1a2d42;
+  --surface-raised: #254158;
+  --accent: #06b6d4;
+  --accent-hover: #2dd4de;
+  --text: #cffafe;
+  --muted: #7ee8f6;
+  --border: #1f3a52;
+  --font-scale: 1.0;
+}
+
+.theme-hula {
+  --bg: #001f0f;
+  --surface: #0d3d28;
+  --surface-raised: #16543d;
+  --accent: #10b981;
+  --accent-hover: #34d399;
+  --text: #d1fae5;
+  --muted: #6ee7b7;
+  --border: #1b4b35;
+  --font-scale: 1.0;
+}
+
 /* ── QN-class performance vars (enhanced-first design target) ── */
 :root {
   --enhanced-blur: 12px;

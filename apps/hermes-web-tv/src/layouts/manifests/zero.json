@@ -1,0 +1,15 @@
+{
+  "id": "zero",
+  "name": "Zero",
+  "cat": "Modern Players",
+  "description": "Cyan-gradient pinnable rail, Z wordmark, Live/Catch-up/Movies/Series tabs and star-rated poster grid",
+  "accent": "#00d4ff",
+  "nav_style": "pinnable-rail",
+  "hero_style": "z-wordmark",
+  "grid_style": "rated-posters",
+  "tier_required": "any",
+  "best_for": ["movies", "series", "live", "catchup"],
+  "tizen_safe": true,
+  "mom_friendly": true,
+  "dave_power": false
+}
