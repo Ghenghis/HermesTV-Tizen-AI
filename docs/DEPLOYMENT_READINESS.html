@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HermesTV Deployment Readiness</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; margin: 1.5rem; line-height: 1.5; max-width: 1200px; }
+  h1 { color: #58a6ff; border-bottom: 2px solid #30363d; padding-bottom: 0.3em; }
+  h2 { color: #58a6ff; margin-top: 2em; border-bottom: 1px solid #30363d; padding-bottom: 0.2em; }
+  h3 { color: #79c0ff; margin-top: 1.4em; }
+  a { color: #58a6ff; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.9rem; }
+  th, td { border: 1px solid #30363d; padding: 6px 10px; vertical-align: top; }
+  th { background: #161b22; text-align: left; color: #79c0ff; }
+  tr:nth-child(even) td { background: #0f141b; }
+  code, pre { background: #161b22; padding: 1px 5px; border-radius: 3px; font-size: 0.85em; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  pre { padding: 12px; overflow-x: auto; border: 1px solid #21262d; }
+  .ok  { color: #56d364; font-weight: 600; }
+  .warn { color: #e3b341; font-weight: 600; }
+  .err { color: #f85149; font-weight: 600; }
+  .muted { color: #8b949e; }
+  details { margin: 0.6em 0; }
+  details summary { cursor: pointer; padding: 0.4em 0; color: #79c0ff; }
+  svg { background: #161b22; border-radius: 6px; padding: 1em; display: block; margin: 1em 0; }
+  .checkbox { font-family: monospace; color: #8b949e; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.75em; background: #21262d; color: #c9d1d9; }
+  .pill.req { background: #4d2a2a; color: #ffa198; }
+  .pill.opt { background: #1f3a52; color: #79c0ff; }
+  .pill.sec { background: #5a3b0a; color: #ffd866; }
+  .pill.pub { background: #1c3a1c; color: #56d364; }
+  hr { border: none; border-top: 1px solid #30363d; margin: 2em 0; }
+  blockquote { border-left: 3px solid #58a6ff; padding-left: 1em; margin-left: 0; color: #c9d1d9; }
+</style>
+</head>
+<body>
+
+<h1>HermesTV Deployment Readiness</h1>
+<p>
+  <strong>Date:</strong> 2026-05-18 &middot;
+  <strong>Branch:</strong> <code>main</code> &middot;
+  <strong>Target:</strong> <code>hermestv.daveai.tech</code> (Hostinger VPS) &middot;
+  <strong>Stack:</strong> docker compose project <code>hermestv-vps</code>
+</p>
+
+<p class="muted">
+  Single-page operator checklist for a stable HermesTV release. Tells you exactly what to verify before
+  <code>docker compose up -d</code>, what to expect after, and what has actually gone wrong on prior deploys.
+  Source of truth for the steps below: <code>docs/29_HERMESTV_DEPLOY_RUNBOOK.md</code>,
+  <code>docs/30_VPS_PHASE_3_DEPLOY_PLAN.md</code>, <code>docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md</code>,
+  <code>upstream/docker-vps/VPS_COMPOSE.yml</code>, <code>upstream/nginx/hermestv.daveai.tech.conf.example</code>,
+  <code>.github/workflows/ci.yml</code>.
+</p>
+
+<h2>1. Deploy pipeline</h2>
+
+<svg viewBox="0 0 1140 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="git push to live site pipeline">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace, monospace" font-size="12" fill="#e6edf3">
+    <rect x="10"   y="20"  width="140" height="44" rx="6" fill="#1f3a52" stroke="#58a6ff"/>
+    <text x="80" y="40" text-anchor="middle">git push</text>
+    <text x="80" y="55" text-anchor="middle" fill="#8b949e">workstation</text>
+
+    <rect x="180"  y="20"  width="170" height="44" rx="6" fill="#1f3a52" stroke="#58a6ff"/>
+    <text x="265" y="40" text-anchor="middle">CI: 4 gates</text>
+    <text x="265" y="55" text-anchor="middle" fill="#8b949e">schema / web / chatbot / secret</text>
+
+    <rect x="380"  y="20"  width="140" height="44" rx="6" fill="#1f3a52" stroke="#58a6ff"/>
+    <text x="450" y="40" text-anchor="middle">PR merged</text>
+    <text x="450" y="55" text-anchor="middle" fill="#8b949e">main</text>
+
+    <rect x="550"  y="20"  width="160" height="44" rx="6" fill="#1f3a52" stroke="#58a6ff"/>
+    <text x="630" y="40" text-anchor="middle">operator SSH + pull</text>
+    <text x="630" y="55" text-anchor="middle" fill="#8b949e">/home/operator/hermestv</text>
+
+    <rect x="740"  y="20"  width="170" height="44" rx="6" fill="#1f3a52" stroke="#58a6ff"/>
+    <text x="825" y="40" text-anchor="middle">docker compose build</text>
+    <text x="825" y="55" text-anchor="middle" fill="#8b949e">hermes-tv-api + hermes-web-tv</text>
+
+    <rect x="940"  y="20"  width="190" height="44" rx="6" fill="#1f3a52" stroke="#58a6ff"/>
+    <text x="1035" y="40" text-anchor="middle">docker compose up -d</text>
+    <text x="1035" y="55" text-anchor="middle" fill="#8b949e">--no-deps, restart healthy</text>
+
+    <rect x="940"  y="120" width="190" height="44" rx="6" fill="#2a3a52" stroke="#58a6ff"/>
+    <text x="1035" y="140" text-anchor="middle">healthcheck loops</text>
+    <text x="1035" y="155" text-anchor="middle" fill="#8b949e">wget /health 200 (api)</text>
+
+    <rect x="740"  y="120" width="170" height="44" rx="6" fill="#2a3a52" stroke="#58a6ff"/>
+    <text x="825" y="140" text-anchor="middle">host nginx proxy</text>
+    <text x="825" y="155" text-anchor="middle" fill="#8b949e">127.0.0.1:3011 / :3080</text>
+
+    <rect x="550"  y="120" width="160" height="44" rx="6" fill="#2a3a52" stroke="#58a6ff"/>
+    <text x="630" y="140" text-anchor="middle">Cloudflare edge</text>
+    <text x="630" y="155" text-anchor="middle" fill="#8b949e">Flexible TLS, proxied</text>
+
+    <rect x="380"  y="120" width="140" height="44" rx="6" fill="#2a3a52" stroke="#58a6ff"/>
+    <text x="450" y="140" text-anchor="middle">browser/TV</text>
+    <text x="450" y="155" text-anchor="middle" fill="#8b949e">workstation + Mom QN85</text>
+
+    <rect x="180"  y="120" width="170" height="44" rx="6" fill="#1c3a1c" stroke="#56d364"/>
+    <text x="265" y="140" text-anchor="middle" fill="#56d364">site live</text>
+    <text x="265" y="155" text-anchor="middle" fill="#8b949e">hermestv.daveai.tech</text>
+
+    <rect x="380"  y="210" width="320" height="44" rx="6" fill="#4d2a2a" stroke="#f85149"/>
+    <text x="540" y="230" text-anchor="middle" fill="#f85149">acceptance fail -> rollback</text>
+    <text x="540" y="245" text-anchor="middle" fill="#8b949e">docker compose stop hermes-tv-api hermes-web-tv</text>
+  </g>
+
+  <g stroke="#58a6ff" stroke-width="2" fill="none">
+    <line x1="150" y1="42" x2="180" y2="42" marker-end="url(#arr)"/>
+    <line x1="350" y1="42" x2="380" y2="42" marker-end="url(#arr)"/>
+    <line x1="520" y1="42" x2="550" y2="42" marker-end="url(#arr)"/>
+    <line x1="710" y1="42" x2="740" y2="42" marker-end="url(#arr)"/>
+    <line x1="910" y1="42" x2="940" y2="42" marker-end="url(#arr)"/>
+    <line x1="1035" y1="64" x2="1035" y2="120" marker-end="url(#arr)"/>
+    <line x1="940" y1="142" x2="910" y2="142" marker-end="url(#arr)"/>
+    <line x1="740" y1="142" x2="710" y2="142" marker-end="url(#arr)"/>
+    <line x1="550" y1="142" x2="520" y2="142" marker-end="url(#arr)"/>
+    <line x1="380" y1="142" x2="350" y2="142" marker-end="url(#arr)"/>
+    <line x1="450" y1="164" x2="450" y2="210" marker-end="url(#arr)" stroke="#f85149"/>
+  </g>
+</svg>
+
+<p class="muted">
+  CI gates are enforced server-side by GitHub Actions (<code>.github/workflows/ci.yml</code>): schema-validation,
+  web-build, chatbot-integration, secret-scan. All four must be green before the PR can merge to <code>main</code>.
+  Deploys are pull-based: the operator SSHes in and updates the repo &mdash; no push from CI to the VPS.
+</p>
+
+<h2>2. Pre-deploy checklist</h2>
+
+<table>
+  <thead>
+    <tr><th style="width:34px">Done</th><th>Item</th><th>How to verify</th><th>Expected</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>All 4 CI gates green on the merge commit</td>
+      <td>GitHub PR &rarr; Checks tab, or <code>gh pr checks &lt;num&gt;</code></td>
+      <td class="ok">schema-validation, web-build, chatbot-integration, secret-scan = success</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>PR conflicts resolved against current <code>main</code></td>
+      <td>GitHub PR &rarr; "This branch has no conflicts with the base branch"</td>
+      <td class="ok">Mergeable, no conflict markers</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Schema 61/61</td>
+      <td><code>node tools/schema-validate.js</code></td>
+      <td class="ok"><code>Results: 61 PASS, 0 FAIL</code></td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Web build dist/ exists after Vite build</td>
+      <td><code>cd apps/hermes-web-tv && npm run build && ls dist/</code></td>
+      <td class="ok"><code>index.html</code> + hashed assets</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Chatbot integration 40/40</td>
+      <td>CI job <code>chatbot-integration</code>, or run <code>tools/test-chatbot-commands.js</code> against a local API</td>
+      <td class="ok"><code>Results: 40 PASS, 0 FAIL</code></td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Secret scan clean</td>
+      <td><code>bash tools/secret-scan.sh</code> (CI also runs the inline mirror)</td>
+      <td class="ok">Pattern scan: zero matches with real values</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Operator <code>.env</code> on VPS up-to-date with any new keys</td>
+      <td>Diff <code>services/hermes-tv-api/.env.example</code> against <code>/home/operator/hermestv/.env</code></td>
+      <td class="ok">Every required key present (see <a href="#envinv">section 7</a>)</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td><code>.env</code> mode is <code>0600</code> owned by <code>operator:operator</code></td>
+      <td><code>ls -l /home/operator/hermestv/.env</code></td>
+      <td class="ok"><code>-rw------- 1 operator operator</code></td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Pre-deploy snapshot of the 9 existing daveai.tech sites all 200</td>
+      <td>Workstation curl sweep saved to <code>/home/operator/hermestv-deploy-logs/pre-deploy-$TS.txt</code></td>
+      <td class="ok">All 9 = <code>200</code></td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Ports <code>3011</code> and <code>3080</code> free on host</td>
+      <td><code>ss -ltn 'sport = :3011'</code> &amp; <code>ss -ltn 'sport = :3080'</code></td>
+      <td class="ok">Both empty</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Compose config validates</td>
+      <td><code>docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml config --quiet</code></td>
+      <td class="ok">Exit code 0, no output</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Disk + RAM headroom</td>
+      <td><code>df -h /</code> and <code>free -m</code></td>
+      <td class="ok">&ge; 5 GB free disk, &ge; 2 GB free RAM</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Rollback SHA recorded</td>
+      <td><code>git rev-parse HEAD</code> before deploy, saved to notes</td>
+      <td class="ok">40-char SHA written down</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>3. Deploy commands</h2>
+
+<p class="muted">
+  These are the commands the operator runs on the VPS. Every command below appears in the source-of-truth runbooks
+  (<code>29_HERMESTV_DEPLOY_RUNBOOK.md</code>, <code>30_VPS_PHASE_3_DEPLOY_PLAN.md</code>,
+  <code>41_OPERATOR_CREDENTIALS_RUNBOOK.md</code>) &mdash; no fabricated steps.
+</p>
+
+<h3>3.1 SSH to the VPS as the operator user</h3>
+<pre>ssh operator@&lt;vps-host&gt;
+hostname     # expect: srv1376124
+id           # expect: uid=1001(operator) ... groups=...sudo,docker</pre>
+
+<h3>3.2 Update the working copy</h3>
+<pre>cd /home/operator/hermestv
+git fetch origin
+git reset --hard origin/main
+git rev-parse HEAD   # record this SHA for rollback</pre>
+
+<p class="muted">
+  <code>git reset --hard</code> is intentional &mdash; the VPS checkout has no local commits and must mirror
+  <code>origin/main</code> bit-for-bit. <code>.env</code> is gitignored and untouched.
+</p>
+
+<h3>3.3 Compose pre-flight (validate + free ports)</h3>
+<pre>docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml config --quiet
+ss -ltn 'sport = :3011' | tail -n +2   # must be empty
+ss -ltn 'sport = :3080' | tail -n +2   # must be empty</pre>
+
+<h3>3.4 Build the two images</h3>
+<pre>TS=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+mkdir -p /home/operator/hermestv-deploy-logs
+
+docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
+  build hermes-tv-api hermes-web-tv 2>&amp;1 \
+  | tee /home/operator/hermestv-deploy-logs/build-$TS.log
+echo "build exit: ${PIPESTATUS[0]}"</pre>
+
+<p class="muted">
+  Expected build time: 3&ndash;6 minutes total. Acceptable warnings: deprecated npm packages. Stop on any
+  <code>error</code> or non-zero exit.
+</p>
+
+<h3>3.5 Bring the two containers up</h3>
+<pre>docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
+  up -d --no-deps hermes-tv-api hermes-web-tv
+
+# Wait for healthchecks (up to 60 s)
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  api=$(docker inspect -f '{{.State.Health.Status}}' hermestv-vps-api 2&gt;/dev/null || echo absent)
+  web=$(docker inspect -f '{{.State.Health.Status}}' hermestv-vps-web 2&gt;/dev/null || echo absent)
+  echo "  $i x 5s  api=$api  web=$web"
+  if [ "$api" = "healthy" ] &amp;&amp; [ "$web" = "healthy" ]; then break; fi
+  sleep 5
+done</pre>
+
+<p class="muted">
+  Both containers must reach <span class="ok">healthy</span> within 60 s. If either stays <code>starting</code>
+  or <code>unhealthy</code>, jump straight to <a href="#rollback">section 5</a> &mdash; do not poke at the running
+  container.
+</p>
+
+<h2>4. Post-deploy verification</h2>
+
+<p class="muted">Run from the workstation, not from the VPS &mdash; Cloudflare behaviour differs at the origin.</p>
+
+<table>
+  <thead>
+    <tr><th style="width:34px">Done</th><th>Check</th><th>Command</th><th>Expected</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Health endpoint</td>
+      <td><code>curl -sI https://hermestv.daveai.tech/health</code></td>
+      <td class="ok"><code>HTTP/1.1 200 OK</code> (or HTTP/2 200)</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td><code>X-Catalog-Source</code> header present</td>
+      <td><code>curl -sI https://hermestv.daveai.tech/api/catalog</code></td>
+      <td class="ok">Header set to <code>seed-147</code>, <code>iptv-org</code>, <code>jellyfin</code>, <code>threadfin-merged</code>, or a <code>merged-with-*</code> combo</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Catalog item count &ge; 147 (seed floor)</td>
+      <td><code>curl -s https://hermestv.daveai.tech/api/catalog | jq .total</code></td>
+      <td class="ok">&ge; <code>147</code> (more once Threadfin / Jellyfin / iptv-org wire up)</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Layouts route returns 7</td>
+      <td><code>curl -s https://hermestv.daveai.tech/api/layouts | jq .count</code></td>
+      <td class="ok"><code>7</code></td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Play returns a ticket envelope, no stream URL</td>
+      <td><code>curl -s -X POST https://hermestv.daveai.tech/api/play \<br>&nbsp;&nbsp;-H 'content-type: application/json' \<br>&nbsp;&nbsp;-d '{"item_id":"seed-news-001","profile_id":"mom_tv"}' | jq .</code></td>
+      <td class="ok">JSON with <code>ticket</code>, <code>stream_endpoint: /api/play/.../stream</code>, <code>expires_at</code>. Body MUST NOT contain a raw provider URL.</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Web SPA HTML serves</td>
+      <td><code>curl -s https://hermestv.daveai.tech/ | grep -c '&lt;div id="root"&gt;'</code></td>
+      <td class="ok"><code>1</code></td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>All 7 layouts cycle without console errors in a real browser</td>
+      <td>Open <code>https://hermestv.daveai.tech</code> &rarr; pick profile &rarr; click "Look" &rarr; cycle all 7 layouts</td>
+      <td class="ok">Layout switcher modal lists 7 entries, each renders, DevTools console has no <code>Uncaught</code> errors</td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>9 existing daveai.tech sites still 200 (regression sweep)</td>
+      <td>Loop curl over <code>daveai.tech</code>, <code>diy</code>, <code>fleet</code>, <code>game</code>, <code>hermes</code>, <code>hermes3d</code>, <code>openhands</code>, <code>voice</code>, <code>www</code></td>
+      <td class="ok">All 9 = <code>200</code></td>
+    </tr>
+    <tr>
+      <td class="checkbox">[ ]</td>
+      <td>Deploy marker written</td>
+      <td><code>date -u +"%Y-%m-%dT%H:%M:%SZ sha=$(git -C /home/operator/hermestv rev-parse HEAD)" \<br>&nbsp;&nbsp;&gt;&gt; /home/operator/hermestv-deploy-logs/deploy-marker.txt</code></td>
+      <td class="ok">Line appended &mdash; the only on-VPS record of when this release went live</td>
+    </tr>
+  </tbody>
+</table>
+
+<details>
+<summary>Existing-sites regression sweep (loop body)</summary>
+<pre>for s in daveai.tech diy.daveai.tech fleet.daveai.tech game.daveai.tech \
+         hermes.daveai.tech hermes3d.daveai.tech openhands.daveai.tech \
+         voice.daveai.tech www.daveai.tech; do
+  code=$(curl -sI -o /dev/null -w "%{http_code}" "https://$s/" 2&gt;/dev/null)
+  echo "  $s : $code"
+done</pre>
+</details>
+
+<h2 id="rollback">5. Rollback plan</h2>
+
+<p class="muted">
+  Rollback is a 60-second action. Phase 2 stack (api + web) and Phase 3 stack (threadfin / m3u-editor / xtreamfilter)
+  are independent &mdash; never stop a healthy layer while diagnosing a broken one.
+</p>
+
+<h3>5.1 Immediate stop (60 s)</h3>
+<pre>cd /home/operator/hermestv
+docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
+  stop hermes-tv-api hermes-web-tv
+echo "containers stopped; volumes intact"</pre>
+
+<p class="muted">
+  After <code>stop</code>, host nginx returns <code>502</code> for <code>hermestv.daveai.tech</code>. The 9 other daveai.tech
+  sites continue to serve <code>200</code> &mdash; verify with the regression sweep before doing anything else.
+</p>
+
+<h3>5.2 Capture diagnostics</h3>
+<pre>TS=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
+  logs --tail=300 hermes-tv-api  &gt; /home/operator/hermestv-deploy-logs/rollback-api-$TS.log
+docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
+  logs --tail=300 hermes-web-tv &gt; /home/operator/hermestv-deploy-logs/rollback-web-$TS.log
+docker inspect hermestv-vps-api hermestv-vps-web \
+  &gt; /home/operator/hermestv-deploy-logs/rollback-inspect-$TS.json</pre>
+
+<p class="muted">
+  Workstation pulls via <code>scp</code> for offline analysis. <span class="err">Never paste these logs anywhere
+  unredacted</span> &mdash; Threadfin / M3U logs can include provider tokens in URL paths.
+</p>
+
+<h3>5.3 Roll the code back to the previous "known good" SHA</h3>
+<pre>cd /home/operator/hermestv
+git fetch origin
+git checkout &lt;previous-known-good-SHA&gt;
+
+docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
+  build hermes-tv-api hermes-web-tv
+
+docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
+  up -d --no-deps hermes-tv-api hermes-web-tv
+
+curl -sI https://hermestv.daveai.tech/health      # expect 200
+curl -sI https://hermestv.daveai.tech/            # expect 200</pre>
+
+<h3>5.4 Forbidden during rollback</h3>
+<table>
+  <thead><tr><th>Command</th><th>Why it's banned</th></tr></thead>
+  <tbody>
+    <tr><td><code>docker compose down -v</code></td><td>Wipes named volumes &mdash; loses the file-backed settings store and the iptv-org cache. Habit-forming danger.</td></tr>
+    <tr><td><code>docker system prune</code></td><td>Touches Dave's daveai.tech stack containers and other unrelated images.</td></tr>
+    <tr><td><code>docker volume rm</code> anything not <code>hermestv-vps-*</code></td><td>Out-of-scope for HermesTV; same prune risk as above.</td></tr>
+    <tr><td>Removing <code>/etc/nginx/sites-enabled/hermestv.daveai.tech</code></td><td>Triggers an nginx reload that has a non-zero chance of misbehaving on the 9 sibling sites. Leave it &mdash; an empty upstream returns clean 502.</td></tr>
+    <tr><td><code>apt install/remove/purge</code>, <code>systemctl restart nginx</code>, <code>ufw enable/disable</code></td><td>VPS-wide blast radius; never during a HermesTV rollback.</td></tr>
+    <tr><td>Stopping any <code>hermes1</code>..<code>hermes5</code>, <code>pipelines</code>, <code>open-webui</code>, <code>shiba-postgres</code>, <code>model-server</code>, <code>edge-tts-server</code></td><td><code>NEVER_TOUCH_SYSTEM_CRITICAL</code> &mdash; documented in <code>docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md</code>.</td></tr>
+  </tbody>
+</table>
+
+<h2>6. What could go wrong</h2>
+
+<table>
+  <thead>
+    <tr><th>Symptom</th><th>Likely cause</th><th>Resolution</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Build fails on <code>ghcr.io/threadfin/threadfin:latest</code>, <code>ghcr.io/sparkison/m3u-editor:latest</code>, or <code>ghcr.io/spanishst/xtreamfilter:latest</code></td>
+      <td>GitHub Container Registry pull denied / rate-limited. Happened during prior deploys.</td>
+      <td>These three services are Phase 3 only. For a Phase 2 deploy you only need <code>hermes-tv-api</code> and <code>hermes-web-tv</code> &mdash; restrict <code>docker compose build</code> and <code>up -d</code> to those two service names (as in section 3). If you need Phase 3 too, <code>docker login ghcr.io</code> with a PAT before pulling.</td>
+    </tr>
+    <tr>
+      <td><code>npm ci</code> fails with <code>npm ERR! Your lock file ...</code></td>
+      <td>Lockfile drift &mdash; a dependency was bumped in <code>package.json</code> without regenerating the lockfile.</td>
+      <td>Reproduce locally with the same Node 20 image. Fix <code>package-lock.json</code> on the workstation, push a follow-up PR. <span class="warn">Do not</span> patch the lockfile on the VPS.</td>
+    </tr>
+    <tr>
+      <td>Container marked <code>unhealthy</code> with <code>Connection refused</code> on <code>http://localhost:80</code></td>
+      <td>Alpine <code>wget</code> resolves <code>localhost</code> to <code>::1</code> first, but the in-container nginx only binds IPv4 <code>0.0.0.0:80</code>. Discovered during Phase 2 deploy 2026-05-18.</td>
+      <td>Healthcheck already pinned to <code>http://127.0.0.1:80/</code> in <code>upstream/docker-vps/VPS_COMPOSE.yml</code>. If you see this in a custom check, swap <code>localhost</code> &rarr; <code>127.0.0.1</code>.</td>
+    </tr>
+    <tr>
+      <td>VPS disk full during build</td>
+      <td>Old image layers, build cache, and stopped containers accumulate.</td>
+      <td>Before deploy: <code>df -h /</code>. If &lt; 5 GB free, prune <span class="warn">scoped</span> to this project only: <code>docker image prune -a --filter "label=com.docker.compose.project=hermestv-vps"</code>. Never <code>docker system prune</code>.</td>
+    </tr>
+    <tr>
+      <td><code>.env</code> file mode is <code>0644</code> or owned by <code>root:root</code></td>
+      <td>Operator created/edited as root, or scp pushed it.</td>
+      <td><code>chmod 0600 /home/operator/hermestv/.env</code> and <code>chown operator:operator /home/operator/hermestv/.env</code> before <code>docker compose up</code>. Compose <code>env_file</code> still reads it, but a world-readable secrets file is a leak vector. See <code>docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md</code> &sect;3.</td>
+    </tr>
+    <tr>
+      <td>Container flaps between <code>healthy</code> and <code>unhealthy</code></td>
+      <td>OOM from a too-small VPS, network blip, or a slow first-load that exceeds the healthcheck timeout.</td>
+      <td><code>docker stats hermestv-vps-api hermestv-vps-web</code> for memory; <code>docker inspect --format '{{json .State.Health.Log}}' hermestv-vps-api | jq</code> for the last healthcheck attempts. If memory is the cause, restart with a memory limit; if it's first-load slowness, bump <code>start_period</code> in the compose file (currently 15 s for api, 20 s for web).</td>
+    </tr>
+    <tr>
+      <td><code>/api/catalog</code> returns <code>X-Catalog-Source: seed-147</code> even after wiring Threadfin / Jellyfin / iptv-org</td>
+      <td>Wrong env var values, Threadfin playlist named wrong (<code>Apollo</code> instead of <code>apollo</code>), Threadfin still parsing the upstream M3U (~30 s), or <code>THREADFIN_URL</code> set to <code>localhost</code> instead of the container DNS name <code>threadfin</code>.</td>
+      <td>Per <code>docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md</code> &sect;4a step 7: <code>docker compose logs --tail=100 hermes-tv-api</code> and confirm <code>THREADFIN_URL=http://threadfin:34400</code>. Recheck the playlist name in Threadfin's admin UI (lowercase exact match).</td>
+    </tr>
+    <tr>
+      <td>One of the 9 existing daveai.tech sites drops below <code>200</code> after deploy</td>
+      <td>Host nginx reload misbehaved, or a sibling container got OOM-killed during build.</td>
+      <td>Immediate rollback (section 5.1). Do NOT touch host nginx config &mdash; leave it as-is so a clean rollback restores 200s. Then capture diagnostics and investigate offline.</td>
+    </tr>
+    <tr>
+      <td>Cloudflare returns <code>521</code> or <code>522</code></td>
+      <td>Origin not reachable (api or web container down) or Cloudflare-flexible mis-set to "Full".</td>
+      <td>SSH in, confirm both containers <code>healthy</code>, confirm host nginx <code>listen 80;</code> still active for <code>hermestv.daveai.tech</code>. If origin is fine, Cloudflare dashboard &rarr; SSL/TLS &rarr; must be "Flexible" (per <code>upstream/nginx/hermestv.daveai.tech.conf.example</code>).</td>
+    </tr>
+    <tr>
+      <td>Cron-driven iptv-org refresh fills <code>/var/cache/iptv-org</code> indefinitely</td>
+      <td>Volume is named <code>hermestv-vps-iptv-org-cache</code> and grows ~5 MB per refresh cycle.</td>
+      <td>Cron runs at 24 h cadence (<code>lib/iptvOrgRefresh.js</code>) and overwrites &mdash; growth is bounded. If something goes wrong: <code>docker exec hermestv-vps-api ls -la /var/cache/iptv-org/</code>, then <code>docker volume rm hermestv-vps-iptv-org-cache</code> (api restart will repopulate).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="envinv">7. Environment variable inventory</h2>
+
+<p class="muted">
+  Variables the <code>hermes-tv-api</code> container reads. Source columns reference
+  <code>upstream/docker-vps/VPS_COMPOSE.yml</code> (Compose <code>environment:</code> block),
+  <code>services/hermes-tv-api/Dockerfile</code> (image <code>ENV</code>), or
+  <code>/home/operator/hermestv/.env</code> (env_file).
+  <span class="pill req">required</span> = API behaviour changes meaningfully without it.
+  <span class="pill sec">sensitive</span> = value is a credential or token.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Source of value</th>
+      <th>Default</th>
+      <th>Req?</th>
+      <th>Sens?</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>NODE_ENV</code></td>
+      <td>Compose <code>environment</code> + Dockerfile <code>ENV</code></td>
+      <td><code>production</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Standard Node mode. Sets log verbosity and disables dev-only routes.</td>
+    </tr>
+    <tr>
+      <td><code>PORT</code></td>
+      <td>Compose <code>environment</code> + Dockerfile <code>ENV</code></td>
+      <td><code>3011</code> on VPS, <code>3001</code> locally</td>
+      <td><span class="pill req">required</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Inside-container listen port. Host nginx proxies <code>127.0.0.1:3011</code> &rarr; container. Local dev uses 3001 &mdash; 3001 on the VPS is owned by Dave's next-server (Phase 1 audit finding).</td>
+    </tr>
+    <tr>
+      <td><code>HERMES_MANIFESTS_DIR</code></td>
+      <td>Dockerfile <code>ENV</code></td>
+      <td><code>/app-resources/layouts</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Baked layout manifests location. Override only for local dev outside Docker.</td>
+    </tr>
+    <tr>
+      <td><code>HERMES_UPSTREAM_CATALOG</code></td>
+      <td>Dockerfile <code>ENV</code></td>
+      <td><code>/app-resources/apps-catalog.json</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Baked upstream apps catalog. Read by <code>/api/upstream-apps</code>.</td>
+    </tr>
+    <tr>
+      <td><code>HERMES_SETTINGS_STORE</code></td>
+      <td>Dockerfile <code>ENV</code></td>
+      <td><code>/var/lib/hermestv/settings.json</code></td>
+      <td><span class="pill req">required</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>File-backed per-profile settings store. Backed by volume <code>hermestv-vps-settings-store</code>.</td>
+    </tr>
+    <tr>
+      <td><code>AZURE_TTS_KEY</code></td>
+      <td>env_file</td>
+      <td>empty (TTS returns 202 stub)</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill sec">sensitive</span></td>
+      <td>Azure Cognitive Services key. Required only if Azure TTS is enabled. Bixby is forbidden by project rule.</td>
+    </tr>
+    <tr>
+      <td><code>AZURE_TTS_REGION</code></td>
+      <td>env_file</td>
+      <td><code>eastus</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Azure Speech region. Paired with the key above.</td>
+    </tr>
+    <tr>
+      <td><code>JELLYFIN_URL</code></td>
+      <td>env_file</td>
+      <td>empty (Jellyfin adapter falls back)</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Tailscale URL of workstation Jellyfin (e.g. <code>http://100.x.y.z:8096</code>).</td>
+    </tr>
+    <tr>
+      <td><code>JELLYFIN_API_KEY</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill sec">sensitive</span></td>
+      <td>Long-lived Jellyfin API key from Dashboard &rarr; API Keys.</td>
+    </tr>
+    <tr>
+      <td><code>APOLLO_M3U_URL</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill sec">sensitive</span></td>
+      <td>Threadfin-internal M3U URL for Apollo (e.g. <code>http://threadfin:34400/m3u/apollo</code>). Never an upstream provider URL with a token in the path.</td>
+    </tr>
+    <tr>
+      <td><code>APOLLO_EPG_URL</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Threadfin-internal XMLTV EPG URL. Typically <code>http://threadfin:34400/xmltv.xml</code>.</td>
+    </tr>
+    <tr>
+      <td><code>XTREMEHD_M3U_URL</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill sec">sensitive</span></td>
+      <td>Threadfin-internal M3U URL for xTremeHD.</td>
+    </tr>
+    <tr>
+      <td><code>XTREMEHD_EPG_URL</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Threadfin-internal XMLTV EPG URL for xTremeHD.</td>
+    </tr>
+    <tr>
+      <td><code>THREADFIN_URL</code></td>
+      <td>env_file</td>
+      <td><code>http://threadfin:34400</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Docker-DNS URL of the Threadfin container on the internal network. Never <code>localhost</code>.</td>
+    </tr>
+    <tr>
+      <td><code>IPTV_ORG_ENABLED</code></td>
+      <td>env_file</td>
+      <td><code>false</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Toggle the public iptv-org adapter. <code>true</code> fetches the catalog once per 24 h.</td>
+    </tr>
+    <tr>
+      <td><code>IPTV_ORG_COUNTRIES</code></td>
+      <td>env_file</td>
+      <td><code>US,GB,CA,AU</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Comma-separated ISO codes to keep. Everything else dropped.</td>
+    </tr>
+    <tr>
+      <td><code>IPTV_ORG_CATEGORIES</code></td>
+      <td>env_file</td>
+      <td><code>general,news,sports,movies,entertainment,kids,documentary,lifestyle,music</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Category whitelist. NSFW + blocklist + closed are always dropped regardless.</td>
+    </tr>
+    <tr>
+      <td><code>IPTV_ORG_CACHE_DIR</code></td>
+      <td>env_file (with code default)</td>
+      <td><code>/var/cache/iptv-org</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Local JSON cache dir. Backed by volume <code>hermestv-vps-iptv-org-cache</code>.</td>
+    </tr>
+    <tr>
+      <td><code>ANTHROPIC_API_KEY</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill sec">sensitive</span></td>
+      <td>LLM upgrade for chatbot intelligence. The 22-command local pattern matcher works without it.</td>
+    </tr>
+    <tr>
+      <td><code>OPENAI_API_KEY</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill sec">sensitive</span></td>
+      <td>OpenAI-compatible chat completions key. Used by <code>lib/llmFallback.js</code>.</td>
+    </tr>
+    <tr>
+      <td><code>OPENAI_BASE_URL</code></td>
+      <td>env_file</td>
+      <td><code>https://api.openai.com/v1</code></td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Override to point at Ollama, vLLM, or any OpenAI-compatible endpoint.</td>
+    </tr>
+    <tr>
+      <td><code>LLM_DEFAULT_MODEL</code></td>
+      <td>env_file</td>
+      <td>empty</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Model name passed to the chat-completions endpoint.</td>
+    </tr>
+    <tr>
+      <td><code>EXTRA_CORS_ORIGINS</code></td>
+      <td>env_file</td>
+      <td>empty (defaults allow localhost, hermestv.local, 192.168.x.x)</td>
+      <td><span class="pill opt">optional</span></td>
+      <td><span class="pill pub">public</span></td>
+      <td>Comma-separated additional CORS origins. Production sets <code>https://hermestv.daveai.tech</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>8. Hard rules</h2>
+
+<ul>
+  <li><span class="err">Never</span> commit a real <code>.env</code>, Azure key, Jellyfin key, M3U URL with a token, or upstream provider credentials to this repo.</li>
+  <li><span class="err">Never</span> echo the contents of <code>G:\Github\DaveAI-IPTV\private\</code> into chat &mdash; not even partial values.</li>
+  <li><span class="err">Never</span> publish Threadfin / m3u-editor / xtreamfilter admin UIs on the public internet. They bind <code>127.0.0.1</code> on host and are reached over Tailscale only.</li>
+  <li><span class="err">Never</span> run <code>docker compose down -v</code>, <code>docker system prune</code>, or <code>docker volume rm</code> on <code>hermestv-vps-*</code> volumes during a deploy &mdash; you will wipe the settings store, the iptv-org cache, or provider config and force a re-paste.</li>
+  <li><span class="err">Never</span> touch the 19 <code>NEVER_TOUCH_SYSTEM_CRITICAL</code> services listed in <code>docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md</code>.</li>
+  <li><span class="err">Never</span> deploy through a yellow CI &mdash; all four gates must be green on the merge commit.</li>
+</ul>
+
+<hr>
+<p class="muted">
+  Generated 2026-05-18. Update when the compose stack, env schema, or CI gates change.
+  See <code>docs/29_HERMESTV_DEPLOY_RUNBOOK.md</code> for the canonical step-by-step,
+  <code>docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md</code> for the credential-paste workflow, and
+  <code>docs/30_VPS_PHASE_3_DEPLOY_PLAN.md</code> for the IPTV proxy stack rollout.
+</p>
+
+</body>
+</html>
