@@ -183,27 +183,54 @@ router.post('/api/tts/speak', async (req, res) => {
     config.speechSynthesisVoiceName = selectedVoice;
 
     const synth = new sdk.SpeechSynthesizer(config, null);
+
+    // Guard against the Azure SDK firing BOTH the success and error callbacks
+    // (rare but observed in the wild). Without this, the second invocation
+    // would call res.send / res.json after the response has already finished
+    // and crash the process with "Cannot set headers after they are sent."
+    // See audit W3-A1 for the race-condition writeup.
+    let responded = false;
+    function safeRespond(fn) {
+      if (responded) { return; }
+      responded = true;
+      try { fn(); } catch (_) { /* response already detached; swallow */ }
+    }
+
     synth.speakTextAsync(
       text,
       result => {
-        if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-          res.setHeader('Content-Type', 'audio/mpeg');
-          res.setHeader('Cache-Control', 'no-store');
-          res.setHeader('X-Voice', selectedVoice);
-          res.setHeader('X-Profile-Id', profileId);
-          res.send(Buffer.from(result.audioData));
-        } else {
-          res.status(502).json({ error: 'TTS synthesis failed', detail: result.errorDetails || 'unknown' });
-        }
-        synth.close();
+        safeRespond(function() {
+          if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('X-Voice', selectedVoice);
+            res.setHeader('X-Profile-Id', profileId);
+            res.send(Buffer.from(result.audioData));
+          } else {
+            // Don't leak Azure's raw errorDetails to the client — could contain
+            // SDK internal state. Surface a stable code instead. (Audit W3-A4.)
+            res.status(502).json({
+              error: 'tts_synthesis_failed',
+              code: (result && result.errorCode) ? String(result.errorCode) : 'unknown',
+            });
+          }
+        });
+        try { synth.close(); } catch (_) { /* idempotent */ }
       },
       err => {
-        synth.close();
-        res.status(502).json({ error: 'TTS synthesis error', detail: String(err) });
+        safeRespond(function() {
+          // Same — don't echo the SDK error string back; it may include the
+          // key in pathological cases (Azure SDK has been known to do this).
+          var code = (err && err.code) ? String(err.code) : 'unknown';
+          res.status(502).json({ error: 'tts_synthesis_error', code: code });
+        });
+        try { synth.close(); } catch (_) { /* idempotent */ }
       }
     );
   } catch (err) {
-    res.status(500).json({ error: 'tts_internal_error', detail: err.message });
+    // Stable error code for sync failures (e.g. SpeechConfig.fromSubscription
+    // refuses an empty key). Don't echo err.message — could leak.
+    res.status(500).json({ error: 'tts_internal_error', code: (err && err.code) ? String(err.code) : 'init_failed' });
   }
 });
 

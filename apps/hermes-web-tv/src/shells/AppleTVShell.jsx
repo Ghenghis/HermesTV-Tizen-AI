@@ -128,7 +128,15 @@ function AppleTVShell(props) {
             return (
               <button
                 key={tab}
+                data-focusable="true"
+                tabIndex={0}
                 onClick={function() { setActiveTab(i); }}
+                onKeyDown={function(e) {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveTab(i);
+                  }
+                }}
                 style={{
                   background: activeTab === i ? 'rgba(255,255,255,0.1)' : 'none',
                   border: 'none',
@@ -139,7 +147,10 @@ function AppleTVShell(props) {
                   padding: '12px 18px',
                   borderRadius: '8px',
                   transition: 'background 120ms',
+                  outline: 'none',
                 }}
+                onFocus={function(e) { e.currentTarget.style.outline = '2px solid #fff'; e.currentTarget.style.outlineOffset = '-2px'; }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
               >
                 {tab}
               </button>
@@ -165,14 +176,34 @@ function AppleTVShell(props) {
               )}
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
+                  data-focusable="true"
+                  tabIndex={0}
                   onClick={function() { if (onItemSelect) onItemSelect(featured); }}
-                  style={{ padding: '12px 28px', background: '#fff', color: '#000', border: 'none', borderRadius: '20px', fontWeight: 600, fontSize: 'calc(14px * ' + fontScale + ')', cursor: 'pointer' }}
+                  onKeyDown={function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (onItemSelect) onItemSelect(featured);
+                    }
+                  }}
+                  style={{ padding: '12px 28px', background: '#fff', color: '#000', border: 'none', borderRadius: '20px', fontWeight: 600, fontSize: 'calc(14px * ' + fontScale + ')', cursor: 'pointer', outline: 'none' }}
+                  onFocus={function(e) { e.currentTarget.style.outline = '3px solid #1f6feb'; e.currentTarget.style.outlineOffset = '2px'; }}
+                  onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
                 >
                   ▶ Play
                 </button>
                 <button
+                  data-focusable="true"
+                  tabIndex={0}
                   onClick={function() { if (onItemSelect) onItemSelect(featured); }}
-                  style={{ padding: '12px 28px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: 600, fontSize: 'calc(14px * ' + fontScale + ')', cursor: 'pointer' }}
+                  onKeyDown={function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (onItemSelect) onItemSelect(featured);
+                    }
+                  }}
+                  style={{ padding: '12px 28px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: 600, fontSize: 'calc(14px * ' + fontScale + ')', cursor: 'pointer', outline: 'none' }}
+                  onFocus={function(e) { e.currentTarget.style.outline = '3px solid #fff'; e.currentTarget.style.outlineOffset = '2px'; }}
+                  onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
                 >
                   + Add to Library
                 </button>
