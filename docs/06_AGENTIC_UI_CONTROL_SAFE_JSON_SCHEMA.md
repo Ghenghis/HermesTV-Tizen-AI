@@ -13,7 +13,7 @@ This document is the binding contract for how agents (and the floating chatbot) 
 3. Every command is validated against its action-specific JSONSchema **before** any side effect runs.
 4. Every command is scoped to a `profile_id`. Cross-profile changes require a separate command per profile.
 5. Every command is logged to an append-only audit ledger (`proof/agent-commands/<session_id>.jsonl`). The ledger is the source of truth for rollback.
-6. Renderer tier (see `docs/05_THEME_BACKGROUND_ENGINE_CONTRACT.md`) is **not** a writable field via this schema. Tier is automatic-only. `UN`-prefix TVs (Dave's `UN55CU8000BXZA` and all Crystal UHD / entry Samsung lines) always stay baseline. `QN`-prefix TVs (`QN85Q7FAAFXZA`, `QN95Q7FAAFXZA`, and all QLED / Neo QLED lines) auto-enter enhanced after passing the capability probe. These TVs are never system-limited. Agents may neither downgrade `QN`-class TVs nor upgrade `UN`-class TVs.
+6. Renderer tier (see `docs/05_THEME_BACKGROUND_ENGINE_CONTRACT.md`) is **not** a writable field via this schema. Tier is automatic-only. `UN`-prefix TVs (Dave's `UN55CU8000BXZA` and all Crystal UHD / entry Samsung lines) always stay baseline. `QN`-prefix TVs (`QN85Q7FAAFXZA`, `QN95Q7FAAFXZA`, and all QLED / Neo QLED lines) auto-enter enhanced after passing the capability probe. These TVs default to enhanced and must not be artificially capped to baseline mode. Agents cannot permanently downgrade `QN`-class TVs. Agents may only suggest temporary protective adjustments (with visible reason, timeout, rollback, and user override) when a measured runtime health condition requires it. `UN`-class TVs cannot be upgraded by agents.
 7. Provider credentials, API keys, and network endpoints are never reachable from this schema.
 8. Destructive or sensitive commands set `requires_user_confirm: true` and are gated by an on-screen confirm step with a 5s timeout default.
 9. Rate limits apply per agent and per profile. Default: 30 commands per minute per agent, hard cap.
@@ -326,7 +326,9 @@ Agent-safe actions for cache management, soft refresh, version inspection, and p
 
 ### QN vs UN tier rule (binding for this schema)
 
-Agents are **never permitted to system-limit `QN`-prefix TVs**. Any command that would impose a performance cap on a `QN`-class TV — enabling low-memory mode, shrinking caches below the enhanced budget, or downgrading animation/background intensity below the enhanced default — is rejected at the policy stage with `result: "rejected_policy"` before the confirm gate. `UN`-prefix TVs receive all performance management commands normally.
+`QN`-prefix TVs default to enhanced rendering and must not be artificially capped to baseline. Commands that would **permanently** downgrade a `QN`-class TV — enabling low-memory mode, shrinking caches, or downgrading animation/background below the enhanced default — are rejected at the policy stage with `result: "rejected_policy"` before the confirm gate. Commands for **temporary** protective adjustments from agents are allowed when a measured runtime health condition requires it; these must include `temporary: true`, a `reason` string, a `timeout_seconds` value, and `rollback_on_timeout: true`, and must revert automatically when the timeout elapses.
+
+`UN`-prefix TVs receive all performance management commands normally.
 
 ### New action allowlist additions
 
@@ -357,7 +359,10 @@ When the active TV's renderer tier is `enhanced`, the router rejects these comma
 - `set_preview_cache_size` with value other than `large`
 - `set_poster_cache_size` with value other than `large`
 
-Exception: commands with `issued_by.agent_role: "system_user_settings"` (user manually adjusting in the Settings overlay) are allowed — users may personally lower their own settings; agents may not.
+Exceptions:
+
+- Commands with `issued_by.agent_role: "system_user_settings"` (user manually adjusting in the Settings overlay) are always allowed — users may personally lower their own settings, including choosing Battery, Quiet, Reduced Motion, or Safe Mode.
+- Temporary protective commands from any agent role are allowed when a measured runtime health condition requires it. These commands must include `temporary: true`, a `reason` string, a `timeout_seconds` value (max 1800), and `rollback_on_timeout: true`. The router enforces the rollback when the timeout elapses. Such commands must surface in the UI as a dismissible status chip showing the reason and remaining time.
 
 ### Canonical schema: `clear_image_cache`
 

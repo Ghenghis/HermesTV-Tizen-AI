@@ -10,7 +10,7 @@ This document is the binding contract for the 12 static layout presets the Herme
 
 1. There are exactly **12 named static layout presets**. No more in v1. Custom variants are parameter overlays on top of a preset, never new presets.
 2. Every preset must run on the **performance floor**: Dave's `UN55CU8000BXZA`. If a preset cannot run there, it is cut from v1.
-3. Mom's `QN85Q7FAAFXZA` (higher-end class) **automatically receives enhanced rendering** for any preset once runtime capability detection passes. No manual toggle. No user opt-in. The tier engine in `docs/05_THEME_BACKGROUND_ENGINE_CONTRACT.md` decides.
+3. Mom's `QN85Q7FAAFXZA` (higher-end class) **automatically receives enhanced rendering** for any preset once runtime capability detection passes. Enabled automatically after capability proof — no manual action needed to promote. QN-class TVs must not be artificially capped to UN/baseline mode unless the user explicitly chooses Battery, Quiet, Reduced Motion, or Safe Mode, or a measured runtime health condition requires temporary protection (memory pressure, thermal slowdown, repeated frame-budget failure, playback instability). Any protective reduction must include a visible reason, a timeout or restore path, and automatic rollback when the condition clears. Agents cannot permanently downgrade QN-class TVs — they may only suggest temporary protective adjustments with visible reason, timeout, rollback, and user override.
 4. Every preset must declare a complete focus order that a Samsung TV remote (D-pad + OK + Back) can traverse without traps.
 5. Every preset must declare Dave Mode and Mom Mode variants (font scale, density, ring intensity, animation density).
 6. Layout state changes only through the safe JSON command router in `docs/06_AGENTIC_UI_CONTROL_SAFE_JSON_SCHEMA.md`.
@@ -24,7 +24,7 @@ Two automatic tiers. The app picks one at boot from runtime detection — never 
 | Tier | Floor target | Enhanced target | Auto-applies when |
 |---|---|---|---|
 | `baseline` | Dave `UN55CU8000BXZA` (CU8000 / Crystal UHD class) | — | Default for any TV that does not match the enhanced gate |
-| `enhanced` | — | Any `QN`-prefix Samsung TV (QLED / Neo QLED / premium lines — `QN85Q7FAAFXZA`, `QN95Q7FAAFXZA`, and all comparable `QN`-class models). Never system-limited. | Model prefix is `QN` (fast-path) AND AVPlay HLS available AND frame-budget probe passes (0 dropped frames) AND memory headroom probe passes. `UN`-prefix TVs are always baseline regardless of probe results. |
+| `enhanced` | — | Any `QN`-prefix Samsung TV (QLED / Neo QLED / premium lines — `QN85Q7FAAFXZA`, `QN95Q7FAAFXZA`, and all comparable `QN`-class models). Default to enhanced/premium; must not be artificially capped to baseline mode. | Model prefix is `QN` (fast-path) AND AVPlay HLS available AND frame-budget probe passes (0 dropped frames) AND memory headroom probe passes. `UN`-prefix TVs are always baseline regardless of probe results. |
 
 Enhancement deltas applied automatically in `enhanced` tier:
 
@@ -340,9 +340,11 @@ A preset is not "done" until all six artifacts exist and are referenced from the
 
 ### QN vs UN tier rule (binding)
 
-`QN`-prefix Samsung TVs (QLED / Neo QLED / premium lines — `QN85Q7FAAFXZA`, `QN95Q7FAAFXZA`, and all comparable `QN`-class models) are **never system-limited**. All performance caps, low-memory restrictions, and downgrade paths apply exclusively to `UN`-prefix TVs (Crystal UHD / entry-level lines, including `UN55CU8000BXZA`) and any TV that fails the enhanced capability probe.
+`QN`-prefix Samsung TVs (QLED / Neo QLED / premium lines — `QN85Q7FAAFXZA`, `QN95Q7FAAFXZA`, and all comparable `QN`-class models) **default to enhanced/premium rendering** after verified runtime capability proof. They must not be artificially capped to UN/baseline mode unless the user explicitly chooses Battery, Quiet, Reduced Motion, or Safe Mode, or a measured runtime health condition requires temporary protection (memory pressure, thermal slowdown, repeated frame-budget failure, playback instability). Any temporary reduction must be visible to the user with a reason, must have a timeout or restore path, and must roll back automatically when the condition clears.
 
-Users may make personal accessibility choices (Mom Mode, reduced motion, high contrast) on any TV — those are user-driven preferences, not system performance limits.
+Agents cannot permanently downgrade `QN`-class TVs. Agents may only suggest temporary protective adjustments with visible reason, timeout, rollback, and user override.
+
+All non-protective performance caps and low-memory restrictions apply exclusively to `UN`-prefix TVs (Crystal UHD / entry-level lines, including `UN55CU8000BXZA`) and any TV that fails the enhanced capability probe. Users may make personal accessibility choices (Mom Mode, reduced motion, high contrast) on any TV — those are user-driven preferences, not performance restrictions.
 
 ### Settings overlay (accessible from any layout)
 

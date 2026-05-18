@@ -211,7 +211,7 @@ This is the rule that ties tier + theme + background together. **It runs once at
 6. Log final selection to proof/tier-detection/<session_id>.json.
 ```
 
-**Why automatic, not opt-in:** Dave and Mom are not expected to tune renderer tiers manually. The TV that can do more, does more. The TV that cannot, stays safe. Agents may not flip this — see `docs/06`.
+**Why automatic:** The TV that can do more, does more. Enhanced tier activates automatically after capability proof — no manual action is needed to promote a QN-class TV. QN-class TVs must not be artificially capped to baseline mode unless the user explicitly chooses Battery, Quiet, Reduced Motion, or Safe Mode, or a measured runtime health condition requires temporary protection (memory pressure, thermal slowdown, repeated frame-budget failure, playback instability). Any temporary reduction must be visible with a reason and must revert automatically when the condition clears or the protective mode exits. Agents cannot permanently flip the tier — agents may only suggest temporary protective adjustments with visible reason, timeout, rollback, and user override. See `docs/06`.
 
 ## Burn-in protection
 
@@ -277,7 +277,11 @@ For the tier engine:
 
 ### QN vs UN tier rule (binding)
 
-`QN`-prefix TVs are **never limited at the renderer**. Full cache budgets, all 12 background packs, full animation density, and motion/cinematic packs are always available on `QN`-class TVs after the capability probe passes. All cache caps, motion suppressions, and pack downgrades apply only on `UN`-prefix TVs. Agents may not reduce `QN`-class TVs below enhanced defaults via `docs/06`.
+`QN`-prefix TVs **default to enhanced rendering** and must not be artificially capped to baseline. Full cache budgets, all 12 background packs, full animation density, and motion/cinematic packs are available on `QN`-class TVs after the capability probe passes. They may temporarily operate at reduced settings only when the user explicitly chooses Battery, Quiet, Reduced Motion, or Safe Mode, or when a measured runtime health condition (memory pressure, thermal slowdown, repeated frame-budget failure, playback instability) requires temporary protection — the reduced state must be visible with a reason, must have a timeout, and must roll back automatically when the condition clears.
+
+Agents cannot permanently reduce `QN`-class TVs below enhanced defaults. Agents may only suggest temporary protective adjustments with visible reason, timeout, rollback, and user override. See `docs/06` for the command schema.
+
+All non-protective performance caps apply only on `UN`-prefix TVs.
 
 ### Cache surfaces
 
@@ -345,4 +349,4 @@ Small test changes (e.g., one token color value) can be pushed and verified on b
 - User-defined custom themes (token overrides via the safe schema are allowed, fully new theme files are not).
 - User-uploaded background assets (assets ship with the app or come from backend).
 - Animated themes (only backgrounds animate; theme tokens do not animate in v1).
-- Manual tier override by the user or by an agent. The tier engine is automatic only in v1.
+- Permanent tier override by agents or the system. Users may choose Battery/Quiet/Safe Mode to temporarily reduce effects; runtime health conditions may trigger temporary protection — both revert when the condition clears or the mode exits.
