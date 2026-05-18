@@ -71,28 +71,38 @@ function TiviMateShell(props) {
           {channelList.map(function(item, idx) {
             var isActive = idx === activeIdx;
             return (
-              <div
+              <button
                 key={item.id || idx}
+                data-focusable="true"
                 onClick={function() { setActiveIdx(idx); if (onItemSelect) onItemSelect(item); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
+                  width: '100%',
+                  textAlign: 'left',
                   padding: isActive ? '11px 18px 11px 15px' : '11px 18px',
                   borderLeft: isActive ? '3px solid #ff7d3a' : '3px solid transparent',
+                  borderTop: 'none',
+                  borderRight: 'none',
+                  borderBottom: 'none',
                   background: isActive ? 'linear-gradient(90deg, rgba(255,125,58,0.18) 0%, transparent 100%)' : 'transparent',
                   cursor: 'pointer',
-                  transition: 'all 120ms',
+                  transition: 'all 120ms, box-shadow 120ms',
                   color: isActive ? '#fff' : '#8b95a5',
                   fontSize: 'calc(13px * ' + fontScale + ')',
+                  fontFamily: 'inherit',
+                  outline: 'none',
                 }}
                 onMouseEnter={function(e) { if (!isActive) e.currentTarget.style.color = '#fff'; }}
                 onMouseLeave={function(e) { if (!isActive) e.currentTarget.style.color = '#8b95a5'; }}
+                onFocus={function(e) { e.currentTarget.style.borderLeft = '3px solid #ff7d3a'; e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(255,125,58,0.35)'; e.currentTarget.style.color = '#fff'; }}
+                onBlur={function(e) { e.currentTarget.style.borderLeft = isActive ? '3px solid #ff7d3a' : '3px solid transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.color = isActive ? '#fff' : '#8b95a5'; }}
               >
                 <span style={{ color: '#6b7484', fontSize: 'calc(11px * ' + fontScale + ')', width: '26px', fontWeight: 600 }}>{idx + 1}</span>
                 <span style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#1d2330', display: 'grid', placeItems: 'center', fontSize: '14px', flexShrink: 0 }}>📺</span>
                 <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Channel ' + (idx + 1)}</span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -101,7 +111,7 @@ function TiviMateShell(props) {
         <div style={{ borderTop: '1px solid #1b1f27', padding: '8px 0', flexShrink: 0 }}>
           {NAV_ITEMS.map(function(n) {
             return (
-              <div key={n.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 18px', fontSize: 'calc(12px * ' + fontScale + ')', color: '#6b7484', cursor: 'pointer' }}>
+              <div key={n.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', fontSize: 'calc(12px * ' + fontScale + ')', color: '#6b7484', cursor: 'pointer' }}>
                 <span>{n.icon}</span><span>{n.label}</span>
               </div>
             );
@@ -137,7 +147,11 @@ function TiviMateShell(props) {
                   return (
                     <div
                       key={si}
+                      data-focusable="true"
+                      tabIndex={0}
+                      role="button"
                       onClick={function() { if (onItemSelect) onItemSelect(prog); }}
+                      onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(prog); } }}
                       style={{
                         borderLeft: '1px solid #161a22',
                         padding: '8px 10px',
@@ -148,11 +162,14 @@ function TiviMateShell(props) {
                         background: isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.22) 0%, rgba(255,125,58,0.05) 100%)' : 'transparent',
                         borderLeftColor: isLive ? '#ff7d3a' : '#161a22',
                         borderLeftWidth: isLive ? '2px' : '1px',
-                        transition: 'background 120ms',
+                        transition: 'background 120ms, box-shadow 120ms',
                         overflow: 'hidden',
+                        outline: 'none',
                       }}
                       onMouseEnter={function(e) { if (!isLive) e.currentTarget.style.background = 'rgba(255,125,58,0.07)'; }}
                       onMouseLeave={function(e) { if (!isLive) e.currentTarget.style.background = 'transparent'; }}
+                      onFocus={function(e) { e.currentTarget.style.background = isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.32) 0%, rgba(255,125,58,0.1) 100%)' : 'rgba(255,125,58,0.15)'; e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #ff7d3a'; }}
+                      onBlur={function(e) { e.currentTarget.style.background = isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.22) 0%, rgba(255,125,58,0.05) 100%)' : 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
                     >
                       <div style={{ fontSize: 'calc(12px * ' + fontScale + ')', fontWeight: 600, color: '#e6e9ef', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(prog && prog.title) || '—'}
