@@ -3,6 +3,7 @@ import * as profileStore from './store/profileStore.js';
 import * as voicePrefStore from './store/voicePrefStore.js';
 import * as hermesApi from './api/hermesApi.js';
 import * as mockApi from './api/mockApi.js';
+import * as voiceClient from './api/azureVoiceClient.js';
 import ThemeProvider from './components/ThemeProvider.jsx';
 import LayoutShell from './components/LayoutShell.jsx';
 import ProfilePicker from './components/ProfilePicker.jsx';
@@ -516,6 +517,24 @@ function App() {
             m3uProviders: m3uProviders,
             iptvOrgCount: iptvOrgCount,
           });
+
+          // ── Boot greeting via Azure TTS ────────────────────────────────────
+          // Speak a short "Welcome back, Sherri" line through the user's
+          // last-picked Azure voice (or the server-side profile default
+          // when nothing has been persisted yet). Skipped when:
+          //   - profile.audio_feedback is false (Dave's default — silent)
+          //   - the API is unreachable (mock fallback paths)
+          //   - AZURE_TTS_KEY is missing on the server (handled silently —
+          //     the server returns 202 with status=azure_not_configured,
+          //     the client treats it as no_audio and we ignore it so the
+          //     operator's local dev box does not throw a modal at them).
+          if (isOnline && profile.audio_feedback) {
+            var displayName = profile.display_name || 'there';
+            var greeting = 'Welcome back, ' + displayName + '. Your library is ready.';
+            voiceClient
+              .speak(greeting, profileId, persistedVoiceId || undefined)
+              .catch(function() { /* boot greeting is best-effort */ });
+          }
         });
       }).catch(function(profileErr) {
         // Profile fetch failed mid-boot. Don't quietly substitute mock data

@@ -172,9 +172,14 @@ router.post('/api/tts/speak', async (req, res) => {
   }
 
   if (!azureConfigured()) {
+    // Stub response when the Azure subscription credentials are not set on the
+    // server. The credentialGuard middleware (middleware/credentialGuard.js)
+    // strips any response body that mentions the env-var name literally, so we
+    // describe what is missing without naming the env vars — the operator-
+    // facing docs in README explain the exact key/region variable names.
     return res.status(202).json({
       status: 'azure_not_configured',
-      message: 'Set AZURE_TTS_KEY and AZURE_TTS_REGION on the server to enable speech synthesis. Returning a stub for development.',
+      message: 'TTS unconfigured: server is missing the Azure Speech subscription credentials. See README for setup.',
       voice: selectedVoice,
       profile_id: profileId,
       text_length: text.length,
