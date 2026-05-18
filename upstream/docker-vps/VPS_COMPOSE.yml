@@ -146,6 +146,12 @@ services:
     # public internet cannot reach the container directly.
     ports:
       - "127.0.0.1:3011:3011"
+    # Persistence: file-backed settings store at /var/lib/hermestv/settings.json
+    # (see services/hermes-tv-api/src/lib/settingsStore.js). The volume name is
+    # intentionally generic ("-store" not "-settings-store") because sibling
+    # PRs (e.g. voice prefs) drop their own files in the same dir.
+    volumes:
+      - hermestv-vps-settings-store:/var/lib/hermestv
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
@@ -233,5 +239,10 @@ volumes:
     name: hermestv-vps-m3u-editor-data
   hermestv-vps-xtreamfilter-data:
     name: hermestv-vps-xtreamfilter-data
+  # File-backed persistence for hermes-tv-api. Holds settings.json today;
+  # sibling features (voice prefs, etc.) will land their JSON files in the
+  # same dir so they all survive container restarts together.
+  hermestv-vps-settings-store:
+    name: hermestv-vps-settings-store
   # hermestv-vps-caddy-data and -config removed in Phase 2 — Caddy
   # service is no longer in this stack. Host nginx is the edge.
