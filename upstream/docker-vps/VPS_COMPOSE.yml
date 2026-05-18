@@ -128,6 +128,12 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3011"
+    # Phase 2: bind 127.0.0.1:3011 → container 3011 so the host nginx
+    # at /etc/nginx/sites-enabled/hermestv.daveai.tech can reverse-proxy
+    # /api/ and /health to us. 127.0.0.1 only — never 0.0.0.0 — so the
+    # public internet cannot reach the container directly.
+    ports:
+      - "127.0.0.1:3011:3011"
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
@@ -140,7 +146,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # hermes-web-tv — HermesTV React web app (nginx)
-  # Serves the Vite-built SPA and proxies /api/* to hermes-tv-api
+  # Serves the Vite-built SPA. Host nginx (NOT this nginx) is the edge.
   # Build from local source — run: docker compose build hermes-web-tv
   # Mom (Sherri) on QN85 accesses this via Samsung Internet browser
   # Dave accesses this from his Windows workstation browser
@@ -150,6 +156,12 @@ services:
       context: ../../apps/hermes-web-tv
       dockerfile: Dockerfile
     container_name: hermestv-vps-web
+    # Phase 2: bind 127.0.0.1:3080 → container 80. Port 8081 was the original
+    # plan but live discovery in Phase 1.5 found it bound by kilocode python;
+    # 3080 confirmed free (see docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md).
+    # 127.0.0.1 only — host nginx is the only edge for the public internet.
+    ports:
+      - "127.0.0.1:3080:80"
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
@@ -163,37 +175,24 @@ services:
       start_period: 20s
 
   # ---------------------------------------------------------------------------
-  # Caddy — Reverse proxy and TLS gateway
-  # Routes external requests to Threadfin, m3u-editor, and xtreamfilter
-  # Caddyfile is mounted read-only from ./Caddyfile
-  # Replace hermestv.example.com in Caddyfile with the real domain before deploying
-  # In production: bind Caddy to the Tailscale IP — see docs/research/agent-11-backend-vps-isolation.md
+  # Caddy — REMOVED in Phase 2.
+  #
+  # Original plan: ship Caddy in-stack to terminate TLS for HermesTV.
+  # Phase 1 audit (2026-05-18) showed the VPS already runs host-level nginx
+  # on ports 80/443 for 10 daveai.tech sites with Cloudflare-proxied DNS
+  # (Flexible mode: edge terminates TLS, origin is HTTP-only). Running our
+  # own Caddy in addition would compete for 80/443 and break everything.
+  #
+  # Decision: HermesTV's edge is the existing host nginx, configured by the
+  # operator-installed site config in upstream/nginx/hermestv.daveai.tech.conf
+  # (already deployed in Phase 1.5). HermesTV exposes only 127.0.0.1:3011 and
+  # 127.0.0.1:3080; host nginx proxies hermestv.daveai.tech → those loopback
+  # ports.
+  #
+  # The Caddyfile at upstream/docker-vps/Caddyfile is preserved as reference
+  # for a future option to switch to Caddy edge if the operator deprecates
+  # the host nginx. It is NOT used by this compose stack.
   # ---------------------------------------------------------------------------
-  caddy:
-    image: caddy:latest
-    container_name: hermestv-vps-caddy
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - hermestv-vps-caddy-data:/data
-      - hermestv-vps-caddy-config:/config
-    ports:
-      - "80:80"
-      - "443:443"
-    restart: unless-stopped
-    networks:
-      - hermestv-vps-internal
-    depends_on:
-      - threadfin
-      - m3u-editor
-      - xtreamfilter
-      - hermes-tv-api
-      - hermes-web-tv
-    healthcheck:
-      test: ["CMD", "caddy", "version"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
 # ---------------------------------------------------------------------------
 # Network
@@ -219,7 +218,5 @@ volumes:
     name: hermestv-vps-m3u-editor-data
   hermestv-vps-xtreamfilter-data:
     name: hermestv-vps-xtreamfilter-data
-  hermestv-vps-caddy-data:
-    name: hermestv-vps-caddy-data
-  hermestv-vps-caddy-config:
-    name: hermestv-vps-caddy-config
+  # hermestv-vps-caddy-data and -config removed in Phase 2 — Caddy
+  # service is no longer in this stack. Host nginx is the edge.
