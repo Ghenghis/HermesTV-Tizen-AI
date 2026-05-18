@@ -1,4 +1,4 @@
-# 30 — Mom-Mode Accessibility Audit (B2.5 read-only review)
+# 36 — Mom-Mode Accessibility Audit (B2.5 read-only review)
 
 **Audit date:** 2026-05-18
 **Audited branch:** `audit/mom-mode-accessibility` (off latest `main`, `b68d48a`)
@@ -561,6 +561,6 @@ L = architectural touch, > 1 hr.
 
 ## Read-only verification
 
-This audit produced **two** new docs (`docs/30_*.md`, `docs/31_*.md`). No
+This audit produced **two** new docs (`docs/36_*.md`, `docs/37_*.md`). No
 shell or component files were modified. `git status` on the audit branch
 shows only documentation additions.

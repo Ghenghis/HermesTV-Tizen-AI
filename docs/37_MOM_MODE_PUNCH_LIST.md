@@ -1,6 +1,6 @@
-# 31 — Mom-Mode Punch List (actionable fixes)
+# 37 — Mom-Mode Punch List (actionable fixes)
 
-**Source audit:** `docs/30_MOM_MODE_ACCESSIBILITY_AUDIT.md`
+**Source audit:** `docs/36_MOM_MODE_ACCESSIBILITY_AUDIT.md`
 **Status:** read-only diagnostic. **No code changes in this PR** — the fixes
 listed below will land in a separate follow-up PR after review.
 **Sort:** rows sorted by impact ÷ effort (highest first).
