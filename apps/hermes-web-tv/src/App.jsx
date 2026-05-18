@@ -1043,7 +1043,7 @@ function App() {
         {/* Shell renderer — active shell layout OR default grid */}
         {(function() {
           var resolvedLayout = state.activeLayout || (profile.mom_mode ? 'mom-mode' : '');
-          var validShells = ['tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen', 'mom-mode', 'dave-power'];
+          var validShells = ['tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen', 'mom-mode', 'dave-power', 'zero'];
           if (resolvedLayout && validShells.indexOf(resolvedLayout) !== -1) {
             return (
               <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
