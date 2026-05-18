@@ -68,7 +68,14 @@ function getCatalog() {
     if (!response.ok) {
       throw makeNetworkError('Catalog fetch failed: HTTP ' + response.status);
     }
-    return response.json();
+    var sourceHeader = response.headers.get('X-Catalog-Source') || null;
+    return response.json().then(function(body) {
+      // Surface the response header on the returned object so the UI can
+      // render an honest "data source" badge (Live providers / Jellyfin /
+      // iptv-org / Mock seed). Tizen 6.5 / Chrome 76 safe — no spread.
+      body._source_header = sourceHeader;
+      return body;
+    });
   });
 }
 

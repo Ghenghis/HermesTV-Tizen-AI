@@ -306,6 +306,11 @@ var INITIAL_STATE = {
   // Selected item for detail panel
   selectedItem: null,
   selectedProviderId: null,
+  // Catalog source signal from /api/catalog's X-Catalog-Source response header
+  // or _meta.source field. Used by the Settings panel "data source" badge so
+  // the operator can tell at a glance whether real providers are wired vs
+  // the mock seed is being served.
+  catalogSource: null,
 };
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -386,6 +391,11 @@ function App() {
           // Support both array-of-items and catalog-wrapper formats
           var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
           var actors = rawCatalog.actors || [];
+          // X-Catalog-Source header (or _meta.source fallback) — honest data
+          // source signal for the Settings badge.
+          var sourceHeader = rawCatalog._source_header || null;
+          var metaSource = rawCatalog._meta && rawCatalog._meta.source ? rawCatalog._meta.source : null;
+          var catalogSource = sourceHeader || metaSource || null;
 
           patchState({
             loading: false,
@@ -397,6 +407,7 @@ function App() {
             tvModel: tvModel,
             online: isOnline,
             showProfilePicker: false,
+            catalogSource: catalogSource,
           });
         });
       }).catch(function(profileErr) {
@@ -1004,22 +1015,45 @@ function App() {
                     {state.tier === 'enhanced' ? 'Enhanced' : 'Degraded'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--muted)' }}>Phase</span>
-                  <span
-                    style={{
-                      fontSize: 'calc(0.7rem * var(--font-scale, 1))',
-                      fontWeight: '700',
-                      color: '#e3b341',
-                      border: '1px solid #e3b341',
-                      borderRadius: '3px',
-                      padding: '0.1rem 0.35rem',
-                      backgroundColor: 'rgba(227,179,65,0.08)',
-                    }}
-                  >
-                    B2 — Mock Mode
-                  </span>
-                </div>
+                {/* Honest data-source badge — replaces the static "B2 — Mock Mode"
+                    label so the operator sees at a glance whether real providers
+                    are serving the catalog or the mock seed is filling in. */}
+                {(function() {
+                  var src = state.catalogSource || 'unknown';
+                  var label;
+                  var color;
+                  if (src === 'jellyfin' || src === 'threadfin-merged' || src === 'merged-with-iptv-org') {
+                    label = 'Live · ' + src;
+                    color = '#22c55e'; // green
+                  } else if (src === 'mock-fallback' || src === 'mock-threadfin-failed') {
+                    label = 'Mock fallback (provider error)';
+                    color = '#ef4444'; // red — provider was reachable but failed
+                  } else if (src === 'mock-no-jellyfin' || src === 'unknown') {
+                    label = 'Mock seed (no providers configured)';
+                    color = '#e3b341'; // amber — no creds pasted
+                  } else {
+                    label = src;
+                    color = '#8b949e'; // grey — unrecognized
+                  }
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--muted)' }}>Data</span>
+                      <span
+                        style={{
+                          fontSize: 'calc(0.7rem * var(--font-scale, 1))',
+                          fontWeight: '700',
+                          color: color,
+                          border: '1px solid ' + color,
+                          borderRadius: '3px',
+                          padding: '0.1rem 0.35rem',
+                          backgroundColor: color + '14', // ~8% alpha
+                        }}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Change voice button */}
