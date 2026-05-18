@@ -37,8 +37,14 @@ services:
       # Enter M3U playlist URLs and provider tokens via the admin UI at runtime.
     volumes:
       - hermestv-vps-threadfin-data:/home/threadfin
+    # SECURITY: 127.0.0.1 ONLY — never 0.0.0.0. The Threadfin admin UI at
+    # /web accepts the operator's M3U URLs + Xtream Codes username/password
+    # without authentication. If 34400 is bound to all interfaces, any
+    # internet-side scanner can hit the Hostinger VPS public IP on this
+    # port and read or modify the playlist configuration. Operator
+    # reaches the UI via Tailscale or `ssh -L 34400:127.0.0.1:34400`.
     ports:
-      - "34400:34400"
+      - "127.0.0.1:34400:34400"
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
@@ -67,8 +73,12 @@ services:
       # mounted volume (hermestv-vps-m3u-editor-data).
     volumes:
       - hermestv-vps-m3u-editor-data:/config
+    # SECURITY: 127.0.0.1 ONLY — never 0.0.0.0. m3u-editor's web UI lets
+    # an unauthenticated visitor edit playlists and read/write any source
+    # URL the operator has configured. Public-internet exposure of this
+    # port is a credential-leak vector. Reach via Tailscale or SSH tunnel.
     ports:
-      - "4200:4200"
+      - "127.0.0.1:4200:4200"
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
@@ -97,8 +107,12 @@ services:
       # They are stored in the mounted volume (hermestv-vps-xtreamfilter-data).
     volumes:
       - hermestv-vps-xtreamfilter-data:/config
+    # SECURITY: 127.0.0.1 ONLY — never 0.0.0.0. xtreamfilter accepts
+    # Xtream Codes URL + username + password through its admin UI and
+    # stores them in the mounted volume. Public-internet exposure
+    # would expose those credentials to anyone scanning the VPS IP.
     ports:
-      - "3456:3456"
+      - "127.0.0.1:3456:3456"
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
