@@ -180,7 +180,60 @@ jobs:
           retention-days: 7
 
   # -----------------------------------------------------------------------
-  # 4) Secret scan — fast, parallel, no Node deps.
+  # 4) E2E smoke — 12 critical-endpoint probes against a freshly-booted API.
+  # Boots the API in-process on PORT=3199 (test-e2e-smoke.js handles its own
+  # /health wait) so this job stays self-contained — no nohup, no PID file.
+  # Expected: "12 PASS, 0 FAIL" from tools/test-e2e-smoke.js. Documented
+  # stub statuses (503 on /api/play/.../stream, 202/503 on /api/tts) are
+  # treated as PASS inside the test; only contract drift breaks the gate.
+  # -----------------------------------------------------------------------
+  e2e-smoke:
+    name: E2E smoke (12 probes)
+    runs-on: ubuntu-latest
+    needs: chatbot-integration
+    timeout-minutes: 10
+    env:
+      PORT: '3199'
+      NODE_ENV: 'test'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            services/hermes-tv-api/package-lock.json
+
+      - name: Install API deps
+        working-directory: services/hermes-tv-api
+        run: npm ci
+
+      - name: Run E2E smoke suite (boots API in-process on PORT=3199)
+        run: node tools/test-e2e-smoke.js | tee e2e-smoke.log
+
+      - name: Enforce 12 PASS / 0 FAIL
+        run: |
+          if ! grep -qE 'Results:[[:space:]]+12[[:space:]]+PASS,[[:space:]]+0[[:space:]]+FAIL' e2e-smoke.log; then
+            echo "::error::test-e2e-smoke.js did not report '12 PASS, 0 FAIL'"
+            tail -n 40 e2e-smoke.log
+            exit 1
+          fi
+          echo "E2E smoke: 12 PASS, 0 FAIL — OK"
+
+      - name: Upload smoke log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-log
+          path: e2e-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # -----------------------------------------------------------------------
+  # 5) Secret scan — fast, parallel, no Node deps.
   # Inline grep patterns mirror tools/secret-scan.sh PATTERNS array so the
   # CI signal matches what an operator runs locally before opening a PR.
   # -----------------------------------------------------------------------

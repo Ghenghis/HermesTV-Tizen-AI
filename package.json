@@ -12,6 +12,7 @@
     "audit:secrets": "node -e \"const {execSync}=require('child_process');try{execSync('bash tools/secret-scan.sh',{stdio:'inherit'})}catch(e){process.exit(1)}\"",
     "test:tiers": "node tools/tier-detect-test.js",
     "test:chatbot": "node tools/test-chatbot-commands.js",
+    "test:e2e": "node tools/test-e2e-smoke.js",
     "test:layouts": "cd tests/playwright && npm test",
     "test:layouts:install": "cd tests/playwright && npm install && npx playwright install chromium"
   },
