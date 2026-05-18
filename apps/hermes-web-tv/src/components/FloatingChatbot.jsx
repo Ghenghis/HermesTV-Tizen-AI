@@ -5,14 +5,27 @@ import * as hermesApi from '../api/hermesApi.js';
 import * as mockApi from '../api/mockApi.js';
 import * as voiceClient from '../api/azureVoiceClient.js';
 import { getResponseText } from '../utils/commandResponseText.js';
+import { matchGreeting } from '../utils/chatbotGreetings.js';
 import CommandChips from './CommandChips.jsx';
 import CommandHelpModal from './CommandHelpModal.jsx';
 
 var STATES = { minimized: 'minimized', compact: 'compact', expanded: 'expanded', walkie: 'walkie-talkie' };
 
 var MOCK_HISTORY = [
-  { role: 'agent', text: 'Hi! I\'m Hermes. Type a command or tap a chip below. Try: show movies, mom mode, dark theme, show 4K.' },
+  { role: 'agent', text: 'Hi! I\'m Hermes. Type a command or tap a Suggestion below. Try: show movies, mom mode, dark theme, show 4K.' },
 ];
+
+// Friendlier no-match message shown when the backend returns
+// { valid: false, source: 'no_match' } — the 22-pattern table missed and
+// the LLM fallback is not configured. The user's input reached the server
+// fine, so do NOT call this a connectivity issue.
+function buildNoMatchReply(userText) {
+  var trimmed = (userText || '').trim();
+  var prefix = trimmed.length > 0 && trimmed.length <= 40
+    ? 'I didn\'t understand "' + trimmed + '". '
+    : 'I didn\'t understand that. ';
+  return prefix + 'Try "show movies", "show 4K", "mom mode", or "dark theme" — or tap a Suggestion below.';
+}
 
 function FloatingChatbot(props) {
   var profile = props.profile || {};
@@ -81,6 +94,22 @@ function FloatingChatbot(props) {
     // Add user message immediately
     setHistory(function(prev) { return prev.concat([{ role: 'user', text: text }]); });
     setInputText('');
+
+    // ── Client-side greeting fast-path ─────────────────────────────────
+    // "hello", "hi", "help", "thanks", etc. don't match the 22-pattern
+    // command table, and the LLM fallback may be unconfigured in prod.
+    // Match them locally so Mom and Dave get an instant friendly reply
+    // instead of a no-match or (previously) a misleading "Couldn't reach
+    // the server" message. Greetings never touch the API.
+    var greetingReply = matchGreeting(text);
+    if (greetingReply) {
+      setHistory(function(prev) {
+        return prev.concat([{ role: 'agent', text: greetingReply }]);
+      });
+      speakIfEnabled(greetingReply);
+      return;
+    }
+
     setSubmitting(true);
 
     // Build audit log envelope (show_notification is valid in CommandValidator)
@@ -111,13 +140,24 @@ function FloatingChatbot(props) {
         });
         speakIfEnabled(responseText);
       } else {
-        var errMsg = result.error || 'Command not recognized.';
+        // API responded 200 with valid:false (regex miss + LLM skipped/failed).
+        // This is NOT a network failure — the server is healthy, it just
+        // didn't recognise the phrase. Show a friendly client-side reply
+        // rather than echoing the verbose server error string.
+        var noMatchReply = buildNoMatchReply(text);
         setHistory(function(prev) {
-          return prev.concat([{ role: 'agent', text: errMsg }]);
+          return prev.concat([{ role: 'agent', text: noMatchReply }]);
         });
-        speakIfEnabled(errMsg);
+        speakIfEnabled(noMatchReply);
       }
-    }).catch(function() {
+    }).catch(function(err) {
+      // Reached only on real network failure: fetch reject, timeout
+      // (hermesApi.fetchWithTimeout), or non-2xx HTTP (validateCommand
+      // throws makeNetworkError when response.ok is false). The user input
+      // never reached a healthy server in these cases — say so honestly.
+      // err is intentionally unused (no per-error UX yet); reference once
+      // so lint doesn't flag it and so console retains the diagnostic.
+      if (err && err.message) { try { console.warn('[chatbot] validate failed:', err.message); } catch (e) {} }
       setSubmitting(false);
       var fallback = 'Couldn\'t reach the server. Try again in a moment.';
       setHistory(function(prev) {
@@ -151,13 +191,18 @@ function FloatingChatbot(props) {
         });
         speakIfEnabled(responseText);
       } else {
-        var chipErr = result.error || 'Command not recognized.';
+        // Same as handleSend: 200 + valid:false is a recognition miss,
+        // NOT a connectivity issue. Chip commands are exact matches so
+        // this should never fire, but keep the friendly fallback for
+        // parity if the command table ever drifts.
+        var chipNoMatch = buildNoMatchReply(commandText);
         setHistory(function(prev) {
-          return prev.concat([{ role: 'agent', text: chipErr }]);
+          return prev.concat([{ role: 'agent', text: chipNoMatch }]);
         });
-        speakIfEnabled(chipErr);
+        speakIfEnabled(chipNoMatch);
       }
-    }).catch(function() {
+    }).catch(function(err) {
+      if (err && err.message) { try { console.warn('[chatbot] chip validate failed:', err.message); } catch (e) {} }
       setSubmitting(false);
       setInputText('');
       var chipFallback = 'Couldn\'t reach the server. Try again.';
