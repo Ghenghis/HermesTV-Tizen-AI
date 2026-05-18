@@ -1,7 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+# npm 10+ removed --only=production (deprecated since npm 7); --omit=dev is
+# the supported replacement and is forward-compatible with npm 11+.
+RUN npm ci --omit=dev
 COPY src/ ./src/
 ENV NODE_ENV=production
 # Phase 1.5: container defaults to 3011 (VPS port 3001 already bound by
