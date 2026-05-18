@@ -275,11 +275,22 @@ function matchesQualityFilter(item, qualityFilter) {
   return true;
 }
 
-function applyFilters(catalog, providerFilter, contentFilter, qualityFilter) {
+function matchesActorFilter(item, actorFilter) {
+  if (!actorFilter) { return true; }
+  var meta = item.metadata || {};
+  var ids = Array.isArray(meta.cast_ids) ? meta.cast_ids : [];
+  for (var i = 0; i < ids.length; i++) {
+    if (ids[i] === actorFilter) { return true; }
+  }
+  return false;
+}
+
+function applyFilters(catalog, providerFilter, contentFilter, qualityFilter, actorFilter) {
   return catalog.filter(function(item) {
     return matchesProviderFilter(item, providerFilter) &&
            matchesContentFilter(item, contentFilter) &&
-           matchesQualityFilter(item, qualityFilter);
+           matchesQualityFilter(item, qualityFilter) &&
+           matchesActorFilter(item, actorFilter);
   });
 }
 
@@ -302,6 +313,9 @@ var INITIAL_STATE = {
   providerFilter: 'all',
   contentFilter: 'all',
   qualityFilter: 'all',
+  // Actor filter — set when the user clicks an actor card in MediaDetailPanel.
+  // Format: { actor_id, name }. null when no actor filter is active.
+  actorFilter: null,
   activeLayout: '',
   showLayoutSwitcher: false,
   showVoicePicker: false,
@@ -551,6 +565,24 @@ function App() {
     patchState({ showPlayer: false, playerTicket: null, playerError: '' });
   }
 
+  // Triggered when the user clicks an actor card in the MediaDetailPanel.
+  // Sets a server-agnostic actor filter (matched against item.metadata.cast_ids)
+  // and closes the detail panel so the filtered grid is immediately visible.
+  // A dismissable banner above the catalog shows "Filtering by ACTOR" with
+  // a Clear button — see the renderActorFilterBanner block below.
+  function handleFindSimilarActor(actor) {
+    if (!actor || !actor.actor_id) { return; }
+    patchState({
+      actorFilter: { actor_id: actor.actor_id, name: actor.name || 'Unknown' },
+      selectedItem: null,
+      selectedProviderId: null,
+    });
+  }
+
+  function handleClearActorFilter() {
+    patchState({ actorFilter: null });
+  }
+
   function handleResetDefaults() {
     patchState({
       providerFilter: 'all',
@@ -593,7 +625,7 @@ function App() {
         patchState({ profile: Object.assign({}, state.profile, { reduced_motion: false }) });
       }
     } else if (action === 'reset_filters') {
-      patchState({ providerFilter: 'all', contentFilter: 'all', qualityFilter: 'all' });
+      patchState({ providerFilter: 'all', contentFilter: 'all', qualityFilter: 'all', actorFilter: null });
     }
     // show_detail and find_similar_actor: no state mutation needed (chatbot response text handles UX)
   }
@@ -725,12 +757,13 @@ function App() {
 
   var profile = state.profile || {};
 
-  // Apply all three filters to the catalog
+  // Apply all four filters (provider + content + quality + actor) to the catalog
   var filteredCatalog = applyFilters(
     state.catalog,
     state.providerFilter,
     state.contentFilter,
-    state.qualityFilter
+    state.qualityFilter,
+    state.actorFilter ? state.actorFilter.actor_id : null
   );
 
   // ── Main app shell ──
@@ -757,6 +790,60 @@ function App() {
           >
             <span aria-hidden="true">&#x26A0;</span>
             Offline mode — showing cached content. Backend at hermestv.local is unreachable.
+          </div>
+        )}
+
+        {/* Actor filter banner — visible whenever the user has clicked an
+            actor card to "find more with this actor". One-tap Clear button
+            restores the unfiltered catalog. Keyboard-focusable so Tizen
+            remote users can reach it. */}
+        {state.actorFilter && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              backgroundColor: 'var(--accent, #1f6feb)',
+              color: '#ffffff',
+              padding: '0.5rem 1.5rem',
+              fontSize: 'calc(0.85rem * var(--font-scale, 1))',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0,
+              gap: '0.75rem',
+            }}
+          >
+            <span>
+              <span aria-hidden="true">&#x1F3AC;</span>{' '}
+              More with <strong>{state.actorFilter.name}</strong> &mdash; showing {filteredCatalog.length} {filteredCatalog.length === 1 ? 'title' : 'titles'}
+            </span>
+            <button
+              tabIndex={0}
+              onClick={handleClearActorFilter}
+              onKeyDown={function(e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClearActorFilter(); }
+              }}
+              aria-label={'Clear actor filter (' + state.actorFilter.name + ')'}
+              style={{
+                padding: '0.3rem 0.8rem',
+                backgroundColor: 'rgba(0,0,0,0.25)',
+                border: '1px solid rgba(255,255,255,0.4)',
+                borderRadius: '5px',
+                color: '#ffffff',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid #ffffff';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              Clear filter
+            </button>
           </div>
         )}
 
@@ -1005,6 +1092,7 @@ function App() {
             selectedProviderId={state.selectedProviderId}
             globalProviders={state.providers}
             onPlay={handlePlay}
+            onFindSimilarActor={handleFindSimilarActor}
           />
         )}
 
