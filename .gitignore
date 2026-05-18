@@ -57,3 +57,8 @@ coverage/
 # The numbered summary doc (docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md) carries
 # only what is safe to share.
 docs/research/vps-phase-1-audit-RUN-*.md
+
+# Playwright MCP scrape artifacts (browser console logs, page snapshots,
+# screenshots from MCP-driven scrapes). These accumulate locally as side
+# effects of running playwright tests and should never be committed.
+.playwright-mcp/
