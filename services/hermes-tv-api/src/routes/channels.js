@@ -62,11 +62,15 @@ router.get('/', function(req, res) {
   const { profile_id } = req.query;
 
   if (!profile_id) {
-    return res.status(400).json({ error: 'profile_id query parameter is required' });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'profile_id query parameter is required',
+    });
   }
   if (!VALID_PROFILES.has(profile_id)) {
     return res.status(400).json({
-      error: 'profile_id must be one of: ' + Array.from(VALID_PROFILES).join(', '),
+      error: 'validation_failed',
+      message: 'profile_id must be one of: ' + Array.from(VALID_PROFILES).join(', '),
     });
   }
 
@@ -87,7 +91,8 @@ router.get('/:channel_id', function(req, res) {
 
   if (!channel) {
     return res.status(404).json({
-      error:      'Channel not found',
+      error:      'channel_not_found',
+      message:    'Channel not found',
       channel_id: channel_id,
     });
   }

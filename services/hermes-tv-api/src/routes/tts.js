@@ -133,19 +133,30 @@ router.post('/api/tts/speak', async (req, res) => {
   const voiceOverride = body.voice_id;
 
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
-    return res.status(400).json({ error: 'text is required and must be a non-empty string' });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'text is required and must be a non-empty string',
+    });
   }
   if (text.length > 800) {
-    return res.status(400).json({ error: 'text exceeds maximum length of 800 characters', max: 800 });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'text exceeds maximum length of 800 characters',
+      max: 800,
+    });
   }
   if (CREDENTIAL_PATTERN.test(text)) {
     return res.status(400).json({
-      error: 'Text contains a forbidden pattern. Credential-like strings may not be synthesised.',
+      error: 'credential_pattern_blocked',
+      message: 'Text contains a forbidden pattern. Credential-like strings may not be synthesised.',
       code: 'TTS_CREDENTIAL_PATTERN_BLOCKED',
     });
   }
   if (!profileId) {
-    return res.status(400).json({ error: 'profile_id is required' });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'profile_id is required',
+    });
   }
 
   let selectedVoice = PROFILE_VOICE_OVERRIDES[profileId] || PROFILE_DEFAULT_VOICE[profileId] || PROFILE_DEFAULT_VOICE.mom_tv;
@@ -153,7 +164,8 @@ router.post('/api/tts/speak', async (req, res) => {
     const allowed = await isVoiceAllowed(voiceOverride);
     if (!allowed) {
       return res.status(400).json({
-        error: 'voice_id is not in the permitted catalog',
+        error: 'invalid_voice_id',
+        message: 'voice_id is not in the permitted catalog',
       });
     }
     selectedVoice = voiceOverride;
