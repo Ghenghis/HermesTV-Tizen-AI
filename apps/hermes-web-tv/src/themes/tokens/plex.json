@@ -1,0 +1,15 @@
+{
+  "id": "plex",
+  "name": "Plex Gold",
+  "layout_id": "plex",
+  "tokens": {
+    "--bg": "#1f2326",
+    "--surface": "#191b1d",
+    "--surface-raised": "#22252a",
+    "--text": "#eaeaea",
+    "--muted": "#b2b9c1",
+    "--accent": "#e5a00d",
+    "--border": "#2a2c2f",
+    "--font-scale": "1"
+  }
+}

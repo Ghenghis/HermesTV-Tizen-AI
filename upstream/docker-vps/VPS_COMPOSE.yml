@@ -110,6 +110,53 @@ services:
       start_period: 15s
 
   # ---------------------------------------------------------------------------
+  # hermes-tv-api — HermesTV backend API (Express)
+  # Serves /health, /api/settings, /api/layouts, /api/upstream-apps, etc.
+  # Build from local source — run: docker compose build hermes-tv-api
+  # ---------------------------------------------------------------------------
+  hermes-tv-api:
+    build:
+      context: ../../services/hermes-tv-api
+      dockerfile: Dockerfile
+    container_name: hermestv-vps-api
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+    restart: unless-stopped
+    networks:
+      - hermestv-vps-internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # hermes-web-tv — HermesTV React web app (nginx)
+  # Serves the Vite-built SPA and proxies /api/* to hermes-tv-api
+  # Build from local source — run: docker compose build hermes-web-tv
+  # Mom (Sherri) on QN85 accesses this via Samsung Internet browser
+  # Dave accesses this from his Windows workstation browser
+  # ---------------------------------------------------------------------------
+  hermes-web-tv:
+    build:
+      context: ../../apps/hermes-web-tv
+      dockerfile: Dockerfile
+    container_name: hermestv-vps-web
+    restart: unless-stopped
+    networks:
+      - hermestv-vps-internal
+    depends_on:
+      - hermes-tv-api
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
   # Caddy — Reverse proxy and TLS gateway
   # Routes external requests to Threadfin, m3u-editor, and xtreamfilter
   # Caddyfile is mounted read-only from ./Caddyfile
@@ -133,6 +180,8 @@ services:
       - threadfin
       - m3u-editor
       - xtreamfilter
+      - hermes-tv-api
+      - hermes-web-tv
     healthcheck:
       test: ["CMD", "caddy", "version"]
       interval: 60s

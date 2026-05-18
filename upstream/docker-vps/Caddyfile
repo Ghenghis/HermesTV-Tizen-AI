@@ -1,0 +1,35 @@
+{
+  email {$ACME_EMAIL}
+  servers {
+    protocols h1 h2 h3
+  }
+}
+
+{$PUBLIC_DOMAIN} {
+  encode gzip zstd
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "no-referrer"
+    -Server
+  }
+
+  @api path /api/* /health
+  handle @api {
+    reverse_proxy hermes-tv-api:3001 {
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-Proto {scheme}
+    }
+  }
+
+  @threadfin path /threadfin/*
+  handle @threadfin {
+    reverse_proxy threadfin:34400
+  }
+
+  handle {
+    reverse_proxy hermes-web-tv:80
+  }
+}

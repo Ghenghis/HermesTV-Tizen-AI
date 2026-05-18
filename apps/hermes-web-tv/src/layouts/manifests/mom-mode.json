@@ -1,0 +1,15 @@
+{
+  "id": "mom-mode",
+  "name": "Mom Mode",
+  "cat": "Special Modes",
+  "description": "Senior-friendly large text, warm colors, simple 2-column grid",
+  "accent": "#ff7eb3",
+  "nav_style": "top-nav",
+  "hero_style": "greeting-banner",
+  "grid_style": "large-grid",
+  "tier_required": "any",
+  "best_for": ["live", "movies", "series"],
+  "tizen_safe": true,
+  "mom_friendly": true,
+  "dave_power": false
+}

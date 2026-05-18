@@ -1,0 +1,15 @@
+{
+  "id": "mom-mode",
+  "name": "Mom Mode Warm",
+  "layout_id": "mom-mode",
+  "tokens": {
+    "--bg": "#1a1a2e",
+    "--surface": "#16213e",
+    "--surface-raised": "#1e2a4a",
+    "--text": "#f0e6ff",
+    "--muted": "#c8b8e8",
+    "--accent": "#ff7eb3",
+    "--border": "#2a2a4a",
+    "--font-scale": "1.4"
+  }
+}

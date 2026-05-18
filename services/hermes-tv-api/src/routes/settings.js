@@ -26,9 +26,65 @@ const DEFAULT_SETTINGS = {
   },
 };
 
+// In-memory overrides — reset on server restart (B2 mock mode)
+let UI_OVERRIDES = {};
+
+const VALID_LAYOUTS = [
+  'tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen',
+  'mom-mode', 'dave-power', 'grid-standard', 'discovery-walls', '',
+];
+
+const VALID_THEMES = [
+  'night-blue', 'dawn-pink', 'forest-green', 'gold-qled',
+  'tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen',
+  'mom-mode', 'dave-power',
+];
+
 // GET /api/settings
 router.get('/api/settings', (req, res) => {
-  res.json(DEFAULT_SETTINGS);
+  const merged = Object.assign({}, DEFAULT_SETTINGS, {
+    ui: Object.assign({}, DEFAULT_SETTINGS.ui, {
+      active_layout: UI_OVERRIDES.active_layout !== undefined
+        ? UI_OVERRIDES.active_layout
+        : DEFAULT_SETTINGS.ui.default_layout,
+      active_theme: UI_OVERRIDES.active_theme !== undefined
+        ? UI_OVERRIDES.active_theme
+        : DEFAULT_SETTINGS.ui.default_theme,
+    }),
+  });
+  res.json(merged);
+});
+
+// PATCH /api/settings
+router.patch('/api/settings', (req, res) => {
+  const { active_layout, active_theme } = req.body || {};
+  const errors = {};
+
+  if (active_layout !== undefined && !VALID_LAYOUTS.includes(active_layout)) {
+    errors.active_layout = `Invalid layout. Allowed: ${VALID_LAYOUTS.join(', ')}`;
+  }
+  if (active_theme !== undefined && !VALID_THEMES.includes(active_theme)) {
+    errors.active_theme = `Invalid theme. Allowed: ${VALID_THEMES.join(', ')}`;
+  }
+  if (Object.keys(errors).length > 0) {
+    return res.status(400).json({ error: 'validation_failed', fields: errors });
+  }
+
+  if (active_layout !== undefined) UI_OVERRIDES.active_layout = active_layout;
+  if (active_theme !== undefined) UI_OVERRIDES.active_theme = active_theme;
+
+  const merged = Object.assign({}, DEFAULT_SETTINGS, {
+    ui: Object.assign({}, DEFAULT_SETTINGS.ui, {
+      active_layout: UI_OVERRIDES.active_layout !== undefined
+        ? UI_OVERRIDES.active_layout
+        : DEFAULT_SETTINGS.ui.default_layout,
+      active_theme: UI_OVERRIDES.active_theme !== undefined
+        ? UI_OVERRIDES.active_theme
+        : DEFAULT_SETTINGS.ui.default_theme,
+    }),
+  });
+
+  res.json(merged);
 });
 
 module.exports = router;
