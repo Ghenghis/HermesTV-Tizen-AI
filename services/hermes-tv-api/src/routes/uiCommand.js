@@ -1,6 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
+const llmFallback = require('../lib/llmFallback');
 const router = Router();
 
 // ---------------------------------------------------------------------------
@@ -154,8 +155,19 @@ function resolveCommand(normalised) {
 
 // ---------------------------------------------------------------------------
 // POST /api/ui-command/validate
+//
+// Resolution order:
+//   1. Fast path: regex/exact-match against COMMAND_TABLE  -> source: "regex"
+//   2. Slow path: LLM fallback (only if OPENAI_API_KEY set) -> source: "llm"
+//   3. No match:                                            -> source: "no_match"
+//
+// The response shape is backward-compatible with the original 40-case
+// integration test: `valid`, `action`, `params`, `error` keep their meaning.
+// New optional field `source` lets clients show debug info; new optional
+// `llm_skipped` is true when the regex missed and no LLM key was configured
+// (lets ops tooling distinguish "we tried and failed" from "we never tried").
 // ---------------------------------------------------------------------------
-router.post('/api/ui-command/validate', (req, res) => {
+router.post('/api/ui-command/validate', async (req, res) => {
   const { command_text, profile_id } = req.body || {};
 
   // --- Input validation ---
@@ -176,20 +188,58 @@ router.post('/api/ui-command/validate', (req, res) => {
   const normalised = command_text.trim().toLowerCase();
   const match = resolveCommand(normalised);
 
-  if (!match) {
+  if (match) {
+    return res.json({
+      valid: true,
+      action: match.action,
+      params: match.params,
+      error: null,
+      source: 'regex',
+    });
+  }
+
+  // --- No regex match — try the LLM if a key is configured ---
+  if (!llmFallback.isEnabled()) {
     return res.json({
       valid: false,
       action: null,
       params: null,
       error: NO_MATCH_ERROR,
+      source: 'no_match',
+      llm_skipped: true,
+    });
+  }
+
+  let llmResult = null;
+  try {
+    llmResult = await llmFallback.tryParse(
+      command_text,
+      profile_id || 'dave_tv'
+    );
+  } catch (err) {
+    // Defensive: tryParse should always resolve (returns null on error).
+    // If it somehow throws, treat as a no-match rather than a 500.
+    console.error('[uiCommand] llmFallback.tryParse threw:', err.message);
+    llmResult = null;
+  }
+
+  if (llmResult) {
+    return res.json({
+      valid: true,
+      action: llmResult.action,
+      params: llmResult.params,
+      error: null,
+      source: 'llm',
     });
   }
 
   return res.json({
-    valid: true,
-    action: match.action,
-    params: match.params,
-    error: null,
+    valid: false,
+    action: null,
+    params: null,
+    error: NO_MATCH_ERROR,
+    source: 'no_match',
+    llm_skipped: false,
   });
 });
 
