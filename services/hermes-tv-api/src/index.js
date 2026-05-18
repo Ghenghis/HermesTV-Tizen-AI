@@ -21,6 +21,7 @@ const settingsRouter = require('./routes/settings');
 const uiCommandRouter = require('./routes/uiCommand');
 const upstreamAppsRouter = require('./routes/upstreamApps');
 const layoutsRouter = require('./routes/layouts');
+const sourceHealthRouter = require('./routes/sourceHealth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -67,6 +68,7 @@ app.use('/', settingsRouter);
 app.use('/', uiCommandRouter);
 app.use('/', upstreamAppsRouter);
 app.use('/', layoutsRouter);
+app.use('/', sourceHealthRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {
