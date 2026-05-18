@@ -128,7 +128,16 @@ services:
       context: ../..
       dockerfile: services/hermes-tv-api/Dockerfile
     container_name: hermestv-vps-api
+    # env_file path is relative to THIS compose file location. Operator places
+    # /home/operator/hermestv/.env (mode 0600); from upstream/docker-vps/ that's
+    # ../../.env. The file is gitignored. Optional: missing file → empty env
+    # (the `required: false` Compose v2.24+ flag would express this, but
+    # operator runbook guarantees the file exists before `up`).
+    env_file:
+      - ../../.env
     environment:
+      # Explicit fallbacks — env_file values win, these are only used if the
+      # .env file is missing the key entirely.
       NODE_ENV: production
       PORT: "3011"
     # Phase 2: bind 127.0.0.1:3011 → container 3011 so the host nginx
