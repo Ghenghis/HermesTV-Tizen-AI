@@ -11,6 +11,7 @@ function MediaDetailPanel(props) {
   var selectedProviderId = props.selectedProviderId || '';
   var globalProviders = props.globalProviders || [];
   var onPlay = props.onPlay;  // (item, providerId?) → parent calls /api/play
+  var onFindSimilarActor = props.onFindSimilarActor;  // (actor) → parent filters catalog by actor_id
 
   // Compute whether playback is currently possible — disable the Watch button
   // when no provider is configured (source_health.status === 'not_configured').
@@ -70,7 +71,9 @@ function MediaDetailPanel(props) {
   }
 
   function handleMoreWithActor(actor) {
-    // Placeholder — chatbot integration in B3
+    if (typeof onFindSimilarActor === 'function') {
+      onFindSimilarActor(actor);
+    }
   }
 
   function handleBackdropClick(e) {
