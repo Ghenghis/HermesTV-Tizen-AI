@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const jellyfin = require('../lib/jellyfin');
 const iptvOrg = require('../lib/iptvOrg');
+const m3uClient = require('../lib/m3uClient');
 const { SEED_CATALOG } = require('../data/seedCatalog');
 const router = Router();
 
@@ -30,6 +31,11 @@ const SRC_MOCK_NO_JELLYFIN = 'mock-no-jellyfin';
 // /var/cache/iptv-org/ JSON files. The badge in the Settings panel turns
 // green when this is the active source.
 const SRC_MERGED_IPTV_ORG = 'merged-with-iptv-org';
+// Operator-pasted M3U providers (Apollo Group, xTremeHD) — activates the
+// moment APOLLO_M3U_URL or XTREMEHD_M3U_URL is non-empty. Outranks
+// iptv-org when both are present because paid provider lineups are the
+// operator's intended catalog; iptv-org rides shotgun.
+const SRC_MERGED_PROVIDERS = 'merged-with-providers';
 
 // ---------------------------------------------------------------------------
 // Actors — same 5 actors as in catalog.mock.json companion data.
@@ -167,11 +173,36 @@ async function resolveCatalog() {
     }
   }
 
+  // Merge operator-pasted M3U providers (Apollo Group, xTremeHD).
+  // This activates whenever APOLLO_M3U_URL or XTREMEHD_M3U_URL is set.
+  // Provider URLs may carry embedded credentials; the m3uClient module
+  // keeps stream URLs server-side only — items returned here carry
+  // sanitised metadata + a provider tag but never the upstream URL.
+  let m3uCount = 0;
+  let m3uProviders = null;
+  if (m3uClient.isEnabled()) {
+    try {
+      const m3uItems = await m3uClient.fetchCatalog({ limit: 600 });
+      if (Array.isArray(m3uItems) && m3uItems.length > 0) {
+        m3uCount = m3uItems.length;
+        baseItems = baseItems.concat(m3uItems);
+        baseSource = SRC_MERGED_PROVIDERS;
+      }
+      // Status is always reported (even on zero items) so the operator
+      // settings panel can show "configured but fetch failed" diagnostics.
+      m3uProviders = m3uClient.getProviderStatus();
+    } catch (err) {
+      console.warn('[catalog] m3u merge failed: ' + require('../lib/sanitizeLog').sanitizeForLog(err && err.message ? err.message : 'unknown'));
+    }
+  }
+
   return {
     items: baseItems,
     source: baseSource,
     iptv_org_count: iptvOrgCount,
     iptv_org_data_age_h: iptvOrgAge,
+    m3u_count: m3uCount,
+    m3u_providers: m3uProviders,
   };
 }
 
@@ -244,6 +275,9 @@ router.get('/api/catalog', async (req, res) => {
     quality_preference,
     provider_filter: provider_id || null,
     source: resolved.source,
+    iptv_org_count: resolved.iptv_org_count,
+    m3u_count: resolved.m3u_count,
+    m3u_providers: resolved.m3u_providers,
   };
 
   res.json({ catalog: items, total: items.length, _meta });
