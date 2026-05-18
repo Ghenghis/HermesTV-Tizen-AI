@@ -49,8 +49,14 @@ function HScrollRow(props) {
           return (
             <div
               key={item.id || idx}
+              data-focusable="true"
+              tabIndex={0}
+              role="button"
               onClick={function() { if (onItemSelect) onItemSelect(item); }}
-              style={{ flexShrink: 0, width: cardW + 'px', cursor: 'pointer' }}
+              onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
+              style={{ flexShrink: 0, width: cardW + 'px', cursor: 'pointer', borderRadius: '10px', padding: '2px', border: '2px solid transparent', transition: 'border-color 150ms, box-shadow 150ms', outline: 'none' }}
+              onFocus={function(e) { e.currentTarget.style.borderColor = '#0071e3'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0,113,227,0.4)'; }}
+              onBlur={function(e) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
             >
               <div style={{ width: cardW + 'px', height: cardH + 'px', borderRadius: '8px', background: posterBg(item, idx), position: 'relative', overflow: 'hidden' }}>
                 {item.type === 'live' && (
@@ -123,7 +129,7 @@ function AppleTVShell(props) {
                   fontSize: 'calc(13px * ' + fontScale + ')',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  padding: '7px 14px',
+                  padding: '12px 18px',
                   borderRadius: '8px',
                   transition: 'background 120ms',
                 }}
@@ -175,7 +181,7 @@ function AppleTVShell(props) {
           <HScrollRow title="Live Channels" items={liveItems.length > 0 ? liveItems : filtered.slice(1)} onItemSelect={onItemSelect} cardW={240} cardH={135} fontScale={fontScale} />
         </div>
 
-        <footer style={{ textAlign: 'center', padding: '24px', fontSize: 'calc(11px * ' + fontScale + ')', color: '#48484a' }}>HermesTV</footer>
+        <footer style={{ textAlign: 'center', padding: '24px', fontSize: 'calc(11px * ' + fontScale + ')', color: '#9fa0a6' }}>HermesTV</footer>
       </div>
     </div>
   );
