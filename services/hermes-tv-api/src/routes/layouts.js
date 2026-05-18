@@ -6,10 +6,12 @@ const fs = require('fs');
 
 const router = Router();
 
-const MANIFESTS_DIR = path.resolve(
-  __dirname,
-  '../../../../apps/hermes-web-tv/src/layouts/manifests'
-);
+// In Docker the container won't have apps/hermes-web-tv/ in the filesystem
+// (different build context), so the Dockerfile bakes the manifests in at a
+// fixed location and sets HERMES_MANIFESTS_DIR to point at them. For local
+// dev (npm run dev:api without Docker), fall back to the repo-relative path.
+const MANIFESTS_DIR = process.env.HERMES_MANIFESTS_DIR
+  || path.resolve(__dirname, '../../../../apps/hermes-web-tv/src/layouts/manifests');
 
 router.get('/api/layouts', (req, res) => {
   let files;
