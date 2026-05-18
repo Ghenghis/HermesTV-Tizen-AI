@@ -1,14 +1,15 @@
 import React from 'react';
 
-var CHIPS = [
+// Suggestions chip bar rendered above the chatbot input. Four curated
+// example commands cover the most common UX paths (content filter, quality
+// filter, profile switch, theme switch). Clicking a chip inserts the text
+// and submits via the parent's onSend handler. Full command list still
+// reachable through the ? Help modal.
+var SUGGESTIONS = [
   { label: 'Show Movies', command: 'show movies' },
-  { label: 'Show Live', command: 'show live' },
   { label: 'Show 4K', command: 'show 4K' },
   { label: 'Mom Mode', command: 'mom mode' },
   { label: 'Dark Theme', command: 'dark theme' },
-  { label: 'Light Theme', command: 'light theme' },
-  { label: 'Show All', command: 'show all providers' },
-  { label: 'Show Series', command: 'show series' },
 ];
 
 function CommandChips(props) {
@@ -18,21 +19,36 @@ function CommandChips(props) {
     <div
       style={{
         display: 'flex',
+        alignItems: 'center',
         gap: '0.4rem',
         overflowX: 'auto',
-        padding: '0.5rem 1rem',
+        padding: '0.4rem 1rem 0.45rem 1rem',
         borderTop: '1px solid var(--border, #30363d)',
         flexShrink: 0,
         scrollbarWidth: 'none',
       }}
-      aria-label="Quick commands"
+      aria-label="Suggestions"
     >
-      {CHIPS.map(function(chip) {
+      <span
+        style={{
+          flexShrink: 0,
+          fontSize: 'calc(0.65rem * var(--font-scale, 1))',
+          fontWeight: '700',
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: 'var(--muted)',
+          marginRight: '0.15rem',
+        }}
+      >
+        Suggestions
+      </span>
+      {SUGGESTIONS.map(function(chip) {
         return (
           <button
             key={chip.command}
             tabIndex={0}
             onClick={function() { if (onSend) { onSend(chip.command); } }}
+            aria-label={'Send: ' + chip.label}
             style={{
               flexShrink: 0,
               padding: '0.25rem 0.65rem',
