@@ -1,0 +1,170 @@
+# upstream/docker-vps/VPS_COMPOSE.yml — HermesTV VPS IPTV proxy/EPG stack
+# Project: hermestv-vps
+# Run: docker compose -p hermestv-vps up -d
+#
+# Credentials: All secrets stay in /home/operator/private/ on the VPS.
+#              Enter M3U URLs and provider tokens via each service's admin UI at runtime.
+#              Never add real credential values to this file or any committed file.
+#
+# This stack is separate from and must never share a network with:
+#   - docker/vps/compose.yml (hermestv-vps control plane: Postgres, Redis, Caddy, hermestv-api)
+#   - docker/workstation/compose.yml (hermestv-workstation: Jellyfin, Tunarr, Dispatcharr, Ollama)
+#   - Any daveai-web project containers
+#
+# VPS target: Hostinger Linux VPS (Ubuntu 22.04, KVM)
+# BLOCKER: SSH access to VPS not yet configured — see docs/research/BLOCKER_VPS_SSH.md
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Threadfin — M3U proxy for Jellyfin/Emby EPG
+  # Successor to xTeVe — actively maintained, native Jellyfin support, REST API
+  # Admin UI: http://<vps-tailscale-ip>:34400/web
+  # Configure M3U sources and XMLTV EPG in the admin UI — no credentials here
+  # GitHub: https://github.com/Threadfin-Org/Threadfin
+  # ---------------------------------------------------------------------------
+  threadfin:
+    image: ghcr.io/threadfin/threadfin:latest
+    container_name: hermestv-vps-threadfin
+    environment:
+      # Port threadfin listens on inside the container
+      THREADFIN_PORT: "34400"
+      # Threadfin config and data directory inside container
+      THREADFIN_HOME: /home/threadfin
+      # Branch/version label — informational only
+      THREADFIN_BRANCH: main
+      # Credentials: DO NOT add THREADFIN_M3U or provider URLs here.
+      # Enter M3U playlist URLs and provider tokens via the admin UI at runtime.
+    volumes:
+      - hermestv-vps-threadfin-data:/home/threadfin
+    ports:
+      - "34400:34400"
+    restart: unless-stopped
+    networks:
+      - hermestv-vps-internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:34400/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # m3u-editor — Web-based M3U playlist editor
+  # Manage, filter, and reorder M3U playlists through a browser UI
+  # Admin UI: http://<vps-tailscale-ip>:4200
+  # Enter M3U source URLs in the UI at runtime — no credentials in this file
+  # GitHub: https://github.com/sparkison/m3u-editor
+  # ---------------------------------------------------------------------------
+  m3u-editor:
+    image: ghcr.io/sparkison/m3u-editor:latest
+    container_name: hermestv-vps-m3u-editor
+    environment:
+      # Port the editor web UI listens on
+      APP_PORT: "4200"
+      # Credentials: DO NOT add M3U source URLs or provider tokens here.
+      # All playlist sources are configured via the web UI and stored in the
+      # mounted volume (hermestv-vps-m3u-editor-data).
+    volumes:
+      - hermestv-vps-m3u-editor-data:/config
+    ports:
+      - "4200:4200"
+    restart: unless-stopped
+    networks:
+      - hermestv-vps-internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4200"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # xtreamfilter — Xtream API stream filter
+  # Filter and transform Xtream Codes API streams by category, quality, or name
+  # Admin UI: http://<vps-tailscale-ip>:3456
+  # Enter Xtream credentials in the UI at runtime — no credentials in this file
+  # GitHub: https://github.com/SpanishST/xtreamfilter
+  # ---------------------------------------------------------------------------
+  xtreamfilter:
+    image: ghcr.io/spanishst/xtreamfilter:latest
+    container_name: hermestv-vps-xtreamfilter
+    environment:
+      # Port xtreamfilter listens on
+      PORT: "3456"
+      # Credentials: DO NOT add XTREAM_URL, XTREAM_USERNAME, or XTREAM_PASSWORD here.
+      # Enter Xtream provider credentials via the admin UI at runtime.
+      # They are stored in the mounted volume (hermestv-vps-xtreamfilter-data).
+    volumes:
+      - hermestv-vps-xtreamfilter-data:/config
+    ports:
+      - "3456:3456"
+    restart: unless-stopped
+    networks:
+      - hermestv-vps-internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3456"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Caddy — Reverse proxy and TLS gateway
+  # Routes external requests to Threadfin, m3u-editor, and xtreamfilter
+  # Caddyfile is mounted read-only from ./Caddyfile
+  # Replace hermestv.example.com in Caddyfile with the real domain before deploying
+  # In production: bind Caddy to the Tailscale IP — see docs/research/agent-11-backend-vps-isolation.md
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:latest
+    container_name: hermestv-vps-caddy
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - hermestv-vps-caddy-data:/data
+      - hermestv-vps-caddy-config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    networks:
+      - hermestv-vps-internal
+    depends_on:
+      - threadfin
+      - m3u-editor
+      - xtreamfilter
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# ---------------------------------------------------------------------------
+# Network
+# hermestv-vps-internal is a private bridge network shared only by the
+# services in this file. It is never connected to hermestv-internal
+# (workstation), hermestv-vps-internal from docker/vps/compose.yml, or
+# any daveai-web project network.
+# ---------------------------------------------------------------------------
+networks:
+  hermestv-vps-internal:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Volumes
+# All volumes are prefixed hermestv-vps- to avoid collisions with other
+# Compose projects. Named volumes persist across container restarts.
+# Credentials entered via admin UIs are stored in these volumes on the VPS.
+# ---------------------------------------------------------------------------
+volumes:
+  hermestv-vps-threadfin-data:
+    name: hermestv-vps-threadfin-data
+  hermestv-vps-m3u-editor-data:
+    name: hermestv-vps-m3u-editor-data
+  hermestv-vps-xtreamfilter-data:
+    name: hermestv-vps-xtreamfilter-data
+  hermestv-vps-caddy-data:
+    name: hermestv-vps-caddy-data
+  hermestv-vps-caddy-config:
+    name: hermestv-vps-caddy-config

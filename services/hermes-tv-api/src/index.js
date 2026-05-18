@@ -19,15 +19,21 @@ const setupRouter = require('./routes/setup');
 const versionsRouter = require('./routes/versions');
 const settingsRouter = require('./routes/settings');
 const uiCommandRouter = require('./routes/uiCommand');
+const upstreamAppsRouter = require('./routes/upstreamApps');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // --- CORS ---
-// Restricted to TV origin and local dev. Never expose credentials via CORS.
+// Allows localhost, hermestv.local (mDNS), and any LAN 192.168.x.x origin for QN85 mirror testing.
+// Never expose credentials via CORS.
+const LAN_ORIGIN = /^http:\/\/(localhost|hermestv\.local|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
 app.use(
   cors({
-    origin: ['http://hermestv.local', 'http://localhost:5173'],
+    origin: function(origin, cb) {
+      if (!origin || LAN_ORIGIN.test(origin)) return cb(null, true);
+      cb(new Error('CORS: origin not allowed: ' + origin));
+    },
     methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Accept'],
     credentials: false,
@@ -58,6 +64,7 @@ app.use('/', setupRouter);
 app.use('/', versionsRouter);
 app.use('/', settingsRouter);
 app.use('/', uiCommandRouter);
+app.use('/', upstreamAppsRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {
