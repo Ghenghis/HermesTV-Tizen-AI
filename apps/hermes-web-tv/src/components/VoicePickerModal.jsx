@@ -101,13 +101,15 @@ function VoicePickerModal(props) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#e8edf5' }}>Choose Hermes's Voice</div>
-            <div style={{ fontSize: '0.8rem', color: '#6b7384', marginTop: '4px' }}>Tap 🔊 to hear a voice, then tap Use to keep it</div>
+            <div style={{ fontSize: 'calc(1.2rem * var(--font-scale, 1))', fontWeight: 700, color: '#e8edf5' }}>Choose Hermes's Voice</div>
+            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#6b7384', marginTop: '4px' }}>Tap 🔊 to hear a voice, then tap Use to keep it</div>
           </div>
           <button
             onClick={onClose}
             autoFocus
-            style={{ background: 'none', border: 'none', color: '#6b7384', fontSize: '1.4rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', outline: 'none', lineHeight: 1 }}
+            style={{ background: 'none', border: 'none', color: '#6b7384', fontSize: 'calc(1.4rem * var(--font-scale, 1))', cursor: 'pointer', padding: '10px 14px', borderRadius: '6px', outline: 'none', lineHeight: 1, minWidth: '44px', minHeight: '44px' }}
+            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.color = '#e8edf5'; }}
+            onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.color = '#6b7384'; }}
           >&times;</button>
         </div>
 
@@ -115,7 +117,7 @@ function VoicePickerModal(props) {
           <div style={{
             margin: '12px 24px 0', padding: '10px 14px', background: 'rgba(227,179,65,0.1)',
             border: '1px solid rgba(227,179,65,0.4)', borderRadius: '8px',
-            fontSize: '0.8rem', color: '#e3b341', lineHeight: 1.4,
+            fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#e3b341', lineHeight: 1.4,
           }}>
             ⚠ Azure not configured on the server yet. Previews and save will return stubs until AZURE_TTS_KEY is set.
           </div>
@@ -123,10 +125,10 @@ function VoicePickerModal(props) {
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
           {loading && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7384', fontSize: '0.9rem' }}>Loading voices…</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7384', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>Loading voices…</div>
           )}
           {!loading && voices.length === 0 && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7384', fontSize: '0.9rem' }}>No voices available.</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7384', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>No voices available.</div>
           )}
           {voices.map(function(voice) {
             var isCurrent = voice.id === currentVoiceId;
@@ -143,35 +145,39 @@ function VoicePickerModal(props) {
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#e8edf5' }}>{voice.name}</span>
-                    <span style={{ fontSize: '0.7rem', color: '#6b7384', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{voice.locale} · {voice.gender} · {voice.tone}</span>
-                    {isCurrent && <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ff7eb3', border: '1px solid #ff7eb3', borderRadius: '3px', padding: '1px 5px' }}>CURRENT</span>}
+                    <span style={{ fontWeight: 700, fontSize: 'calc(0.95rem * var(--font-scale, 1))', color: '#e8edf5' }}>{voice.name}</span>
+                    <span style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', color: '#6b7384', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{voice.locale} · {voice.gender} · {voice.tone}</span>
+                    {isCurrent && <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 700, color: '#ff7eb3', border: '1px solid #ff7eb3', borderRadius: '3px', padding: '1px 5px' }}>CURRENT</span>}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#9aa3b2', fontStyle: 'italic' }}>"{voice.sample}"</div>
+                  <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#9aa3b2', fontStyle: 'italic' }}>"{voice.sample}"</div>
                 </div>
                 <button
                   onClick={function() { handlePreview(voice); }}
                   disabled={previewing === voice.id}
                   style={{
-                    padding: '8px 12px', borderRadius: '6px',
+                    padding: '12px 16px', borderRadius: '6px',
                     background: '#22232f', border: '1px solid #2a2b3a',
-                    color: '#e8edf5', fontSize: '0.8rem', fontWeight: 600,
+                    color: '#e8edf5', fontSize: 'calc(0.8rem * var(--font-scale, 1))', fontWeight: 600,
                     cursor: previewing === voice.id ? 'wait' : 'pointer',
-                    flexShrink: 0, outline: 'none',
+                    flexShrink: 0, outline: 'none', minHeight: '44px',
                   }}
+                  onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; }}
+                  onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
                 >{previewing === voice.id ? '…' : '🔊'}</button>
                 <button
                   onClick={function() { handleSelect(voice); }}
                   disabled={isCurrent || saving === voice.id}
                   style={{
-                    padding: '8px 14px', borderRadius: '6px',
+                    padding: '12px 16px', borderRadius: '6px',
                     background: isCurrent ? 'transparent' : '#ff7eb3',
                     border: isCurrent ? '1px solid #2a2b3a' : 'none',
                     color: isCurrent ? '#6b7384' : '#000',
-                    fontSize: '0.8rem', fontWeight: 700,
+                    fontSize: 'calc(0.8rem * var(--font-scale, 1))', fontWeight: 700,
                     cursor: isCurrent ? 'default' : 'pointer',
-                    flexShrink: 0, outline: 'none',
+                    flexShrink: 0, outline: 'none', minHeight: '44px',
                   }}
+                  onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; }}
+                  onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
                 >{isCurrent ? 'Active' : (saving === voice.id ? 'Saving…' : 'Use')}</button>
               </div>
             );
@@ -181,7 +187,7 @@ function VoicePickerModal(props) {
         {statusMsg && (
           <div style={{
             padding: '10px 24px 14px', borderTop: '1px solid #2a2b3a',
-            fontSize: '0.8rem', color: '#9aa3b2', textAlign: 'center',
+            fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#9aa3b2', textAlign: 'center',
           }}>{statusMsg}</div>
         )}
       </div>

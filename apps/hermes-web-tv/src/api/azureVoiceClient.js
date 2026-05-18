@@ -1,8 +1,15 @@
 'use strict';
 
-var BASE_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-  ? 'http://localhost:3001'
-  : 'http://hermestv.local';
+// Production (https://hermestv.daveai.tech) → same-origin (BASE_URL = '').
+// Local dev / LAN mirror → cross-origin to the workstation API on :3001.
+var BASE_URL = (function() {
+  if (typeof window === 'undefined') return '';
+  var h = window.location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:3001';
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return 'http://' + h + ':3001';
+  if (h === 'hermestv.local') return 'http://hermestv.local';
+  return '';
+})();
 
 var currentAudio = null;
 

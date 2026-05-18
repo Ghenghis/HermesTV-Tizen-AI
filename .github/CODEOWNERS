@@ -1,0 +1,9 @@
+# HermesTV — Code Owners
+#
+# The operator (Ghenghis) is the owner of every path in this repo.
+# Any PR that modifies code, schemas, ops scripts, docs, or workflows
+# requires their review before merge.
+#
+# Syntax: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-configuration/customizing-your-repository/about-code-owners
+
+* @Ghenghis

@@ -1,0 +1,16 @@
+{
+  "name": "hermes-tv-tizen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HermesTV Tizen .wgt build pipeline — produces a sideloadable package from the hermes-web-tv Vite build",
+  "scripts": {
+    "prebuild": "node ../../tools/tizen-prep.js",
+    "build:web": "npm run build --prefix ../hermes-web-tv",
+    "build:wgt": "node ../../tools/tizen-package.js",
+    "build": "npm run build:web && npm run prebuild && npm run build:wgt"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "_note": "build:web compiles the source-of-truth React app. prebuild stages it into dist/ with config.xml + icon. build:wgt invokes the Tizen CLI to produce dist-tizen/HermesTV-0.1.0.wgt."
+}
