@@ -1,1 +1,0 @@
-[    5651ms] [ERROR] Blocked script execution in 'https://raw.githubusercontent.com/iptv-org/awesome-iptv/master/README.md' because the document's frame is sandboxed and the 'allow-scripts' permission is not set. @ https://raw.githubusercontent.com/iptv-org/awesome-iptv/master/README.md:0
