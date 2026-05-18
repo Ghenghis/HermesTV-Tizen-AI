@@ -22,32 +22,35 @@
  */
 
 const express = require('express');
+const { LIVE_DEFS } = require('../data/seedCatalog');
 const router  = express.Router();
 
 const VALID_PROFILES = new Set(['dave_tv', 'mom_tv']);
 
-// Mock channel data — shape matches what the EPG grid expects.
-// No stream URLs. No credentials.
-const MOCK_CHANNELS = [
-  {
-    channel_id:         'mock.ch.001',
-    channel_number:     '1',
-    display_name:       'Mock HD Channel 1',
-    logo_url:           null,
-    provider_tags:      ['apollo'],
-    catch_up_available: true,
-    epg_status:         'matched',
-  },
-  {
-    channel_id:         'mock.ch.002',
-    channel_number:     '2',
-    display_name:       'Mock HD Channel 2 (XtremeHD)',
-    logo_url:           null,
-    provider_tags:      ['xtremehd'],
-    catch_up_available: false,
-    epg_status:         'partial',
-  },
-];
+// Derive the channel list from the same seed catalog so /api/channels and
+// /api/catalog (the catalog rail in each shell) stay consistent. ~90 live
+// channels cover sports/news/entertainment/lifestyle/family/local broadcast,
+// which is what the EPG grid needs to actually populate the viewport.
+// When a real provider is wired (Threadfin-fronted Apollo / xTremeHD or
+// iptv-org), this seed gets replaced by that provider's channel list.
+const MOCK_CHANNELS = LIVE_DEFS.map(function(def, i) {
+  return {
+    channel_id:         'live.' + def.slug,
+    channel_number:     String(i + 1),
+    display_name:       def.title,
+    logo_url:           'https://hermestv.local/assets/logos/' + def.slug + '.png',
+    // Use 'apollo' for backward-compat with provider.* schemas that use
+    // the no-suffix form; the catalog endpoint uses the 'apollo_group' form.
+    provider_tags:      (def.providers || ['apollo_group']).map(function(p) {
+      return p === 'apollo_group' ? 'apollo' : p;
+    }),
+    catch_up_available: !!def.has_catchup,
+    epg_status:         def.has_catchup ? 'matched' : 'partial',
+    category:           def.category,
+    resolution:         def.resolution || '1080p',
+    profile_access:     def.profile_access || ['dave_tv', 'mom_tv'],
+  };
+});
 
 const CHANNEL_INDEX = MOCK_CHANNELS.reduce(function(map, ch) {
   map[ch.channel_id] = ch;
@@ -67,8 +70,12 @@ router.get('/', function(req, res) {
     });
   }
 
+  const visible = MOCK_CHANNELS.filter(function(ch) {
+    return !ch.profile_access || ch.profile_access.indexOf(profile_id) !== -1;
+  });
+
   return res.status(200).json({
-    channels: MOCK_CHANNELS,
+    channels: visible,
     _note:    'TV-safe. No stream URLs. No credentials. Served by HermesTV backend.',
   });
 });
