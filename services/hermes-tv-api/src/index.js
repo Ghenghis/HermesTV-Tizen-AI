@@ -25,6 +25,7 @@ const layoutsRouter = require('./routes/layouts');
 const sourceHealthRouter = require('./routes/sourceHealth');
 const playRouter = require('./routes/play');
 const downloadsRouter = require('./routes/downloads');
+const pairingRouter = require('./routes/pairing');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -74,6 +75,7 @@ app.use('/', layoutsRouter);
 app.use('/', sourceHealthRouter);
 app.use('/', playRouter);
 app.use('/', downloadsRouter);
+app.use('/', pairingRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {

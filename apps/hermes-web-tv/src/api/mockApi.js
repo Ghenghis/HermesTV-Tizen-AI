@@ -120,4 +120,37 @@ function speakStub(text, profileId, voiceId) {
   return Promise.resolve({ played: false, status: 'mock_mode', message: 'Mock mode — speech disabled offline.' });
 }
 
-export { getProfile, getProviders, getCatalog, getEpg, validateCommand, listVoices, getProfileVoice, setProfileVoice, speakStub };
+// ── Mock pairing (offline) ────────────────────────────────────────────────
+// Offline = no backend. The QR modal still shows a code so the UX shape is
+// honest. createPairing returns a stable mock; getPairingStatus always
+// reports 'pending' (the user can scan all they want — there's nothing to
+// complete the handshake against).
+var MOCK_PAIRING_TTL_MS = 10 * 60 * 1000;
+
+function createPairing() {
+  var now = new Date();
+  return Promise.resolve({
+    pairing_code: 'HRM-MOCK',
+    status: 'pending',
+    issued_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + MOCK_PAIRING_TTL_MS).toISOString(),
+    ttl_ms: MOCK_PAIRING_TTL_MS,
+    mock: true,
+  });
+}
+
+function getPairingStatus(code) {
+  return Promise.resolve({
+    pairing_code: code || 'HRM-MOCK',
+    status: 'pending',
+    issued_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + MOCK_PAIRING_TTL_MS).toISOString(),
+    mock: true,
+  });
+}
+
+export {
+  getProfile, getProviders, getCatalog, getEpg, validateCommand,
+  listVoices, getProfileVoice, setProfileVoice, speakStub,
+  createPairing, getPairingStatus,
+};
