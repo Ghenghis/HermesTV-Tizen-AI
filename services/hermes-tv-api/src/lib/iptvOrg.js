@@ -260,9 +260,20 @@ function fetchCatalog(opts) {
 }
 
 /**
- * Internal — never expose over HTTP. Resolves a stream URL for play-time.
+ * INTERNAL ONLY — never expose over HTTP and never include in any API
+ * response body. Renamed from `fetchStreamUrl` to `_resolveStreamUrl` and
+ * removed from module.exports per audit W3-B2 P0: when the function was
+ * exported, a future route author could accidentally call
+ * `iptvOrg.fetchStreamUrl(id)` and return the result, leaking the
+ * provider's raw stream URL to the TV client.
+ *
+ * The /api/play endpoint will need this resolver at play-time — when that
+ * land, expose it via a dedicated server-side play resolver module that
+ * itself is not directly exposed over HTTP, OR re-add this as
+ * `_resolveStreamUrl` to a curated `internal` export object that other
+ * server-side modules call but routes can't accidentally proxy.
  */
-function fetchStreamUrl(channelId) {
+function _resolveStreamUrl(channelId) {
   var idx = _maybeReload();
   if (!idx) { return null; }
   var stream = _bestStream(channelId, idx.streamsByChannel);
@@ -287,7 +298,9 @@ function _clearCache() {
 module.exports = {
   loadIndex: loadIndex,
   fetchCatalog: fetchCatalog,
-  fetchStreamUrl: fetchStreamUrl,
+  // Stream URL resolver is intentionally NOT exported. See _resolveStreamUrl
+  // above for the rationale; play-time URL resolution lives behind a
+  // separate server-side module that routes never directly call.
   getDataAgeHours: getDataAgeHours,
   isEnabled: isEnabled,
   _clearCache: _clearCache,
