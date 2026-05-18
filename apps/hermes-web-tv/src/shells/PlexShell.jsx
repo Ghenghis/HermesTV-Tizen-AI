@@ -43,6 +43,8 @@ function GridSection(props) {
   var items = props.items;
   var onItemSelect = props.onItemSelect;
   var fontScale = props.fontScale;
+  var profile = props.profile;
+  var allowMotion = !(profile && profile.reduced_motion);
 
   if (!items || items.length === 0) return null;
 
@@ -54,10 +56,16 @@ function GridSection(props) {
           return (
             <div
               key={item.id || idx}
+              data-focusable="true"
+              tabIndex={0}
+              role="button"
               onClick={function() { if (onItemSelect) onItemSelect(item); }}
-              style={{ cursor: 'pointer', borderRadius: '6px', overflow: 'hidden', border: '1px solid #2a2c2f', transition: 'border-color 120ms, transform 120ms' }}
-              onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#e5a00d'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
+              style={{ cursor: 'pointer', borderRadius: '6px', overflow: 'hidden', border: '1px solid #2a2c2f', transition: 'border-color 120ms, transform 120ms, box-shadow 120ms', outline: 'none' }}
+              onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#e5a00d'; if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#2a2c2f'; e.currentTarget.style.transform = 'none'; }}
+              onFocus={function(e) { e.currentTarget.style.borderColor = '#e5a00d'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(229,160,13,0.35)'; }}
+              onBlur={function(e) { e.currentTarget.style.borderColor = '#2a2c2f'; e.currentTarget.style.boxShadow = 'none'; }}
             >
               <div style={{ aspectRatio: '16/9', background: posterBg(item, idx), position: 'relative' }}>
                 {item.quality && (
@@ -114,28 +122,39 @@ function PlexShell(props) {
         <div style={{ overflowY: 'auto', flex: 1 }}>
           <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#6c7177', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Library</div>
           {SIDEBAR_SECTIONS.map(function(s, i) {
+            var isActive = activeSection === i;
             return (
-              <div
+              <button
                 key={s.label}
+                data-focusable="true"
                 onClick={function() { setActiveSection(i); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  padding: activeSection === i ? '9px 22px 9px 19px' : '9px 22px',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: isActive ? '14px 22px 14px 19px' : '14px 22px',
                   fontSize: 'calc(13px * ' + fontScale + ')',
                   cursor: 'pointer',
-                  color: activeSection === i ? '#e5a00d' : '#b2b9c1',
-                  background: activeSection === i ? '#22252a' : 'transparent',
-                  borderLeft: activeSection === i ? '3px solid #e5a00d' : '3px solid transparent',
-                  transition: 'all 80ms',
+                  color: isActive ? '#e5a00d' : '#b2b9c1',
+                  background: isActive ? '#22252a' : 'transparent',
+                  borderLeft: isActive ? '3px solid #e5a00d' : '3px solid transparent',
+                  borderTop: 'none',
+                  borderRight: 'none',
+                  borderBottom: 'none',
+                  transition: 'all 80ms, box-shadow 120ms',
+                  fontFamily: 'inherit',
+                  outline: 'none',
                 }}
-                onMouseEnter={function(e) { if (activeSection !== i) e.currentTarget.style.background = '#22252a'; }}
-                onMouseLeave={function(e) { if (activeSection !== i) e.currentTarget.style.background = 'transparent'; }}
+                onMouseEnter={function(e) { if (!isActive) e.currentTarget.style.background = '#22252a'; }}
+                onMouseLeave={function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                onFocus={function(e) { e.currentTarget.style.background = '#22252a'; e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(229,160,13,0.6)'; }}
+                onBlur={function(e) { e.currentTarget.style.background = isActive ? '#22252a' : 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 <span>{s.icon}</span>
                 <span>{s.label}</span>
-              </div>
+              </button>
             );
           })}
 
@@ -178,10 +197,10 @@ function PlexShell(props) {
           </div>
         )}
 
-        <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 4)} onItemSelect={onItemSelect} fontScale={fontScale} />
-        <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, 10)} onItemSelect={onItemSelect} fontScale={fontScale} />
-        <GridSection title="Series" items={series.length > 0 ? series : filtered.slice(4)} onItemSelect={onItemSelect} fontScale={fontScale} />
-        <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, 8)} onItemSelect={onItemSelect} fontScale={fontScale} />
+        <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, 10)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="Series" items={series.length > 0 ? series : filtered.slice(4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, 8)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
 
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px', color: '#6c7177', fontSize: 'calc(14px * ' + fontScale + ')' }}>

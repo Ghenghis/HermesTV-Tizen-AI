@@ -1,0 +1,286 @@
+name: HermesTV CI
+
+# Runs on every PR to main and on push to main.
+# Tizen builds and Playwright suites are out of scope here.
+# - Tizen needs the Samsung SDK on a real or emulated TV (separate job, future).
+# - Playwright needs a Chromium container + a running Vite dev server (deferred).
+
+"on":
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # -----------------------------------------------------------------------
+  # 1) Schema validation — fast, gate-blocker.
+  # Expected: "61 PASS, 0 FAIL" from tools/schema-validate.js.
+  # -----------------------------------------------------------------------
+  schema-validation:
+    name: Schema validation (61/61)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            services/hermes-tv-api/package-lock.json
+            apps/hermes-web-tv/package-lock.json
+
+      - name: Install API deps
+        working-directory: services/hermes-tv-api
+        run: npm ci
+
+      - name: Run schema validator
+        run: node tools/schema-validate.js | tee schema-validate.log
+
+      - name: Enforce 61 PASS / 0 FAIL
+        run: |
+          if ! grep -qE 'Results:[[:space:]]+61[[:space:]]+PASS,[[:space:]]+0[[:space:]]+FAIL' schema-validate.log; then
+            echo "::error::schema-validate.js did not report '61 PASS, 0 FAIL'"
+            tail -n 20 schema-validate.log
+            exit 1
+          fi
+          echo "Schema validation: 61 PASS, 0 FAIL — OK"
+
+  # -----------------------------------------------------------------------
+  # 2) Web build — parallel with schema-validation.
+  # Produces apps/hermes-web-tv/dist/ as an artifact for downstream jobs.
+  # -----------------------------------------------------------------------
+  web-build:
+    name: Web build (Vite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            apps/hermes-web-tv/package-lock.json
+            services/hermes-tv-api/package-lock.json
+
+      - name: Install workspace deps (with devDependencies)
+        run: npm install --include=dev
+
+      - name: Build web (Vite)
+        working-directory: apps/hermes-web-tv
+        run: npm run build
+
+      - name: Confirm dist/ exists
+        run: |
+          if [ ! -d apps/hermes-web-tv/dist ]; then
+            echo "::error::apps/hermes-web-tv/dist not produced"
+            exit 1
+          fi
+          ls -la apps/hermes-web-tv/dist
+
+      - name: Upload web dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/hermes-web-tv/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  # -----------------------------------------------------------------------
+  # 3) Chatbot integration — depends on schema-validation passing.
+  # Boots the API in background, waits for /health, then runs 40 cases.
+  # Expected: "40 PASS, 0 FAIL" from tools/test-chatbot-commands.js.
+  # -----------------------------------------------------------------------
+  chatbot-integration:
+    name: Chatbot integration (40/40)
+    runs-on: ubuntu-latest
+    needs: schema-validation
+    timeout-minutes: 10
+    env:
+      PORT: '3001'
+      NODE_ENV: 'test'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            services/hermes-tv-api/package-lock.json
+
+      - name: Install API deps
+        working-directory: services/hermes-tv-api
+        run: npm ci
+
+      - name: Start API in background
+        working-directory: services/hermes-tv-api
+        run: |
+          nohup node src/index.js > "$GITHUB_WORKSPACE/hermes-api.log" 2>&1 &
+          echo $! > "$GITHUB_WORKSPACE/hermes-api.pid"
+          echo "API started with PID $(cat "$GITHUB_WORKSPACE/hermes-api.pid")"
+
+      - name: Wait for /health (30s budget)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null -w '%{http_code}' http://localhost:3001/health | grep -q '^200$'; then
+              echo "API is healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API did not become healthy within 30s"
+          echo "--- hermes-api.log ---"
+          tail -n 100 hermes-api.log || true
+          exit 1
+
+      - name: Run chatbot command suite
+        run: node tools/test-chatbot-commands.js | tee chatbot.log
+
+      - name: Enforce 40 PASS / 0 FAIL
+        run: |
+          if ! grep -qE 'Results:[[:space:]]+40[[:space:]]+PASS,[[:space:]]+0[[:space:]]+FAIL' chatbot.log; then
+            echo "::error::test-chatbot-commands.js did not report '40 PASS, 0 FAIL'"
+            tail -n 30 chatbot.log
+            exit 1
+          fi
+          echo "Chatbot integration: 40 PASS, 0 FAIL — OK"
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f hermes-api.pid ]; then
+            kill "$(cat hermes-api.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload API log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-api-log
+          path: hermes-api.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # -----------------------------------------------------------------------
+  # 4) Secret scan — fast, parallel, no Node deps.
+  # Inline grep patterns mirror tools/secret-scan.sh PATTERNS array so the
+  # CI signal matches what an operator runs locally before opening a PR.
+  # -----------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan (grep patterns)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history for diff range)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tools/secret-scan.sh exists
+        run: |
+          if [ ! -f tools/secret-scan.sh ]; then
+            echo "::error::tools/secret-scan.sh is missing"
+            exit 1
+          fi
+          chmod +x tools/secret-scan.sh
+
+      - name: Run grep pattern scan (inline mirror of secret-scan.sh)
+        run: |
+          set -e
+          # Mirror of PATTERNS in tools/secret-scan.sh — keep in sync.
+          # Include list intentionally excludes *.md (docs legitimately show env-var names
+          # with placeholder values) — matches secret-scan.sh include set.
+          PATTERNS=(
+            "password="
+            "passwd="
+            "api_key="
+            "apikey="
+            "client_secret="
+            "x-ui-token"
+            "bearer "
+            "Authorization:"
+            "x-api-key:"
+            "/get.php?username="
+            "/player_api.php"
+            "m3u_plus"
+            "xtream"
+            "AZURE_TTS_KEY="
+            "DEEPSEEK_API_KEY="
+            "MINIMAX_API_KEY="
+          )
+          # Allowlist of substrings that mark a match as a non-secret (placeholder,
+          # env-interpolation, doc/spec, guard array, or self-reference in this workflow).
+          # If any of these appear on the matching line, the line is treated as benign.
+          ALLOW_RE='REPLACE_WITH_|\$\{[A-Z_]+\}|<[A-Z_]+>|PATTERNS=|CRED_PATTERNS|credentialGuard|VPS_COMPOSE|\.example|playwright-mcp/page-|workflows/ci\.yml|provider\.capabilities\.schema|apps-catalog\.json'
+          GREP_FAIL=0
+          for pat in "${PATTERNS[@]}"; do
+            raw=$(grep -rni "$pat" . \
+              --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" \
+              --include="*.json" --include="*.yaml" --include="*.yml" \
+              --include="*.html" --include="*.xml" \
+              --exclude-dir=".git" --exclude-dir="node_modules" --exclude-dir="dist" \
+              --exclude-dir=".claude" --exclude-dir=".playwright-mcp" \
+              --exclude="*.example" --exclude="*mock*" 2>/dev/null || true)
+            # Drop benign lines via the allowlist regex.
+            filtered=$(printf '%s\n' "$raw" | grep -vE "$ALLOW_RE" | grep -v '^$' || true)
+            if [ -n "$filtered" ]; then
+              echo "::warning::Pattern '$pat' matched — review below:"
+              echo "$filtered" | head -10
+              GREP_FAIL=$((GREP_FAIL + 1))
+            fi
+          done
+          if [ "$GREP_FAIL" -gt 0 ]; then
+            echo "::error::$GREP_FAIL secret pattern(s) matched a real value — see warnings above"
+            exit 1
+          fi
+          echo "Pattern scan: zero matches with real values — OK"
+
+      - name: High-entropy string scan (light)
+        run: |
+          # Looks for base64/hex blobs >= 40 chars assigned to quoted strings.
+          # Allowlist: known asset hashes, sourcemaps, and lockfile entries.
+          set -e
+          MATCHES=$(grep -rEn "['\"][A-Za-z0-9+/=_-]{40,}['\"]" . \
+            --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" \
+            --include="*.json" --include="*.yaml" --include="*.yml" \
+            --exclude-dir=".git" --exclude-dir="node_modules" --exclude-dir="dist" \
+            --exclude-dir=".claude" --exclude-dir=".playwright-mcp" \
+            --exclude="package-lock.json" --exclude="*.map" 2>/dev/null \
+            | grep -viE "(sha[0-9]+-|integrity|sourcemap|chrome 76|browserslist|mock|test|spec|fixture)" \
+            || true)
+          if [ -n "$MATCHES" ]; then
+            COUNT=$(echo "$MATCHES" | wc -l)
+            echo "::warning::Found $COUNT high-entropy candidate string(s) — review manually:"
+            echo "$MATCHES" | head -20
+            # Warning only — entropy heuristics are noisy. Pattern scan above is the gate.
+          else
+            echo "High-entropy scan: no candidates — OK"
+          fi
+
+      - name: Check for committed .env / key files
+        run: |
+          ENV_FILES=$(git ls-files | grep -E "\.(env|authkey|pem|p12|pfx)$" || true)
+          if [ -n "$ENV_FILES" ]; then
+            echo "::error::Committed secret-extension files found:"
+            echo "$ENV_FILES"
+            exit 1
+          fi
+          echo "No committed .env/.authkey/.pem files — OK"
