@@ -91,6 +91,13 @@ function AppleTVShell(props) {
   var activeTab = activeTabResult[0];
   var setActiveTab = activeTabResult[1];
 
+  React.useEffect(function() {
+    var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   var navStyle = {
     height: '56px',
     display: 'flex',
