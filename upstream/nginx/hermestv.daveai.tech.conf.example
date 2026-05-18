@@ -1,0 +1,138 @@
+# ============================================================================
+# HermesTV — host nginx site config TEMPLATE (operator-installed)
+#
+# DO NOT auto-deploy. The sysadmin copies this file into
+#   /etc/nginx/sites-available/hermestv.daveai.tech
+# and symlinks it from
+#   /etc/nginx/sites-enabled/hermestv.daveai.tech
+# after the Phase 1.5 PR has merged and the DNS A record is in place.
+#
+# The host already owns 80/443 with 10 other daveai.tech sites; this file
+# adds an 11th. HermesTV's internal Docker stack listens on container-local
+# ports (NOT bound to 0.0.0.0:80/443) — this nginx is the only public edge.
+#
+# Phase 1.5 reference: docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md
+# ============================================================================
+
+# --- HTTP → HTTPS redirect ---
+server {
+    listen 80;
+    listen [::]:80;
+    server_name hermestv.daveai.tech;
+
+    # Let Certbot answer ACME challenges in-place (do not redirect well-known)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# --- HTTPS termination + reverse proxy to internal HermesTV stack ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name hermestv.daveai.tech;
+
+    # TLS certificates — operator points these at the Certbot output for
+    # hermestv.daveai.tech. Issue with:
+    #   sudo certbot --nginx -d hermestv.daveai.tech
+    # AFTER the DNS A record resolves to this VPS.
+    ssl_certificate     /etc/letsencrypt/live/hermestv.daveai.tech/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/hermestv.daveai.tech/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    # --- API + health ---
+    # HermesTV API container listens on 3011 inside the
+    # hermestv-vps-internal Docker network. Phase 1 audit confirmed port
+    # 3001 is already bound on the VPS by Dave's next-server.
+    location /api/ {
+        proxy_pass http://127.0.0.1:3011/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 30s;
+        proxy_buffering off;
+    }
+
+    location = /health {
+        proxy_pass http://127.0.0.1:3011/health;
+        access_log off;
+    }
+
+    # --- TTS audio streaming (longer timeout, no buffering) ---
+    location /api/tts/speak {
+        proxy_pass http://127.0.0.1:3011/api/tts/speak;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 60s;
+    }
+
+    # --- Web app SPA ---
+    # The hermes-web-tv container serves the Vite-built SPA on its container
+    # nginx port 80. Bind it to a non-conflicting host port (8081 below) in
+    # VPS_COMPOSE.yml, OR proxy directly to the container network IP.
+    #
+    # Recommended: expose via host port for simplicity, since this host
+    # nginx already terminates TLS.
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # --- Caching policy for static assets ---
+    location ~* \.(js|css|png|jpg|jpeg|ico|svg|woff2?)$ {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # --- Refuse direct access to internal admin UIs (Threadfin, etc.) ---
+    # These should be reached via the operator's Tailscale tunnel or local
+    # SSH port-forward, NEVER over the public internet.
+    location ~ ^/(threadfin|m3u-editor|xtreamfilter)/ {
+        return 403;
+    }
+
+    # --- Standard nginx limits ---
+    client_max_body_size 4m;
+}
+
+# ============================================================================
+# Installation checklist (sysadmin):
+#
+#   1. sudo cp upstream/nginx/hermestv.daveai.tech.conf.example \
+#               /etc/nginx/sites-available/hermestv.daveai.tech
+#   2. sudo ln -s /etc/nginx/sites-available/hermestv.daveai.tech \
+#                 /etc/nginx/sites-enabled/
+#   3. sudo nginx -t                       # MUST print "syntax is ok"
+#   4. sudo systemctl reload nginx         # reload, NOT restart
+#   5. sudo certbot --nginx -d hermestv.daveai.tech   (after DNS resolves)
+#   6. curl -I https://hermestv.daveai.tech/health    (expect 200 once Phase 2 ships)
+#
+# If `nginx -t` fails, REMOVE the symlink and reload — do not leave a broken
+# config in sites-enabled, or nginx refuses to reload and the other 10 sites
+# go down:
+#   sudo rm /etc/nginx/sites-enabled/hermestv.daveai.tech
+#   sudo nginx -t && sudo systemctl reload nginx
+# ============================================================================

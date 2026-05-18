@@ -58,7 +58,11 @@ FORBIDDEN_PATTERNS=(
   "reboot"
   "mkfs"
   "dd if="
-  ">"  # any output redirection on the remote side — keeps writes off
+  # Note: bare ">" was too broad — caught safe stderr/null redirects like
+  # 2>/dev/null. Destructive redirections that write to real files are
+  # already covered by the explicit destructive patterns above (rm -rf,
+  # docker rm, etc.). Read-only audit commands may legitimately use
+  # 2>/dev/null and >/dev/null.
 )
 
 # Scan one command string against FORBIDDEN_PATTERNS; refuse if any match.

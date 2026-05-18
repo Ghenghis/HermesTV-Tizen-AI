@@ -44,7 +44,9 @@ services:
     command: node src/index.js
     environment:
       NODE_ENV: production
-      PORT: '3001'
+      # Phase 1.5: 3001 → 3011 — VPS port 3001 already bound by Dave's
+      # next-server. See docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md.
+      PORT: '3011'
       # Credentials injected at runtime — never in image or compose file
     restart: unless-stopped
     networks: [hermestv-vps-internal]
@@ -52,7 +54,7 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3011/health"]
       interval: 30s
       timeout: 10s
       retries: 3

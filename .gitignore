@@ -52,3 +52,8 @@ npm-debug.log*
 # Coverage
 coverage/
 .nyc_output/
+
+# VPS audit raw runs — contain hostname + container inventory, kept local.
+# The numbered summary doc (docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md) carries
+# only what is safe to share.
+docs/research/vps-phase-1-audit-RUN-*.md
