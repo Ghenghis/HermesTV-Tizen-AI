@@ -134,4 +134,51 @@ function startPlayback(args) {
   });
 }
 
-export { isReachable, getProfile, getProviders, getCatalog, getEpg, submitCommand, validateCommand, startPlayback };
+/**
+ * Queue a download for a movie / episode / series item. Returns the
+ * exact-size envelope (job_id, exact_size_human, status: 'queued') so the
+ * DownloadModal can show "EXACT DOWNLOAD SIZE NNN MB" and a Proceed button.
+ *
+ * Resolves with the server JSON body on any status. Caller is responsible
+ * for branching on body.error — that lets the modal distinguish a 503
+ * threadfin_proxy_required from a real exception so the UI can present a
+ * 'configure THREADFIN_URL' tip instead of a generic error.
+ */
+function startDownload(args) {
+  return fetchWithTimeout(BASE_URL + '/api/download', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {}),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      body._status = response.status;
+      return body;
+    });
+  });
+}
+
+function listDownloads() {
+  return fetchWithTimeout(BASE_URL + '/api/downloads').then(function(response) {
+    if (!response.ok) {
+      throw makeNetworkError('Downloads list failed: HTTP ' + response.status);
+    }
+    return response.json();
+  });
+}
+
+function cancelDownload(jobId) {
+  return fetchWithTimeout(BASE_URL + '/api/download/' + encodeURIComponent(jobId), {
+    method: 'DELETE',
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      body._status = response.status;
+      return body;
+    });
+  });
+}
+
+export {
+  isReachable, getProfile, getProviders, getCatalog, getEpg,
+  submitCommand, validateCommand, startPlayback,
+  startDownload, listDownloads, cancelDownload,
+};

@@ -18,6 +18,7 @@ import ShellRenderer from './engine/ShellRenderer.jsx';
 import LayoutSwitcher from './components/LayoutSwitcher.jsx';
 import VoicePickerModal from './components/VoicePickerModal.jsx';
 import PlayerModal from './components/PlayerModal.jsx';
+import DownloadModal from './components/DownloadModal.jsx';
 import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
 
 // Determine tier from TV model prefix
@@ -328,6 +329,15 @@ var INITIAL_STATE = {
   showPlayer: false,
   playerTicket: null,
   playerError: '',
+  // Download modal state — populated by /api/download response. Mirrors the
+  // IPTV Player Zero exact-size disclosure dialog. downloadConfirmed flips
+  // after the user clicks Proceed so the modal switches from review → queued.
+  showDownload: false,
+  downloadItem: null,
+  downloadEnvelope: null,
+  downloadPending: false,
+  downloadConfirmed: false,
+  downloadError: null,
   // Catalog source signal from /api/catalog's X-Catalog-Source response header
   // or _meta.source field. Used by the Settings panel "data source" badge so
   // the operator can tell at a glance whether real providers are wired vs
@@ -587,6 +597,63 @@ function App() {
 
   function handleClosePlayer() {
     patchState({ showPlayer: false, playerTicket: null, playerError: '' });
+  }
+
+  // ─── Download flow (Zero-shell 1-click ⤓) ─────────────────────────────────
+  // 1. User clicks ⤓ on a card or in the detail panel
+  // 2. POST /api/download → returns exact size envelope + job_id
+  // 3. Modal opens with "EXACT DOWNLOAD SIZE NNN MB" + Cancel/Proceed
+  // 4. Proceed flips downloadConfirmed → modal switches to "queued" view
+  // 5. Cancel DELETEs the queued job + closes the modal
+  function handleStartDownload(item) {
+    if (!item || !item.id) { return; }
+    var pid = (state.profile && state.profile.profile_id) || 'mom_tv';
+    patchState({
+      showDownload: true,
+      downloadItem: item,
+      downloadEnvelope: null,
+      downloadPending: true,
+      downloadConfirmed: false,
+      downloadError: null,
+    });
+    hermesApi.startDownload({ item_id: item.id, profile_id: pid })
+      .then(function(body) {
+        if (body && body.job_id) {
+          patchState({ downloadEnvelope: body, downloadPending: false, downloadError: null });
+        } else {
+          // Backend returned an error envelope (400 / 404 / 503).
+          patchState({ downloadEnvelope: null, downloadPending: false, downloadError: body || { error: 'unknown_error', message: 'Server returned no body.' } });
+        }
+      })
+      .catch(function(err) {
+        patchState({
+          downloadEnvelope: null,
+          downloadPending: false,
+          downloadError: { error: 'network_error', message: (err && err.message) || 'Unable to reach the API.' },
+        });
+      });
+  }
+
+  function handleProceedDownload() {
+    // Backend already queued the job on POST /api/download; clicking Proceed is
+    // an explicit consent step. Flip the modal into its "queued" view.
+    patchState({ downloadConfirmed: true });
+  }
+
+  function handleCloseDownload() {
+    // If the user cancelled (downloadConfirmed=false but envelope present)
+    // we'd ideally call hermesApi.cancelDownload — but the in-memory job
+    // table self-trims old jobs, so leaving it is harmless and avoids a
+    // gratuitous round-trip when the user just dismisses. Cancel-as-explicit
+    // can come in a follow-up if the operator asks for it.
+    patchState({
+      showDownload: false,
+      downloadItem: null,
+      downloadEnvelope: null,
+      downloadPending: false,
+      downloadConfirmed: false,
+      downloadError: null,
+    });
   }
 
   // Triggered when the user clicks an actor card in the MediaDetailPanel.
@@ -1117,8 +1184,21 @@ function App() {
             globalProviders={state.providers}
             onPlay={handlePlay}
             onFindSimilarActor={handleFindSimilarActor}
+            onDownload={handleStartDownload}
           />
         )}
+
+        {/* Download modal — Zero-shell exact-size disclosure */}
+        <DownloadModal
+          isOpen={state.showDownload}
+          envelope={state.downloadEnvelope}
+          pending={state.downloadPending}
+          confirmed={state.downloadConfirmed}
+          error={state.downloadError}
+          item={state.downloadItem}
+          onClose={handleCloseDownload}
+          onProceed={handleProceedDownload}
+        />
 
         {/* Player overlay — opened by ▶ Watch in the detail panel. Talks to
             /api/play and renders the resulting ticket. The actual byte

@@ -12,6 +12,7 @@ function MediaDetailPanel(props) {
   var globalProviders = props.globalProviders || [];
   var onPlay = props.onPlay;  // (item, providerId?) → parent calls /api/play
   var onFindSimilarActor = props.onFindSimilarActor;  // (actor) → parent filters catalog by actor_id
+  var onDownload = props.onDownload;  // (item) → parent opens DownloadModal w/ /api/download envelope
 
   // Compute whether playback is currently possible — disable the Watch button
   // when no provider is configured (source_health.status === 'not_configured').
@@ -332,6 +333,50 @@ function MediaDetailPanel(props) {
             >
               {canPlay ? '▶ Watch' : '▶ Provider not configured'}
             </button>
+
+            {/* Download button — Zero-shell parity. Opens the exact-size
+                modal which calls POST /api/download. Disabled when no
+                provider serves the item (same gate as the Watch button)
+                because the streamResolver path is the data source for
+                both flows. Hidden for live channels — operators don't
+                download live broadcasts; they record them, and that
+                surface lands with the Phase 4 recording pipeline. */}
+            {item.type !== 'live' && (
+              <button
+                tabIndex={0}
+                disabled={!canPlay}
+                title={canPlay ? 'Download for offline viewing' : noPlayReason}
+                onClick={function() {
+                  if (canPlay && typeof onDownload === 'function') { onDownload(item); }
+                }}
+                aria-label={'Download ' + (item.title || 'item')}
+                style={{
+                  padding: '0.75rem 1.2rem',
+                  fontSize: 'calc(0.9rem * var(--font-scale, 1))',
+                  fontWeight: 700,
+                  color: canPlay ? 'var(--text, #e6edf3)' : 'var(--muted, #8b949e)',
+                  background: 'transparent',
+                  border: '1px solid var(--border, #30363d)',
+                  borderRadius: '6px',
+                  cursor: canPlay ? 'pointer' : 'not-allowed',
+                  outline: 'none',
+                  opacity: canPlay ? 1 : 0.6,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+                onFocus={function(e) {
+                  if (canPlay) {
+                    e.currentTarget.style.outline = '2px solid var(--accent)';
+                    e.currentTarget.style.outlineOffset = '2px';
+                  }
+                }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              >
+                <span aria-hidden="true">⤓</span> Download
+              </button>
+            )}
+
             {!canPlay && (
               <span style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: 'var(--muted, #8b949e)', maxWidth: '320px' }}>
                 {noPlayReason}
