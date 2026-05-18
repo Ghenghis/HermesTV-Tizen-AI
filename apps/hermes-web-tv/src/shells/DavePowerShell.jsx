@@ -92,7 +92,16 @@ function DavePowerShell(props) {
           return (
             <button
               key={item.label}
+              data-focusable="true"
+              tabIndex={0}
+              aria-label={item.label}
               onClick={function() { setActiveIcon(i); }}
+              onKeyDown={function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveIcon(i);
+                }
+              }}
               title={item.label}
               style={{
                 width: '48px',
@@ -107,7 +116,10 @@ function DavePowerShell(props) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'background 120ms, color 120ms',
+                outline: 'none',
               }}
+              onFocus={function(e) { e.currentTarget.style.outline = '2px solid #00d4aa'; e.currentTarget.style.outlineOffset = '-2px'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
             >
               {item.icon}
             </button>

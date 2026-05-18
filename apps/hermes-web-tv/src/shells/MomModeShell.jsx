@@ -116,7 +116,16 @@ function MomModeShell(props) {
           return (
             <button
               key={tab.label}
+              data-focusable="true"
+              tabIndex={0}
+              aria-label={tab.label}
               onClick={function() { setActiveTab(i); }}
+              onKeyDown={function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveTab(i);
+                }
+              }}
               style={{
                 flex: 1,
                 height: '64px',
@@ -132,7 +141,10 @@ function MomModeShell(props) {
                 fontWeight: isActive ? 700 : 500,
                 cursor: 'pointer',
                 transition: 'all 120ms',
+                outline: 'none',
               }}
+              onFocus={function(e) { e.currentTarget.style.outline = '3px solid #ff7eb3'; e.currentTarget.style.outlineOffset = '-3px'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
             >
               <span style={{ fontSize: 'calc(22px * ' + fontScale + ')' }}>{tab.icon}</span>
               <span>{tab.label}</span>
