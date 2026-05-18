@@ -113,6 +113,12 @@ services:
   # hermes-tv-api — HermesTV backend API (Express)
   # Serves /health, /api/settings, /api/layouts, /api/upstream-apps, etc.
   # Build from local source — run: docker compose build hermes-tv-api
+  #
+  # PORT NOTE (Phase 1.5 remediation, 2026-05-18):
+  # On this VPS, port 3001 is already bound by an existing next-server
+  # (Dave's daveai.tech stack) — see docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md.
+  # HermesTV's API moves to port 3011 to avoid the conflict. Local dev still
+  # uses 3001 (see services/hermes-tv-api/.env.example).
   # ---------------------------------------------------------------------------
   hermes-tv-api:
     build:
@@ -121,12 +127,12 @@ services:
     container_name: hermestv-vps-api
     environment:
       NODE_ENV: production
-      PORT: "3001"
+      PORT: "3011"
     restart: unless-stopped
     networks:
       - hermestv-vps-internal
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3011/health"]
       interval: 30s
       timeout: 10s
       retries: 3

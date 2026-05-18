@@ -18,7 +18,9 @@
 
   @api path /api/* /health
   handle @api {
-    reverse_proxy hermes-tv-api:3001 {
+    # Phase 1.5: HermesTV API moved 3001 → 3011 (port 3001 already bound on VPS
+    # by Dave's next-server). See docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md.
+    reverse_proxy hermes-tv-api:3011 {
       header_up X-Real-IP {remote_host}
       header_up X-Forwarded-Proto {scheme}
     }

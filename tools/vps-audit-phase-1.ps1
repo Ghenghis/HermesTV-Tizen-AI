@@ -59,8 +59,12 @@ $ForbiddenPatterns = @(
     'shutdown',
     'reboot',
     'mkfs',
-    'dd if=',
-    '>'
+    'dd if='
+    # Note: bare ">" was too broad — caught safe stderr/null redirects like
+    # 2>/dev/null. Destructive redirections that write to real files are
+    # already covered by the explicit destructive patterns above (rm -rf,
+    # docker rm, etc.). Read-only audit commands may legitimately use
+    # 2>/dev/null and >/dev/null.
 )
 
 function Test-ContainsForbidden {

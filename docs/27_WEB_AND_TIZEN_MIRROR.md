@@ -33,7 +33,7 @@ apply quality caps only to Dave's TV.
                        │                                        │
                        │   ┌──────────────┐  ┌──────────────┐   │
                        │   │ hermes-tv-api│  │  threadfin   │   │
-                       │   │   :3001      │  │   :34400     │   │
+                       │   │   :3011 (VPS)│  │   :34400     │   │
                        │   └──────┬───────┘  └──────┬───────┘   │
                        │          │                 │           │
                        │          ▼                 │           │
@@ -66,9 +66,11 @@ apply quality caps only to Dave's TV.
 ```
 
 The web app is served by an nginx container (`hermes-web-tv:80`) behind the
-same Caddy that proxies `/api/*` to `hermes-tv-api:3001`. The Tizen app is
-served from inside the TV itself (the `.wgt` is sideloaded) and reaches the
-same Caddy across the open internet.
+same Caddy that proxies `/api/*` to `hermes-tv-api:3011` on the VPS (Phase 1.5
+moved this off 3001 — see [20_VPS_PHASE_1_AUDIT_FINDINGS.md](20_VPS_PHASE_1_AUDIT_FINDINGS.md)).
+Local dev still uses 3001. The Tizen app is served from inside the TV itself
+(the `.wgt` is sideloaded) and reaches the same Caddy across the open
+internet.
 
 ---
 
