@@ -27,6 +27,174 @@
 // iptv-org responses (see lib/jellyfin.js and the iptv-org adapter plan).
 
 // ---------------------------------------------------------------------------
+// Artwork helpers — see also the KNOWN_LOGOS / KNOWN_POSTERS maps below.
+//
+// Without real artwork the shells (NetflixShell, TiviMate, Zero, Apple TV,
+// Samsung, Mom Mode, Dave Power) fall back to coloured gradients because
+// `item.poster` / `item.poster_url` are absent. To make the catalog look
+// like a real lineup on a freshly-deployed VPS we attach:
+//
+//   * logo_url    — Wikipedia Commons thumb URL for ~50 well-known networks,
+//                   picsum.photos placeholder (seeded by slug) for the rest.
+//                   Shape: square-ish channel logo.
+//   * poster_url  — TMDb /t/p/w500 path for a handful of famous titles,
+//                   picsum.photos placeholder (seeded by slug) otherwise.
+//                   Shape: 2:3 portrait poster.
+//   * poster      — alias of poster_url (the 6 OG shells read item.poster,
+//                   ZeroShell + CatalogCard read item.poster_url). Carrying
+//                   both keeps every shell happy without changing render code.
+//
+// All of these are free-tier public CDNs (Wikipedia upload.wikimedia.org,
+// TMDb image.tmdb.org, picsum.photos). No credentials, no API calls — direct
+// image URLs only. The web app's CSP allows img-src 'self' data: blob: http:
+// https: so all three hosts are reachable from the TV.
+//
+// When the operator wires real providers (Jellyfin / Threadfin / iptv-org),
+// those adapters supply their own poster_url / logo_url and this seed is
+// replaced wholesale.
+// ---------------------------------------------------------------------------
+
+// picsum.photos returns a deterministic image keyed by the seed; the same
+// slug always renders the same poster, so the catalog is stable across
+// rebuilds and the operator's eye can recognise a tile they tab past
+// (instead of getting a roulette of random photos).
+function picsumPoster(slug)  { return 'https://picsum.photos/seed/htv-' + slug + '/300/450'; }
+function picsumLogo(slug)    { return 'https://picsum.photos/seed/htv-logo-' + slug + '/200/200'; }
+function picsumThumb(slug)   { return 'https://picsum.photos/seed/htv-thumb-' + slug + '/480/270'; }
+
+// ---------------------------------------------------------------------------
+// KNOWN_LOGOS — Wikipedia Commons thumb URLs for well-known live channels.
+// Picked for stability (long-standing Commons files) and reasonable file
+// sizes (240px thumb wrappers around the original SVG/PNG). Anything not in
+// this map gets a picsum placeholder so the tile still renders artwork
+// rather than a coloured gradient.
+// ---------------------------------------------------------------------------
+var KNOWN_LOGOS = {
+  // Sports
+  'espn':           'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/240px-ESPN_wordmark.svg.png',
+  'espn2':          'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/ESPN2_logo.svg/240px-ESPN2_logo.svg.png',
+  'espnu':          'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/ESPNU_logo.svg/240px-ESPNU_logo.svg.png',
+  'nfl-network':    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/NFL_Network_logo.svg/240px-NFL_Network_logo.svg.png',
+  'nfl-redzone':    'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/NFL_RedZone_logo.svg/240px-NFL_RedZone_logo.svg.png',
+  'nba-tv':         'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/NBA_TV.svg/240px-NBA_TV.svg.png',
+  'mlb-network':    'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/MLB_Network_logo.svg/240px-MLB_Network_logo.svg.png',
+  'nhl-network':    'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/NHL_Network_logo.svg/240px-NHL_Network_logo.svg.png',
+  'fs1':            'https://upload.wikimedia.org/wikipedia/commons/thumb/e/edb/Fox_Sports_1_logo.svg/240px-Fox_Sports_1_logo.svg.png',
+  'fs2':            'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Fox_Sports_2_logo.svg/240px-Fox_Sports_2_logo.svg.png',
+  'golf-channel':   'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Golf_Channel_logo.svg/240px-Golf_Channel_logo.svg.png',
+  'tennis-channel': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Tennis_Channel_logo.svg/240px-Tennis_Channel_logo.svg.png',
+  'big-ten-network':'https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Big_Ten_Network_logo.svg/240px-Big_Ten_Network_logo.svg.png',
+  'sec-network':    'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/SEC_Network_logo.svg/240px-SEC_Network_logo.svg.png',
+
+  // News
+  'cnn':            'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/CNN.svg/240px-CNN.svg.png',
+  'fox-news':       'https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Fox_News_Channel_logo.svg/240px-Fox_News_Channel_logo.svg.png',
+  'msnbc':          'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/MSNBC_2015_logo.svg/240px-MSNBC_2015_logo.svg.png',
+  'cnbc':           'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/CNBC_logo.svg/240px-CNBC_logo.svg.png',
+  'bbc-world':      'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/BBC_World_News_red.svg/240px-BBC_World_News_red.svg.png',
+  'sky-news':       'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Sky_News.svg/240px-Sky_News.svg.png',
+  'bloomberg':      'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Bloomberg_logo.svg/240px-Bloomberg_logo.svg.png',
+  'al-jazeera':     'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Aljazeera_eng.svg/240px-Aljazeera_eng.svg.png',
+  'france-24':      'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/FRANCE_24_logo.svg/240px-FRANCE_24_logo.svg.png',
+  'euronews':       'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Euronews_2016_logo.svg/240px-Euronews_2016_logo.svg.png',
+
+  // Entertainment / Premium
+  'hbo':            'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/HBO_logo.svg/240px-HBO_logo.svg.png',
+  'showtime':       'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Showtime.svg/240px-Showtime.svg.png',
+  'starz':          'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Starz_2016.svg/240px-Starz_2016.svg.png',
+  'cinemax':        'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Cinemax_2008.svg/240px-Cinemax_2008.svg.png',
+  'amc':            'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/AMC_logo_2019.svg/240px-AMC_logo_2019.svg.png',
+  'fx':             'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/FX_International_logo.svg/240px-FX_International_logo.svg.png',
+  'usa':            'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/USA_Network_logo_%282016%29.svg/240px-USA_Network_logo_%282016%29.svg.png',
+  'tnt':            'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/TNT_Logo_2016.svg/240px-TNT_Logo_2016.svg.png',
+  'tbs':            'https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/TBS_logo_2016.svg/240px-TBS_logo_2016.svg.png',
+  'bravo':          'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Bravo_2017_logo.svg/240px-Bravo_2017_logo.svg.png',
+  'syfy':           'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Syfy_2017.svg/240px-Syfy_2017.svg.png',
+  'history':        'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/History_%282021%29.svg/240px-History_%282021%29.svg.png',
+  'discovery':      'https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Discovery_Channel_logo.svg/240px-Discovery_Channel_logo.svg.png',
+  'animal-planet':  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/2018_Animal_Planet_logo.svg/240px-2018_Animal_Planet_logo.svg.png',
+  'natgeo':         'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Natgeologo.svg/240px-Natgeologo.svg.png',
+
+  // Lifestyle
+  'hgtv':           'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/HGTV_US_Logo_2015.svg/240px-HGTV_US_Logo_2015.svg.png',
+  'food-network':   'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Food_Network_logo.svg/240px-Food_Network_logo.svg.png',
+  'tlc':            'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/TLC_Logo.svg/240px-TLC_Logo.svg.png',
+  'lifetime':       'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Logo_Lifetime_2020.svg/240px-Logo_Lifetime_2020.svg.png',
+  'hallmark':       'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Hallmark_Channel.svg/240px-Hallmark_Channel.svg.png',
+
+  // Kids
+  'disney':         'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/2019_Disney_Channel_logo.svg/240px-2019_Disney_Channel_logo.svg.png',
+  'cartoon-network':'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Cartoon_Network_2010_logo.svg/240px-Cartoon_Network_2010_logo.svg.png',
+  'nickelodeon':    'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Nickelodeon_2009_logo.svg/240px-Nickelodeon_2009_logo.svg.png',
+  'pbs-kids':       'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/PBS_Kids_logo.svg/240px-PBS_Kids_logo.svg.png',
+
+  // Music
+  'mtv':            'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/MTV-2021.svg/240px-MTV-2021.svg.png',
+  'vh1':            'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/VH1_logonew.svg/240px-VH1_logonew.svg.png',
+  'cmt':            'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/CMT_2017_logo.svg/240px-CMT_2017_logo.svg.png',
+  'bet':            'https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/BET_2017_logo.svg/240px-BET_2017_logo.svg.png',
+
+  // Broadcast
+  'abc':            'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/American_Broadcasting_Company_Logo.svg/240px-American_Broadcasting_Company_Logo.svg.png',
+  'nbc':            'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/NBC_logo_%282022%29.svg/240px-NBC_logo_%282022%29.svg.png',
+  'cbs':            'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/CBS_logo_%282020%29.svg/240px-CBS_logo_%282020%29.svg.png',
+  'fox':            'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Fox_Broadcasting_Company_logo_%282019%29.svg/240px-Fox_Broadcasting_Company_logo_%282019%29.svg.png',
+  'pbs':            'https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/PBS_logo.svg/240px-PBS_logo.svg.png',
+  'cw':             'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/The_CW.svg/240px-The_CW.svg.png',
+
+  // International
+  'univision':      'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Logo_Univision_2019.svg/240px-Logo_Univision_2019.svg.png',
+  'telemundo':      'https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Telemundo_logo_2018.svg/240px-Telemundo_logo_2018.svg.png',
+};
+
+// ---------------------------------------------------------------------------
+// KNOWN_POSTERS — TMDb /t/p/w500 image paths for movies and series the
+// operator is likely to recognise. The paths come from TMDb's public image
+// CDN (no API key needed for asset GETs). Anything not in this map gets a
+// picsum placeholder so every card still has artwork.
+// ---------------------------------------------------------------------------
+var TMDB_BASE = 'https://image.tmdb.org/t/p/w500';
+var KNOWN_POSTERS = {
+  // VOD
+  'top-gun-maverick':           TMDB_BASE + '/62HCnUTziyWcpDaBO2i1DX17ljH.jpg',
+  'avengers-endgame':           TMDB_BASE + '/or06FN3Dka5tukK1e9sl16pB3iy.jpg',
+  'dune-part-two':              TMDB_BASE + '/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg',
+  'oppenheimer':                TMDB_BASE + '/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
+  'barbie':                     TMDB_BASE + '/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg',
+  'john-wick-4':                TMDB_BASE + '/vZloFAK7NmvMGKE7VkF5UHaz0I.jpg',
+  'spiderman-across':           TMDB_BASE + '/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg',
+  'the-batman':                 TMDB_BASE + '/74xTEgt7R36Fpooo50r9T25onhq.jpg',
+  'eeao':                       TMDB_BASE + '/w3LxiVYdWWRvEVdn5RYq6jIqkb1.jpg',
+  'glass-onion':                TMDB_BASE + '/vDGr1YdrlfbU9wxTOdpf3zChmv9.jpg',
+  'knives-out':                 TMDB_BASE + '/pThyQovXQrw2m0s9x82twj48Jq4.jpg',
+  'wonka':                      TMDB_BASE + '/qhb1qOilapbapxWQn9jtRCMwXJF.jpg',
+  'inside-out-2':               TMDB_BASE + '/vpnVM9B6NMmQpWeZvzLvDESb2QE.jpg',
+  'shawshank':                  TMDB_BASE + '/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg',
+  'godfather':                  TMDB_BASE + '/3bhkrj58Vtu7enYsRolD1fZdja1.jpg',
+  'casablanca':                 TMDB_BASE + '/5K7cOHoay2mZusSLezBOY0Qxh8a.jpg',
+  'pretty-woman':               TMDB_BASE + '/hVHUfT801LQATGd26VPzhorIYza.jpg',
+  // Series
+  'stranger-things':            TMDB_BASE + '/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
+  'house-of-dragon':            TMDB_BASE + '/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg',
+  'severance':                  TMDB_BASE + '/lFf6LLrQjYldcZItzOkGmMMigP7.jpg',
+  'ted-lasso':                  TMDB_BASE + '/5fhZdwP1DVJ0FyVHvrFFr1wxb6w.jpg',
+  'the-bear':                   TMDB_BASE + '/sHF6nWUMW7TnZTNTzCDxQjEdY0E.jpg',
+  'wednesday':                  TMDB_BASE + '/9PFonBhy4cQy7Jz20NpMygczOkv.jpg',
+  'yellowstone':                TMDB_BASE + '/uoLnG7TWlYZJ7N0xJ4Wm8I0Ftyn.jpg',
+  'succession':                 TMDB_BASE + '/7HW47XbkNQ5fiwQFYGWdw9gs144.jpg',
+  'breaking-bad':               TMDB_BASE + '/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
+  'better-call-saul':           TMDB_BASE + '/fC2HDm5t0kHl7mTm7jxMR31b7by.jpg',
+  'the-crown':                  TMDB_BASE + '/1M876KPjulVwppEpldhdc8V4o68.jpg',
+  'bridgerton':                 TMDB_BASE + '/luoKpgVwi1E5nQsi7W0UuKHu2Rq.jpg',
+  'true-detective':             TMDB_BASE + '/aDD4tLp4VuG6PNTjjB1bKtJiHou.jpg',
+  'fargo':                      TMDB_BASE + '/jpdtAhMTQFOWNDXgGqOSDjFRfd.jpg',
+  'sherlock':                   TMDB_BASE + '/7WTsnHkbA0FaG6R9twfFde0I9hl.jpg',
+};
+
+function logoFor(slug)    { return KNOWN_LOGOS[slug] || picsumLogo(slug); }
+function posterFor(slug)  { return KNOWN_POSTERS[slug] || picsumPoster(slug); }
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -44,13 +212,24 @@ function liveItem(seq, opts) {
       },
     };
   });
+  // Live channels: logo_url is the channel bug (Wikipedia logo when known);
+  // poster_url / poster / thumb give shells that draw a card background
+  // something to show besides a gradient. Same image is fine — picsum keeps
+  // every channel visually distinct because the seed is the slug.
+  var logo = logoFor(opts.slug);
+  var poster = picsumPoster(opts.slug);
+  var thumb = picsumThumb(opts.slug);
   return {
     id: id,
     type: 'live',
     title: opts.title,
     provider: providers[0] ? providers[0].provider_id : 'apollo_group',
     category: opts.category,
-    logo_url: 'https://hermestv.local/assets/logos/' + opts.slug + '.png',
+    logo_url: logo,
+    poster_url: poster,
+    poster: poster,
+    thumb: thumb,
+    thumbnail_url: thumb,
     profile_access: opts.profile_access || ['dave_tv', 'mom_tv'],
     providers: providers,
     metadata: {
@@ -75,13 +254,22 @@ function vodItem(seq, opts) {
       },
     };
   });
+  // Movies: TMDb poster when known (Top Gun, Dune, Oppenheimer, etc.),
+  // picsum 2:3 portrait placeholder otherwise. No logo for VOD — the field
+  // is kept for backwards compat with shells that fall back to it.
+  var poster = posterFor(opts.slug);
+  var thumb = picsumThumb(opts.slug);
   return {
     id: id,
     type: 'vod',
     title: opts.title,
     provider: providers[0] ? providers[0].provider_id : 'xtremehd',
     category: opts.category || 'movies',
-    logo_url: 'https://hermestv.local/assets/logos/' + opts.slug + '.png',
+    logo_url: poster,
+    poster_url: poster,
+    poster: poster,
+    thumb: thumb,
+    thumbnail_url: thumb,
     profile_access: opts.profile_access || ['dave_tv', 'mom_tv'],
     providers: providers,
     metadata: {
@@ -109,13 +297,21 @@ function seriesItem(seq, opts) {
       },
     };
   });
+  // Series: TMDb poster when known (Stranger Things, Severance, The Bear,
+  // ...), picsum 2:3 portrait otherwise.
+  var poster = posterFor(opts.slug);
+  var thumb = picsumThumb(opts.slug);
   return {
     id: id,
     type: 'series',
     title: opts.title,
     provider: providers[0] ? providers[0].provider_id : 'xtremehd',
     category: opts.category || 'series',
-    logo_url: 'https://hermestv.local/assets/logos/' + opts.slug + '.png',
+    logo_url: poster,
+    poster_url: poster,
+    poster: poster,
+    thumb: thumb,
+    thumbnail_url: thumb,
     profile_access: opts.profile_access || ['dave_tv', 'mom_tv'],
     providers: providers,
     metadata: {
