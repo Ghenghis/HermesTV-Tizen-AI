@@ -19,6 +19,7 @@ import LayoutSwitcher from './components/LayoutSwitcher.jsx';
 import VoicePickerModal from './components/VoicePickerModal.jsx';
 import PlayerModal from './components/PlayerModal.jsx';
 import DownloadModal from './components/DownloadModal.jsx';
+import SettingsPanelTabbed from './components/SettingsPanelTabbed.jsx';
 import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
 
 // Determine tier from TV model prefix
@@ -1217,290 +1218,37 @@ function App() {
           onClose={handleClosePlayer}
         />
 
-        {/* Settings overlay */}
-        {state.showSettings && (
-          <div
-            onClick={function(e) {
-              if (e.target === e.currentTarget) { patchState({ showSettings: false }); }
-            }}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 40,
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <div
-              style={{
-                marginTop: '3.5rem',
-                marginRight: '1rem',
-                width: '300px',
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border, #30363d)',
-                borderRadius: '10px',
-                padding: '1.25rem',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-                color: 'var(--text)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-              }}
-            >
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: '700', fontSize: 'calc(0.95rem * var(--font-scale, 1))' }}>
-                  Settings
-                </span>
-                <button
-                  tabIndex={0}
-                  autoFocus
-                  onClick={function() { patchState({ showSettings: false }); }}
-                  aria-label="Close settings"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--muted)',
-                    fontSize: '1.2rem',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    padding: '0.1rem 0.3rem',
-                  }}
-                  onFocus={function(e) {
-                    e.currentTarget.style.outline = '2px solid var(--accent)';
-                    e.currentTarget.style.outlineOffset = '2px';
-                  }}
-                  onBlur={function(e) {
-                    e.currentTarget.style.outline = 'none';
-                  }}
-                >
-                  &times;
-                </button>
-              </div>
-
-              {/* Info rows */}
-              <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--muted)' }}>Profile</span>
-                  <span style={{ fontWeight: '600' }}>{profile.display_name || profile.profile_id || '—'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--muted)' }}>TV Model</span>
-                  <span style={{ fontWeight: '600' }}>{state.tvModel}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--muted)' }}>Tier</span>
-                  <span
-                    style={{
-                      fontWeight: '700',
-                      color: state.tier === 'enhanced' ? '#FFD700' : 'var(--muted)',
-                    }}
-                  >
-                    {state.tier === 'enhanced' ? 'Enhanced' : 'Degraded'}
-                  </span>
-                </div>
-                {/* Honest data-source badge — replaces the static "B2 — Mock Mode"
-                    label so the operator sees at a glance whether real providers
-                    are serving the catalog or the mock seed is filling in. */}
-                {(function() {
-                  var src = state.catalogSource || 'unknown';
-                  var label;
-                  var color;
-                  if (src === 'jellyfin' || src === 'threadfin-merged' || src === 'merged-with-iptv-org' || src === 'merged-with-providers') {
-                    label = 'Live · ' + src;
-                    color = '#22c55e'; // green
-                  } else if (src === 'mock-fallback' || src === 'mock-threadfin-failed') {
-                    label = 'Mock fallback (provider error)';
-                    color = '#ef4444'; // red — provider was reachable but failed
-                  } else if (src === 'dev-mock') {
-                    label = 'Dev mock (API offline)';
-                    color = '#ef4444'; // red — honest signal that we never reached the API
-                  } else if (src === 'mock-no-jellyfin' || src === 'unknown') {
-                    label = 'Mock seed (no providers configured)';
-                    color = '#e3b341'; // amber — no creds pasted
-                  } else {
-                    label = src;
-                    color = '#8b949e'; // grey — unrecognized
-                  }
-                  return (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--muted)' }}>Data</span>
-                      <span
-                        style={{
-                          fontSize: 'calc(0.7rem * var(--font-scale, 1))',
-                          fontWeight: '700',
-                          color: color,
-                          border: '1px solid ' + color,
-                          borderRadius: '3px',
-                          padding: '0.1rem 0.35rem',
-                          backgroundColor: color + '14', // ~8% alpha
-                        }}
-                      >
-                        {label}
-                      </span>
-                    </div>
-                  );
-                })()}
-
-                {/* iptv-org count row — only render when the operator has
-                    flipped IPTV_ORG_ENABLED=true and the cron has produced
-                    a non-empty merge. Hidden when 0 to keep Settings tight. */}
-                {state.iptvOrgCount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--muted)' }}>iptv-org</span>
-                    <span style={{ fontWeight: '700', color: '#22c55e' }}>
-                      {state.iptvOrgCount} channels
-                    </span>
-                  </div>
-                )}
-
-                {/* Per-provider M3U diagnostics — Apollo / xTremeHD.
-                    Shows configured/count/error per provider so the operator
-                    can spot a bad M3U URL without opening DevTools. */}
-                {state.m3uProviders && (function() {
-                  var rows = [];
-                  var pids = Object.keys(state.m3uProviders);
-                  for (var pi = 0; pi < pids.length; pi++) {
-                    var pid = pids[pi];
-                    var p = state.m3uProviders[pid] || {};
-                    if (!p.configured) { continue; } // hide unconfigured slots
-                    var ok = !p.error && (p.count > 0);
-                    var pcolor = ok ? '#22c55e' : (p.error ? '#ef4444' : '#e3b341');
-                    var pmsg = ok ? (p.count + ' channels')
-                                  : (p.error ? 'fetch failed' : 'fetch pending');
-                    rows.push(
-                      <div key={pid} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: 'var(--muted)' }}>{p.label || pid}</span>
-                        <span style={{ fontWeight: '700', color: pcolor }}>{pmsg}</span>
-                      </div>
-                    );
-                  }
-                  return rows.length > 0 ? rows : null;
-                })()}
-              </div>
-
-              {/* Change voice button */}
-              <button
-                tabIndex={0}
-                onClick={function() { patchState({ showSettings: false, showVoicePicker: true }); }}
-                style={{
-                  marginTop: '0.25rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: 'transparent',
-                  border: '1px solid var(--accent)',
-                  borderRadius: '6px',
-                  color: 'var(--accent)',
-                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-                onFocus={function(e) {
-                  e.currentTarget.style.outline = '2px solid var(--accent)';
-                  e.currentTarget.style.outlineOffset = '2px';
-                }}
-                onBlur={function(e) {
-                  e.currentTarget.style.outline = 'none';
-                }}
-              >
-                &#x1F509; Change Voice
-              </button>
-
-              {/* Change layout button */}
-              <button
-                tabIndex={0}
-                onClick={function() { patchState({ showSettings: false, showLayoutSwitcher: true }); }}
-                style={{
-                  marginTop: '0.25rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: 'var(--accent)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#000',
-                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-                onFocus={function(e) {
-                  e.currentTarget.style.outline = '2px solid var(--accent)';
-                  e.currentTarget.style.outlineOffset = '2px';
-                }}
-                onBlur={function(e) {
-                  e.currentTarget.style.outline = 'none';
-                }}
-              >
-                &#x1F3A8; Change Layout
-              </button>
-
-              {/* Switch profile button — Sherri ↔ Dave without going through the
-                  fatal-error screen. Clears the persisted profile_id and re-shows
-                  the picker so the next pick re-runs bootWithProfileId(). */}
-              <button
-                tabIndex={0}
-                onClick={function() {
-                  profileStore.clearActiveProfileId();
-                  patchState(Object.assign({}, INITIAL_STATE, {
-                    loading: false,
-                    showProfilePicker: true,
-                    showSettings: false,
-                  }));
-                }}
-                style={{
-                  marginTop: '0.25rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: 'transparent',
-                  border: '1px solid var(--border, #30363d)',
-                  borderRadius: '6px',
-                  color: 'var(--text)',
-                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-                onFocus={function(e) {
-                  e.currentTarget.style.outline = '2px solid var(--accent)';
-                  e.currentTarget.style.outlineOffset = '2px';
-                }}
-                onBlur={function(e) {
-                  e.currentTarget.style.outline = 'none';
-                }}
-              >
-                &#x1F464; Switch Profile
-              </button>
-
-              {/* Reset button */}
-              <button
-                tabIndex={0}
-                onClick={handleResetDefaults}
-                style={{
-                  marginTop: '0.25rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: 'transparent',
-                  border: '1px solid var(--border, #30363d)',
-                  borderRadius: '6px',
-                  color: 'var(--text)',
-                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-                onFocus={function(e) {
-                  e.currentTarget.style.outline = '2px solid var(--accent)';
-                  e.currentTarget.style.outlineOffset = '2px';
-                }}
-                onBlur={function(e) {
-                  e.currentTarget.style.outline = 'none';
-                }}
-              >
-                Reset to defaults
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Settings — tabbed modal that clones the IPTV Player Zero
+            panel (Playlists / General / Backups / Appearance / Features /
+            Hotkeys / About). Existing per-action callbacks pipe back into
+            the same handlers the old inline panel used. */}
+        <SettingsPanelTabbed
+          isOpen={state.showSettings}
+          profile={profile}
+          tier={state.tier}
+          tvModel={state.tvModel}
+          catalogSource={state.catalogSource}
+          iptvOrgCount={state.iptvOrgCount}
+          m3uProviders={state.m3uProviders}
+          activeTheme={(profile && profile.active_theme) || 'night-blue'}
+          providers={state.providers}
+          onClose={function() { patchState({ showSettings: false }); }}
+          onOpenVoicePicker={function() { patchState({ showSettings: false, showVoicePicker: true }); }}
+          onOpenLayoutSwitcher={function() { patchState({ showSettings: false, showLayoutSwitcher: true }); }}
+          onSwitchProfile={function() {
+            profileStore.clearActiveProfileId();
+            patchState(Object.assign({}, INITIAL_STATE, {
+              loading: false,
+              showProfilePicker: true,
+              showSettings: false,
+            }));
+          }}
+          onResetDefaults={handleResetDefaults}
+          onThemeChange={function(themeName) {
+            applyThemeByName(themeName);
+            patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
+          }}
+        />
 
         {/* Layout switcher modal */}
         <LayoutSwitcher
