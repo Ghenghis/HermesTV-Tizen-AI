@@ -18,6 +18,7 @@ const ttsRouter = require('./routes/tts');
 const setupRouter = require('./routes/setup');
 const versionsRouter = require('./routes/versions');
 const settingsRouter = require('./routes/settings');
+const uiCommandRouter = require('./routes/uiCommand');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -56,6 +57,7 @@ app.use('/', ttsRouter);
 app.use('/', setupRouter);
 app.use('/', versionsRouter);
 app.use('/', settingsRouter);
+app.use('/', uiCommandRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {

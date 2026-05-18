@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermestv.local/schemas/actor.person.schema.json",
+  "title": "HermesTV Actor / Person Record",
+  "description": "Minimal actor/person record for use in catalog metadata and 'More with this actor' recommendations. All URLs must use hermestv.local. Chrome 76 compatible.",
+  "type": "object",
+  "required": ["actor_id", "name"],
+  "additionalProperties": false,
+  "properties": {
+    "actor_id": {
+      "type": "string",
+      "description": "Stable actor identifier in the format actor-NNN (three or more digits).",
+      "pattern": "^actor-[0-9]{3,}$",
+      "examples": ["actor-001", "actor-042", "actor-100"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Full display name of the actor or person."
+    },
+    "photo_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "pattern": "^https://hermestv\\.local/",
+      "description": "Headshot or publicity photo. Must use hermestv.local domain."
+    },
+    "known_for_titles": {
+      "type": "array",
+      "description": "Array of catalog item IDs (id field) for which this actor is prominently known.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "bio_short": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "One or two sentence biography displayed in the UI. Hard limit 200 characters."
+    }
+  }
+}

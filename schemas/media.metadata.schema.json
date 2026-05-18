@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermestv.local/schemas/media.metadata.schema.json",
+  "title": "HermesTV Media Metadata",
+  "description": "Extended editorial/metadata record for a VOD, series, or episode. Uses mock IDs only — no real TMDB or IMDB identifiers.",
+  "type": "object",
+  "required": ["title", "year"],
+  "additionalProperties": false,
+  "properties": {
+    "tmdb_mock_id": {
+      "type": ["string", "null"],
+      "description": "Fake TMDB-style identifier for offline mock use only. Never a real TMDB ID.",
+      "pattern": "^mock-tmdb-[0-9]+$|^null$",
+      "examples": ["mock-tmdb-12345"]
+    },
+    "imdb_mock_id": {
+      "type": ["string", "null"],
+      "description": "Fake IMDB-style identifier for offline mock use only. Never a real IMDB ID.",
+      "pattern": "^mock-imdb-[0-9]+$|^null$",
+      "examples": ["mock-imdb-67890"]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "year": {
+      "type": "integer",
+      "minimum": 1900,
+      "maximum": 2100
+    },
+    "plot": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Short plot synopsis. Hard limit 500 characters."
+    },
+    "rating_mpaa": {
+      "type": ["string", "null"],
+      "enum": ["G", "PG", "PG-13", "R", "NR", null],
+      "description": "MPAA content rating."
+    },
+    "runtime_min": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Runtime in minutes. Null for series-level records; set on episode records."
+    },
+    "genres": {
+      "type": "array",
+      "description": "List of genre strings.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "uniqueItems": true
+    },
+    "cast": {
+      "type": "array",
+      "description": "Ordered array of actor_id strings. Cross-reference with actors list in catalog.",
+      "items": {
+        "type": "string",
+        "pattern": "^actor-[0-9]{3,}$"
+      }
+    },
+    "director": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "language": {
+      "type": ["string", "null"],
+      "description": "Primary spoken language (BCP-47 or plain English label).",
+      "maxLength": 32
+    }
+  }
+}

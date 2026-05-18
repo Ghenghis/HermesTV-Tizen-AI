@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermestv.local/schemas/catalog.item.schema.json",
+  "title": "HermesTV Catalog Item",
+  "description": "Schema for a single catalog entry (live channel, VOD movie, series, or episode). Chrome 76 compatible — no optional chaining or nullish coalescing in consuming code.",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "title",
+    "provider_id",
+    "category",
+    "resolution",
+    "has_hdr",
+    "codec",
+    "profile_access",
+    "source_health",
+    "metadata",
+    "poster_url"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "ULID identifier for this catalog item.",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$|^(live|vod|ser|ep)-[0-9]{3,}$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["live", "vod", "series", "episode"],
+      "description": "Content type of this item."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "provider_id": {
+      "type": "string",
+      "enum": ["apollo_group", "xtremehd"],
+      "description": "Primary provider supplying this item. For items on multiple providers, use the preferred/primary provider here; full provider list lives in the providers array."
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Content category (e.g. sports, entertainment, news, drama, action)."
+    },
+    "resolution": {
+      "type": "string",
+      "enum": ["480p", "720p", "1080p", "4K"]
+    },
+    "has_hdr": {
+      "type": "boolean"
+    },
+    "codec": {
+      "type": "string",
+      "enum": ["h264", "h265", "av1"]
+    },
+    "profile_access": {
+      "type": "array",
+      "description": "Which profile IDs may access this item.",
+      "items": {
+        "type": "string",
+        "enum": ["dave_tv", "mom_tv"]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "source_health": {
+      "$ref": "https://hermestv.local/schemas/source.health.schema.json",
+      "description": "Source health record for the primary provider. Per-provider health is stored on each providers array entry."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Editorial metadata for this item.",
+      "additionalProperties": false,
+      "properties": {
+        "year": {
+          "type": ["integer", "null"],
+          "minimum": 1900,
+          "maximum": 2100
+        },
+        "duration_min": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Runtime in minutes. Null for live channels."
+        },
+        "plot": {
+          "type": ["string", "null"],
+          "maxLength": 500
+        },
+        "rating_mpaa": {
+          "type": ["string", "null"],
+          "enum": ["G", "PG", "PG-13", "R", "NR", null]
+        },
+        "cast_ids": {
+          "type": "array",
+          "description": "Array of actor_id strings referencing actors in the catalog.",
+          "items": {
+            "type": "string",
+            "pattern": "^actor-[0-9]{3,}$"
+          }
+        }
+      }
+    },
+    "poster_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://hermestv\\.local/",
+      "description": "Poster/thumbnail URL. Must use hermestv.local domain."
+    },
+    "logo_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "pattern": "^https://hermestv\\.local/",
+      "description": "Channel or network logo URL (primarily for live channels)."
+    },
+    "backdrop_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "pattern": "^https://hermestv\\.local/",
+      "description": "Wide backdrop / hero image URL."
+    }
+  }
+}

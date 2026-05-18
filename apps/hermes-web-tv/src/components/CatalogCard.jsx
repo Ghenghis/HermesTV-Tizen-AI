@@ -49,7 +49,7 @@ function CatalogCard(props) {
   function handleKeyDown(e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      // Future: trigger playback / detail view
+      if (props.onClick) { props.onClick(item); }
     }
   }
 
@@ -65,6 +65,7 @@ function CatalogCard(props) {
       role="button"
       aria-label={title + ', ' + typeLabel}
       className={cardClasses.join(' ')}
+      onClick={function() { if (props.onClick) { props.onClick(item); } }}
       onKeyDown={handleKeyDown}
       style={{
         backgroundColor: 'var(--surface)',

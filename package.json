@@ -1,0 +1,17 @@
+{
+  "name": "hermestv-tizen-ai",
+  "version": "0.2.0",
+  "description": "HermesTV Tizen AI — IPTV streaming shell for Samsung QN85/QN95 QLED TVs",
+  "private": true,
+  "scripts": {
+    "build:web": "npm run build --prefix apps/hermes-web-tv",
+    "dev:web": "npm run dev --prefix apps/hermes-web-tv",
+    "start:api": "node services/hermes-tv-api/src/index.js",
+    "install:all": "npm install --prefix apps/hermes-web-tv && npm install --include=dev --prefix apps/hermes-web-tv && npm install --prefix services/hermes-tv-api",
+    "validate:schemas": "node tools/schema-validate.js",
+    "audit:secrets": "node -e \"const {execSync}=require('child_process');try{execSync('bash tools/secret-scan.sh',{stdio:'inherit'})}catch(e){process.exit(1)}\"",
+    "test:tiers": "node tools/tier-detect-test.js"
+  },
+  "engines": { "node": ">=20.0.0" },
+  "workspaces": ["apps/hermes-web-tv", "services/hermes-tv-api"]
+}
