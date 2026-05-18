@@ -411,6 +411,25 @@ function App() {
     patchState({ loading: true, showProfilePicker: false, error: null });
 
     hermesApi.isReachable().then(function(reachable) {
+      // Honest mode: when the API is unreachable we DO NOT silently swap to
+      // mockApi (which previously made the UI look identical regardless of
+      // whether the backend was working). Instead, surface a clear error
+      // screen unless the dev explicitly opted in by setting
+      // localStorage.hermestv_dev_mock='1'. The Settings data-source badge
+      // also flips to a red 'no-api' state on every mock fallback path so
+      // the operator can see the degradation at a glance.
+      var devMockAllowed = (typeof window !== 'undefined' && window.localStorage &&
+        window.localStorage.getItem('hermestv_dev_mock') === '1');
+
+      if (!reachable && !devMockAllowed) {
+        patchState({
+          loading: false,
+          online: false,
+          error: 'Cannot reach the HermesTV server. Check your network or wait a moment and click Retry.',
+        });
+        return;
+      }
+
       var api = reachable ? hermesApi : mockApi;
       var isOnline = reachable;
 
@@ -431,10 +450,11 @@ function App() {
           var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
           var actors = rawCatalog.actors || [];
           // X-Catalog-Source header (or _meta.source fallback) — honest data
-          // source signal for the Settings badge.
+          // source signal for the Settings badge. When we're on the dev-mock
+          // path the badge shows 'dev-mock' so it's obvious in DevTools.
           var sourceHeader = rawCatalog._source_header || null;
           var metaSource = rawCatalog._meta && rawCatalog._meta.source ? rawCatalog._meta.source : null;
-          var catalogSource = sourceHeader || metaSource || null;
+          var catalogSource = isOnline ? (sourceHeader || metaSource || null) : 'dev-mock';
 
           patchState({
             loading: false,
@@ -450,46 +470,15 @@ function App() {
           });
         });
       }).catch(function(profileErr) {
-        // Profile fetch failed — try mock fallback even if we thought we were online
-        if (isOnline) {
-          return mockApi.getProfile(profileId).then(function(profile) {
-            var tvModel = profile.tv_model || state.tvModel;
-            var tier = resolveTier(tvModel);
-            applyDocumentTheme(profile);
-            applyTierClasses(tier);
-
-            return Promise.all([
-              mockApi.getProviders(),
-              mockApi.getCatalog(),
-            ]).then(function(results) {
-              var providers = results[0] || [];
-              var rawCatalog = results[1] || [];
-              var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
-              var actors = rawCatalog.actors || [];
-
-              patchState({
-                loading: false,
-                profile: profile,
-                providers: providers,
-                catalog: catalog,
-                actors: actors,
-                tier: tier,
-                tvModel: tvModel,
-                online: false,
-                showProfilePicker: false,
-              });
-            });
-          }).catch(function(mockErr) {
-            patchState({
-              loading: false,
-              error: 'Failed to load profile: ' + (mockErr.message || 'unknown error'),
-            });
-          });
-        }
-
+        // Profile fetch failed mid-boot. Don't quietly substitute mock data
+        // even though we passed isReachable — that's how the old code lied
+        // about the system state. Show an honest error instead. Operators
+        // who really want the mock data while debugging can re-issue with
+        // localStorage.hermestv_dev_mock='1'.
         patchState({
           loading: false,
-          error: 'Failed to load profile: ' + (profileErr.message || 'unknown error'),
+          online: false,
+          error: 'Profile load failed: ' + (profileErr.message || 'unknown error'),
         });
       });
     }).catch(function(bootErr) {
@@ -673,29 +662,61 @@ function App() {
       >
         <div style={{ fontSize: '2rem' }}>&#x26A0;</div>
         <h2 style={{ margin: 0, color: '#e6edf3', fontSize: '1.25rem' }}>Something went wrong</h2>
-        <p style={{ margin: 0, color: '#8b949e', fontSize: '0.875rem' }}>{state.error}</p>
-        <button
-          tabIndex={0}
-          onClick={function() {
-            profileStore.clearActiveProfileId();
-            patchState(Object.assign({}, INITIAL_STATE, { loading: false, showProfilePicker: true }));
-          }}
-          style={{
-            marginTop: '1rem',
-            padding: '0.6rem 1.5rem',
-            backgroundColor: '#161b22',
-            border: '1px solid #30363d',
-            borderRadius: '8px',
-            color: '#e6edf3',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            outline: 'none',
-          }}
-          onFocus={function(e) { e.currentTarget.style.outline = '2px solid #1f6feb'; e.currentTarget.style.outlineOffset = '2px'; }}
-          onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
-        >
-          Switch Profile
-        </button>
+        <p style={{ margin: 0, color: '#8b949e', fontSize: '0.875rem', maxWidth: '480px' }}>{state.error}</p>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {/* Retry — re-run the boot sequence with the currently-saved profile.
+              Most transient network blips clear after one retry; this avoids
+              forcing Mom back to the profile picker. */}
+          <button
+            tabIndex={0}
+            autoFocus
+            onClick={function() {
+              var pid = profileStore.getActiveProfileId();
+              if (pid) {
+                patchState({ error: null, loading: true });
+                bootWithProfileId(pid);
+              } else {
+                patchState(Object.assign({}, INITIAL_STATE, { loading: false, showProfilePicker: true }));
+              }
+            }}
+            style={{
+              padding: '0.6rem 1.5rem',
+              backgroundColor: '#1f6feb',
+              border: '1px solid #1f6feb',
+              borderRadius: '8px',
+              color: '#fff',
+              fontWeight: '700',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              outline: 'none',
+            }}
+            onFocus={function(e) { e.currentTarget.style.outline = '3px solid #fff'; e.currentTarget.style.outlineOffset = '2px'; }}
+            onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+          >
+            &#x21BB; Retry
+          </button>
+          <button
+            tabIndex={0}
+            onClick={function() {
+              profileStore.clearActiveProfileId();
+              patchState(Object.assign({}, INITIAL_STATE, { loading: false, showProfilePicker: true }));
+            }}
+            style={{
+              padding: '0.6rem 1.5rem',
+              backgroundColor: '#161b22',
+              border: '1px solid #30363d',
+              borderRadius: '8px',
+              color: '#e6edf3',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              outline: 'none',
+            }}
+            onFocus={function(e) { e.currentTarget.style.outline = '2px solid #1f6feb'; e.currentTarget.style.outlineOffset = '2px'; }}
+            onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+          >
+            Switch Profile
+          </button>
+        </div>
       </div>
     );
   }
@@ -1097,6 +1118,9 @@ function App() {
                   } else if (src === 'mock-fallback' || src === 'mock-threadfin-failed') {
                     label = 'Mock fallback (provider error)';
                     color = '#ef4444'; // red — provider was reachable but failed
+                  } else if (src === 'dev-mock') {
+                    label = 'Dev mock (API offline)';
+                    color = '#ef4444'; // red — honest signal that we never reached the API
                   } else if (src === 'mock-no-jellyfin' || src === 'unknown') {
                     label = 'Mock seed (no providers configured)';
                     color = '#e3b341'; // amber — no creds pasted
