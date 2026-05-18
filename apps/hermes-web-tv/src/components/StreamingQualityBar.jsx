@@ -89,10 +89,13 @@ function StreamingQualityBar(props) {
     );
   }
 
-  var healthScore = typeof providerEntry.health_score === 'number' ? providerEntry.health_score : null;
-  var healthLabel = providerEntry.health_label || (healthScore !== null ? scoreLabel(healthScore) : 'unknown');
-  var startupMs = typeof providerEntry.startup_latency_ms === 'number' ? providerEntry.startup_latency_ms : null;
-  var sessionStatus = providerEntry.session_limit_status || '';
+  // source_health may be nested under providerEntry.source_health (catalog.mock.json format)
+  // or flat on providerEntry directly (legacy catalog.js format).
+  var _sh = providerEntry.source_health || providerEntry;
+  var healthScore = typeof _sh.health_score === 'number' ? _sh.health_score : null;
+  var healthLabel = _sh.health_label || (healthScore !== null ? scoreLabel(healthScore) : 'unknown');
+  var startupMs = typeof _sh.startup_latency_ms === 'number' ? _sh.startup_latency_ms : null;
+  var sessionStatus = _sh.session_limit_status || '';
   var dotColor = scoreColor(healthScore);
   var barWidth = healthScore !== null ? Math.min(100, Math.max(0, healthScore)) : 0;
 

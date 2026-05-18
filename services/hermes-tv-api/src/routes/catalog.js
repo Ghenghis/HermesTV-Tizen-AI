@@ -10,31 +10,33 @@ const VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'all'];
 // Actors — same 5 actors as in catalog.mock.json companion data.
 // photo_url uses hermestv.local (no external CDN, no credentials).
 // ---------------------------------------------------------------------------
+// actor_id format: actor-NNN (matches actor.person.schema.json pattern ^actor-[0-9]{3,}$)
+// and matches cast_ids references in catalog items (actor-001 format).
 const ACTORS = [
   {
-    actor_id: 'act-001',
+    actor_id: 'actor-001',
     name: 'Tom Cruise',
-    photo_url: 'https://hermestv.local/assets/actors/tom-cruise.jpg',
+    photo_url: 'https://hermestv.local/mock/actors/actor-001.jpg',
   },
   {
-    actor_id: 'act-002',
+    actor_id: 'actor-002',
     name: 'Ryan Gosling',
-    photo_url: 'https://hermestv.local/assets/actors/ryan-gosling.jpg',
+    photo_url: 'https://hermestv.local/mock/actors/actor-002.jpg',
   },
   {
-    actor_id: 'act-003',
+    actor_id: 'actor-003',
     name: 'Keanu Reeves',
-    photo_url: 'https://hermestv.local/assets/actors/keanu-reeves.jpg',
+    photo_url: 'https://hermestv.local/mock/actors/actor-003.jpg',
   },
   {
-    actor_id: 'act-004',
+    actor_id: 'actor-004',
     name: 'Julia Roberts',
-    photo_url: 'https://hermestv.local/assets/actors/julia-roberts.jpg',
+    photo_url: 'https://hermestv.local/mock/actors/actor-004.jpg',
   },
   {
-    actor_id: 'act-005',
+    actor_id: 'actor-005',
     name: 'Kevin Costner',
-    photo_url: 'https://hermestv.local/assets/actors/kevin-costner.jpg',
+    photo_url: 'https://hermestv.local/mock/actors/actor-005.jpg',
   },
 ];
 
@@ -156,7 +158,7 @@ const CATALOG_ITEMS = [
       duration_min: 130,
       year: 2022,
     },
-    actors: ['act-001'],
+    actors: ['actor-001'],
   },
 ];
 

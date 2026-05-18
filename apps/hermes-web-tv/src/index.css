@@ -116,9 +116,10 @@
   transform: scale(1.03);
 }
 
-/* Enhanced overlay blur */
+/* Enhanced overlay blur — Chrome 76 (Tizen 6.5) requires -webkit- prefix */
 .enhanced .overlay-panel,
 .enhanced .chatbot-panel {
+  -webkit-backdrop-filter: blur(var(--enhanced-blur));
   backdrop-filter: blur(var(--enhanced-blur));
 }
 

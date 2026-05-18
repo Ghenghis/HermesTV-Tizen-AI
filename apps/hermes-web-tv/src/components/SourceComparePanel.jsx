@@ -24,14 +24,16 @@ function buildProviderCards(item, globalProviders) {
           }
         }
       }
+      // source_health may be nested (catalog.mock.json) or flat (legacy catalog.js format)
+      var sh = p.source_health || p;
       return {
         provider_id: p.provider_id,
         display_name: displayName || p.provider_id,
-        health_score: typeof p.health_score === 'number' ? p.health_score : null,
-        health_label: p.health_label || '',
-        bitrate_bucket: p.bitrate_bucket || '',
-        startup_latency_ms: typeof p.startup_latency_ms === 'number' ? p.startup_latency_ms : null,
-        fallback_available: p.fallback_available || false,
+        health_score: typeof sh.health_score === 'number' ? sh.health_score : null,
+        health_label: sh.health_label || '',
+        bitrate_bucket: sh.bitrate_bucket || p.bitrate_bucket || '',
+        startup_latency_ms: typeof sh.startup_latency_ms === 'number' ? sh.startup_latency_ms : null,
+        fallback_available: sh.fallback_available || p.fallback_available || false,
       };
     });
   }
