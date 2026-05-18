@@ -10,6 +10,24 @@ function MediaDetailPanel(props) {
   var onSelectProvider = props.onSelectProvider;
   var selectedProviderId = props.selectedProviderId || '';
   var globalProviders = props.globalProviders || [];
+  var onPlay = props.onPlay;  // (item, providerId?) → parent calls /api/play
+
+  // Compute whether playback is currently possible — disable the Watch button
+  // when no provider is configured (source_health.status === 'not_configured').
+  var canPlay = false;
+  var noPlayReason = '';
+  var providersOnItem = Array.isArray(item.providers) ? item.providers : [];
+  if (providersOnItem.length === 0) {
+    noPlayReason = 'No provider serves this item yet.';
+  } else {
+    for (var pp = 0; pp < providersOnItem.length; pp++) {
+      var ph = providersOnItem[pp].source_health || {};
+      if (ph.status === 'ok' || ph.status === 'degraded' || !ph.status) { canPlay = true; break; }
+    }
+    if (!canPlay) {
+      noPlayReason = 'Provider not configured — paste credentials per docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md';
+    }
+  }
 
   // ESC key closes the panel — cleaned up on unmount
   React.useEffect(function() {
@@ -274,6 +292,49 @@ function MediaDetailPanel(props) {
               {plot}
             </p>
           )}
+
+          {/* Watch button — primary CTA. Disabled when no provider is configured;
+              the disabled-reason tooltip points the operator at the runbook so
+              they know exactly what to do. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.75rem 0 1.25rem' }}>
+            <button
+              tabIndex={0}
+              autoFocus
+              disabled={!canPlay}
+              title={canPlay ? 'Start playback' : noPlayReason}
+              onClick={function() {
+                if (canPlay && typeof onPlay === 'function') {
+                  onPlay(item, selectedProviderId || null);
+                }
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: 'calc(1rem * var(--font-scale, 1))',
+                fontWeight: 800,
+                color: canPlay ? '#fff' : 'var(--muted, #8b949e)',
+                backgroundColor: canPlay ? '#e50914' : 'transparent',
+                border: canPlay ? 'none' : '1px solid var(--border, #30363d)',
+                borderRadius: '6px',
+                cursor: canPlay ? 'pointer' : 'not-allowed',
+                outline: 'none',
+                opacity: canPlay ? 1 : 0.65,
+              }}
+              onFocus={function(e) {
+                if (canPlay) {
+                  e.currentTarget.style.outline = '3px solid #fff';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              {canPlay ? '▶ Watch' : '▶ Provider not configured'}
+            </button>
+            {!canPlay && (
+              <span style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: 'var(--muted, #8b949e)', maxWidth: '320px' }}>
+                {noPlayReason}
+              </span>
+            )}
+          </div>
 
           {/* Cast row */}
           {castActors.length > 0 && (
