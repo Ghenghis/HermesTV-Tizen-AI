@@ -9,13 +9,16 @@ import ProviderFilter from './components/ProviderFilter.jsx';
 import CatalogGrid from './components/CatalogGrid.jsx';
 import FloatingChatbot from './components/FloatingChatbot.jsx';
 import QROnboarding from './components/QROnboarding.jsx';
+import MediaDetailPanel from './components/MediaDetailPanel.jsx';
+import StreamingQualityBar from './components/StreamingQualityBar.jsx';
 
 // Determine tier from TV model prefix
-// default to degraded — QN is the design target
+// QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
 function resolveTier(tvModel) {
   if (!tvModel) { return 'degraded'; }
   var upper = tvModel.toUpperCase();
   if (upper.indexOf('QN') === 0) { return 'enhanced'; }
+  if (upper === 'CUSTOM') { return 'enhanced'; }
   return 'degraded';
 }
 
@@ -59,19 +62,236 @@ function applyDocumentTheme(profile) {
   }
 }
 
+// ── FilterBar (inline component) ──────────────────────────────────────────────
+// A horizontal row of dropdowns for provider, content type, and quality.
+function FilterBar(props) {
+  var providerFilter = props.providerFilter;
+  var contentFilter = props.contentFilter;
+  var qualityFilter = props.qualityFilter;
+  var onProviderChange = props.onProviderChange;
+  var onContentChange = props.onContentChange;
+  var onQualityChange = props.onQualityChange;
+
+  var selectStyle = {
+    backgroundColor: 'var(--surface-raised, #1c2128)',
+    border: '1px solid var(--border, #30363d)',
+    borderRadius: '6px',
+    color: 'var(--text)',
+    fontSize: 'calc(0.85rem * var(--font-scale, 1))',
+    padding: '0.4rem 0.75rem',
+    cursor: 'pointer',
+    outline: 'none',
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        padding: '0.6rem 1.5rem',
+        backgroundColor: 'var(--surface)',
+        borderBottom: '1px solid var(--border, #30363d)',
+        flexShrink: 0,
+        flexWrap: 'wrap',
+      }}
+    >
+      <span
+        style={{
+          fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+          color: 'var(--muted)',
+          fontWeight: '600',
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+        }}
+      >
+        Filter:
+      </span>
+
+      {/* Provider filter */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <span style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
+          Provider
+        </span>
+        <select
+          value={providerFilter}
+          onChange={function(e) { onProviderChange(e.target.value); }}
+          style={selectStyle}
+        >
+          <option value="all">All</option>
+          <option value="apollo_group">Apollo Group</option>
+          <option value="xtremehd">XtremeHD</option>
+        </select>
+      </label>
+
+      {/* Content type filter */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <span style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
+          Content
+        </span>
+        <select
+          value={contentFilter}
+          onChange={function(e) { onContentChange(e.target.value); }}
+          style={selectStyle}
+        >
+          <option value="all">All</option>
+          <option value="live">Live</option>
+          <option value="movies">Movies</option>
+          <option value="series">Series</option>
+        </select>
+      </label>
+
+      {/* Quality filter */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <span style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
+          Quality
+        </span>
+        <select
+          value={qualityFilter}
+          onChange={function(e) { onQualityChange(e.target.value); }}
+          style={selectStyle}
+        >
+          <option value="all">All</option>
+          <option value="720p+">720p+</option>
+          <option value="1080p+">1080p+</option>
+          <option value="4K">4K</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
+// ── ModelSelector (inline component) ─────────────────────────────────────────
+function ModelSelector(props) {
+  var tvModel = props.tvModel;
+  var tier = props.tier;
+  var onChange = props.onChange;
+
+  var tierBadgeStyle = {
+    fontSize: 'calc(0.65rem * var(--font-scale, 1))',
+    fontWeight: '700',
+    border: '1px solid',
+    borderRadius: '3px',
+    padding: '0.1rem 0.4rem',
+    letterSpacing: '0.05em',
+    marginLeft: '0.3rem',
+    color: tier === 'enhanced' ? '#FFD700' : 'var(--muted)',
+    borderColor: tier === 'enhanced' ? '#FFD700' : 'var(--muted)',
+    backgroundColor: tier === 'enhanced' ? 'rgba(255,215,0,0.1)' : 'transparent',
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <span style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
+        TV Model:
+      </span>
+      <select
+        value={tvModel}
+        onChange={function(e) { onChange(e.target.value); }}
+        style={{
+          backgroundColor: 'var(--surface-raised, #1c2128)',
+          border: '1px solid var(--border, #30363d)',
+          borderRadius: '5px',
+          color: 'var(--text)',
+          fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+          padding: '0.25rem 0.5rem',
+          cursor: 'pointer',
+          outline: 'none',
+        }}
+      >
+        <option value="QN85Q7FAAFXZA">QN85Q7FAAFXZA</option>
+        <option value="UN55CU8000BXZA">UN55CU8000BXZA</option>
+        <option value="custom">Custom</option>
+      </select>
+      <span style={tierBadgeStyle}>
+        {tier === 'enhanced' ? 'ENHANCED' : 'DEGRADED'}
+      </span>
+    </div>
+  );
+}
+
+// ── Filter logic helpers ──────────────────────────────────────────────────────
+function matchesProviderFilter(item, providerFilter) {
+  if (providerFilter === 'all') { return true; }
+  // Rich format: item.providers is an array of objects
+  if (Array.isArray(item.providers)) {
+    for (var i = 0; i < item.providers.length; i++) {
+      if (item.providers[i].provider_id === providerFilter) { return true; }
+    }
+    return false;
+  }
+  // Old flat format: item.provider is a string, or item.provider_tags is an array
+  if (typeof item.provider === 'string') {
+    return item.provider === providerFilter;
+  }
+  if (Array.isArray(item.provider_tags)) {
+    // Map filter values to the provider_tags used in mock (apollo_group → apollo)
+    var tagAlias = providerFilter === 'apollo_group' ? 'apollo' : providerFilter;
+    return item.provider_tags.indexOf(tagAlias) !== -1 ||
+           item.provider_tags.indexOf(providerFilter) !== -1;
+  }
+  return false;
+}
+
+function matchesContentFilter(item, contentFilter) {
+  if (contentFilter === 'all') { return true; }
+  var type = item.type || item.content_type || '';
+  if (contentFilter === 'live') { return type === 'live'; }
+  if (contentFilter === 'movies') { return type === 'vod' || type === 'movie'; }
+  if (contentFilter === 'series') { return type === 'series'; }
+  return true;
+}
+
+function matchesQualityFilter(item, qualityFilter) {
+  if (qualityFilter === 'all') { return true; }
+  // resolution may be at top level or nested in item.quality
+  var res = item.resolution || (item.quality && item.quality.resolution) || '';
+  var r = res.toLowerCase();
+  if (qualityFilter === '720p+') {
+    return r === '720p' || r === '1080p' || r === '4k' || r === '2160p';
+  }
+  if (qualityFilter === '1080p+') {
+    return r === '1080p' || r === '4k' || r === '2160p';
+  }
+  if (qualityFilter === '4K') {
+    return r === '4k' || r === '2160p';
+  }
+  return true;
+}
+
+function applyFilters(catalog, providerFilter, contentFilter, qualityFilter) {
+  return catalog.filter(function(item) {
+    return matchesProviderFilter(item, providerFilter) &&
+           matchesContentFilter(item, contentFilter) &&
+           matchesQualityFilter(item, qualityFilter);
+  });
+}
+
+// ── Initial state ─────────────────────────────────────────────────────────────
 var INITIAL_STATE = {
   loading: true,
   profile: null,
   providers: [],
   catalog: [],
+  actors: [],
   activeTab: 'all',
   tier: 'degraded',
+  tvModel: 'QN85Q7FAAFXZA',
   online: true,
   showProfilePicker: false,
   showQR: false,
+  showSettings: false,
   error: null,
+  // Filters
+  providerFilter: 'all',
+  contentFilter: 'all',
+  qualityFilter: 'all',
+  // Selected item for detail panel
+  selectedItem: null,
+  selectedProviderId: null,
 };
 
+// ── App ───────────────────────────────────────────────────────────────────────
 function App() {
   var stateResult = React.useState(INITIAL_STATE);
   var state = stateResult[0];
@@ -103,7 +323,8 @@ function App() {
       var isOnline = reachable;
 
       return api.getProfile(profileId).then(function(profile) {
-        var tier = resolveTier(profile.tv_model || '');
+        var tvModel = profile.tv_model || state.tvModel;
+        var tier = resolveTier(tvModel);
         applyDocumentTheme(profile);
         applyTierClasses(tier);
 
@@ -112,14 +333,20 @@ function App() {
           api.getCatalog(),
         ]).then(function(results) {
           var providers = results[0] || [];
-          var catalog = results[1] || [];
+          var rawCatalog = results[1] || [];
+
+          // Support both array-of-items and catalog-wrapper formats
+          var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
+          var actors = rawCatalog.actors || [];
 
           patchState({
             loading: false,
             profile: profile,
             providers: providers,
             catalog: catalog,
+            actors: actors,
             tier: tier,
+            tvModel: tvModel,
             online: isOnline,
             showProfilePicker: false,
           });
@@ -128,7 +355,8 @@ function App() {
         // Profile fetch failed — try mock fallback even if we thought we were online
         if (isOnline) {
           return mockApi.getProfile(profileId).then(function(profile) {
-            var tier = resolveTier(profile.tv_model || '');
+            var tvModel = profile.tv_model || state.tvModel;
+            var tier = resolveTier(tvModel);
             applyDocumentTheme(profile);
             applyTierClasses(tier);
 
@@ -137,14 +365,18 @@ function App() {
               mockApi.getCatalog(),
             ]).then(function(results) {
               var providers = results[0] || [];
-              var catalog = results[1] || [];
+              var rawCatalog = results[1] || [];
+              var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
+              var actors = rawCatalog.actors || [];
 
               patchState({
                 loading: false,
                 profile: profile,
                 providers: providers,
                 catalog: catalog,
+                actors: actors,
                 tier: tier,
+                tvModel: tvModel,
                 online: false,
                 showProfilePicker: false,
               });
@@ -184,6 +416,44 @@ function App() {
 
   function handleCloseQR() {
     patchState({ showQR: false });
+  }
+
+  function handleTvModelChange(model) {
+    var newTier = resolveTier(model);
+    applyTierClasses(newTier);
+    patchState({ tvModel: model, tier: newTier });
+  }
+
+  function handleItemClick(item) {
+    // Pick the first available provider as default
+    var defaultProvider = null;
+    if (Array.isArray(item.providers) && item.providers.length > 0) {
+      defaultProvider = item.providers[0].provider_id;
+    } else if (typeof item.preferred_source === 'string') {
+      defaultProvider = item.preferred_source;
+    } else if (Array.isArray(item.provider_tags) && item.provider_tags.length > 0) {
+      defaultProvider = item.provider_tags[0];
+    }
+    patchState({ selectedItem: item, selectedProviderId: defaultProvider });
+  }
+
+  function handleCloseDetail() {
+    patchState({ selectedItem: null, selectedProviderId: null });
+  }
+
+  function handleSelectProvider(providerId) {
+    patchState({ selectedProviderId: providerId });
+  }
+
+  function handleResetDefaults() {
+    patchState({
+      providerFilter: 'all',
+      contentFilter: 'all',
+      qualityFilter: 'all',
+      tvModel: 'QN85Q7FAAFXZA',
+      tier: resolveTier('QN85Q7FAAFXZA'),
+    });
+    applyTierClasses(resolveTier('QN85Q7FAAFXZA'));
   }
 
   // ── Profile picker ──
@@ -274,6 +544,14 @@ function App() {
 
   var profile = state.profile || {};
 
+  // Apply all three filters to the catalog
+  var filteredCatalog = applyFilters(
+    state.catalog,
+    state.providerFilter,
+    state.contentFilter,
+    state.qualityFilter
+  );
+
   // ── Main app shell ──
   return (
     <ThemeProvider profile={profile}>
@@ -311,9 +589,11 @@ function App() {
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0,
+            flexWrap: 'wrap',
+            gap: '0.5rem',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <span
               style={{
                 fontSize: 'calc(1.25rem * var(--font-scale, 1))',
@@ -339,9 +619,16 @@ function App() {
                 ENHANCED
               </span>
             )}
+
+            {/* Model selector */}
+            <ModelSelector
+              tvModel={state.tvModel}
+              tier={state.tier}
+              onChange={handleTvModelChange}
+            />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             {/* Add Provider button */}
             <button
               tabIndex={0}
@@ -401,8 +688,46 @@ function App() {
               </div>
               <span>{profile.display_name || profile.profile_id}</span>
             </div>
+
+            {/* Settings gear button */}
+            <button
+              tabIndex={0}
+              onClick={function() { patchState({ showSettings: !state.showSettings }); }}
+              aria-label="Settings"
+              aria-expanded={state.showSettings}
+              style={{
+                padding: '0.35rem 0.6rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: '6px',
+                color: 'var(--muted)',
+                fontSize: '1.1rem',
+                cursor: 'pointer',
+                outline: 'none',
+                lineHeight: '1',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid var(--accent)';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) {
+                e.currentTarget.style.outline = 'none';
+              }}
+            >
+              &#x2699;
+            </button>
           </div>
         </header>
+
+        {/* Filter bar */}
+        <FilterBar
+          providerFilter={state.providerFilter}
+          contentFilter={state.contentFilter}
+          qualityFilter={state.qualityFilter}
+          onProviderChange={function(v) { patchState({ providerFilter: v }); }}
+          onContentChange={function(v) { patchState({ contentFilter: v }); }}
+          onQualityChange={function(v) { patchState({ qualityFilter: v }); }}
+        />
 
         {/* Provider filter tabs */}
         <ProviderFilter
@@ -419,11 +744,12 @@ function App() {
           }}
         >
           <CatalogGrid
-            items={state.catalog}
+            items={filteredCatalog}
             activeTab={state.activeTab}
             profile={profile}
             tier={state.tier}
             columns={state.activeTab === 'discovery' ? (state.tier === 'enhanced' ? 8 : 4) : (state.tier === 'enhanced' ? 5 : 3)}
+            onItemClick={handleItemClick}
           />
         </main>
 
@@ -432,6 +758,152 @@ function App() {
 
         {/* QR onboarding modal */}
         <QROnboarding isOpen={state.showQR} onClose={handleCloseQR} />
+
+        {/* Media detail panel — full-screen overlay */}
+        {state.selectedItem && (
+          <MediaDetailPanel
+            item={state.selectedItem}
+            actors={state.actors}
+            onClose={handleCloseDetail}
+            onSelectProvider={handleSelectProvider}
+            selectedProviderId={state.selectedProviderId}
+            globalProviders={state.providers}
+          />
+        )}
+
+        {/* Settings overlay */}
+        {state.showSettings && (
+          <div
+            onClick={function(e) {
+              if (e.target === e.currentTarget) { patchState({ showSettings: false }); }
+            }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              zIndex: 40,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <div
+              style={{
+                marginTop: '3.5rem',
+                marginRight: '1rem',
+                width: '300px',
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: '10px',
+                padding: '1.25rem',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                color: 'var(--text)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: '700', fontSize: 'calc(0.95rem * var(--font-scale, 1))' }}>
+                  Settings
+                </span>
+                <button
+                  tabIndex={0}
+                  autoFocus
+                  onClick={function() { patchState({ showSettings: false }); }}
+                  aria-label="Close settings"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--muted)',
+                    fontSize: '1.2rem',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    padding: '0.1rem 0.3rem',
+                  }}
+                  onFocus={function(e) {
+                    e.currentTarget.style.outline = '2px solid var(--accent)';
+                    e.currentTarget.style.outlineOffset = '2px';
+                  }}
+                  onBlur={function(e) {
+                    e.currentTarget.style.outline = 'none';
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Info rows */}
+              <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted)' }}>Profile</span>
+                  <span style={{ fontWeight: '600' }}>{profile.display_name || profile.profile_id || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted)' }}>TV Model</span>
+                  <span style={{ fontWeight: '600' }}>{state.tvModel}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted)' }}>Tier</span>
+                  <span
+                    style={{
+                      fontWeight: '700',
+                      color: state.tier === 'enhanced' ? '#FFD700' : 'var(--muted)',
+                    }}
+                  >
+                    {state.tier === 'enhanced' ? 'Enhanced' : 'Degraded'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted)' }}>Phase</span>
+                  <span
+                    style={{
+                      fontSize: 'calc(0.7rem * var(--font-scale, 1))',
+                      fontWeight: '700',
+                      color: '#e3b341',
+                      border: '1px solid #e3b341',
+                      borderRadius: '3px',
+                      padding: '0.1rem 0.35rem',
+                      backgroundColor: 'rgba(227,179,65,0.08)',
+                    }}
+                  >
+                    B2 — Mock Mode
+                  </span>
+                </div>
+              </div>
+
+              {/* Reset button */}
+              <button
+                tabIndex={0}
+                onClick={handleResetDefaults}
+                style={{
+                  marginTop: '0.25rem',
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--border, #30363d)',
+                  borderRadius: '6px',
+                  color: 'var(--text)',
+                  fontSize: 'calc(0.8rem * var(--font-scale, 1))',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid var(--accent)';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.outline = 'none';
+                }}
+              >
+                Reset to defaults
+              </button>
+            </div>
+          </div>
+        )}
 
       </LayoutShell>
     </ThemeProvider>

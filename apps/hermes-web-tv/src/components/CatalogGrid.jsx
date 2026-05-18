@@ -6,6 +6,7 @@ function CatalogGrid(props) {
   var activeTab = props.activeTab || 'all';
   var profile = props.profile || {};
   var tier = props.tier || 'degraded';
+  var onItemClick = props.onItemClick || null;
 
   var profileId = profile.profile_id;
   var activeLayout = profile.active_layout || 'grid-standard';
@@ -81,6 +82,7 @@ function CatalogGrid(props) {
             item={item}
             profile={profile}
             tier={tier}
+            onClick={onItemClick}
           />
         );
       })}

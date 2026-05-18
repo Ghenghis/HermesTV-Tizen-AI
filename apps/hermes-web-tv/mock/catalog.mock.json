@@ -1,191 +1,520 @@
 {
-  "_comment": "Safe mock catalog for offline development. No real provider URLs, credentials, M3U links, or Xtream tokens.",
-  "_generated": "2026-05-17",
+  "_comment": "Safe mock catalog for offline development. No real provider URLs, credentials, M3U links, Xtream tokens, or passwords. All stream URLs use hermestv.local.",
+  "version": "2.0.0",
+  "generated": "2026-05-18",
   "providers": [
     {
-      "provider_id": "apollo",
-      "display_label": "Apollo Group",
-      "enabled": true,
-      "health": "ok",
-      "capabilities": {
-        "live": true,
-        "vod": true,
-        "series": true,
-        "catch_up": true,
-        "xmltv": true
-      },
-      "profile_access": ["dave_tv", "mom_tv"],
-      "last_refresh_utc": "2026-05-17T04:00:00Z",
-      "stream_slots_total": 2,
-      "stream_slots_in_use": 0,
-      "priority_order": 1
+      "provider_id": "apollo_group",
+      "display_name": "Apollo Group",
+      "mock": true
     },
     {
       "provider_id": "xtremehd",
-      "display_label": "XtremeHD",
-      "enabled": true,
-      "health": "ok",
-      "capabilities": {
-        "live": true,
-        "vod": true,
-        "series": true,
-        "catch_up": false,
-        "xmltv": true
-      },
+      "display_name": "XtremeHD",
+      "mock": true
+    }
+  ],
+  "actors": [
+    {
+      "actor_id": "actor-001",
+      "name": "Tom Cruise",
+      "photo_url": "https://hermestv.local/mock/actors/actor-001.jpg",
+      "known_for_titles": ["vod-001"],
+      "bio_short": "American actor and film producer known for action roles."
+    },
+    {
+      "actor_id": "actor-002",
+      "name": "Ryan Gosling",
+      "photo_url": "https://hermestv.local/mock/actors/actor-002.jpg",
+      "known_for_titles": ["vod-002"],
+      "bio_short": "Canadian actor known for dramatic and romantic roles."
+    },
+    {
+      "actor_id": "actor-003",
+      "name": "Keanu Reeves",
+      "photo_url": "https://hermestv.local/mock/actors/actor-003.jpg",
+      "known_for_titles": ["vod-003"],
+      "bio_short": "Canadian actor known for action and science fiction films."
+    },
+    {
+      "actor_id": "actor-004",
+      "name": "Julia Roberts",
+      "photo_url": "https://hermestv.local/mock/actors/actor-004.jpg",
+      "known_for_titles": ["vod-004"],
+      "bio_short": "American actress and film producer, known for romantic films."
+    },
+    {
+      "actor_id": "actor-005",
+      "name": "Kevin Costner",
+      "photo_url": "https://hermestv.local/mock/actors/actor-005.jpg",
+      "known_for_titles": ["ser-001"],
+      "bio_short": "American actor and director, known for epic drama roles."
+    }
+  ],
+  "items": [
+    {
+      "id": "live-001",
+      "type": "live",
+      "title": "ESPN",
+      "category": "sports",
+      "resolution": "1080p",
+      "has_hdr": false,
+      "codec": "h264",
       "profile_access": ["dave_tv", "mom_tv"],
-      "last_refresh_utc": "2026-05-17T04:02:00Z",
-      "stream_slots_total": 2,
-      "stream_slots_in_use": 0,
-      "priority_order": 2
-    }
-  ],
-  "profiles": [
-    {
-      "profile_id": "dave_tv",
-      "display_name": "Dave",
-      "tv_model": "UN55CU8000BXZA",
-      "tier": "baseline",
-      "mom_mode": false,
-      "active_layout": "grid-standard",
-      "active_theme": "night-blue",
-      "font_scale": 1.0,
-      "reduced_motion": false,
-      "audio_feedback": false,
-      "agent_name": "Hermes",
-      "agent_voice": "azure-en-us-guy-neural"
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-live-001",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-live-001",
+            "quality": "good",
+            "codec": "h264",
+            "bitrate_bucket": "high",
+            "startup_latency_ms": 620,
+            "buffering_events": 1,
+            "health_score": 85,
+            "health_label": "Good",
+            "fallback_available": false,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": null,
+        "duration_min": null,
+        "plot": "Live sports coverage including NFL, NBA, MLB, college sports and more.",
+        "rating_mpaa": "NR",
+        "cast_ids": []
+      },
+      "poster_url": "https://hermestv.local/mock/posters/live-001.jpg",
+      "logo_url": "https://hermestv.local/mock/logos/live-001.jpg",
+      "backdrop_url": "https://hermestv.local/mock/backdrops/live-001.jpg"
     },
     {
-      "profile_id": "mom_tv",
-      "display_name": "Sherri",
-      "tv_model": "QN85Q7FAAFXZA",
-      "tier": "enhanced",
-      "mom_mode": true,
-      "active_layout": "jumbo-rail",
-      "active_theme": "mom-calm",
-      "font_scale": 1.35,
-      "reduced_motion": true,
-      "audio_feedback": true,
-      "agent_name": "Hermes",
-      "agent_voice": "azure-en-us-aria-neural"
-    }
-  ],
-  "catalog": [
-    {
-      "item_id": "MOCK-LIVE-001",
-      "title": "Mock Live Channel 1",
-      "content_type": "live",
-      "provider_tags": ["apollo", "xtremehd"],
-      "preferred_source": "apollo",
-      "duplicate_count": 2,
-      "quality": {
-        "resolution": "1080p",
-        "codec": "h264",
-        "bitrate_bucket": "high",
-        "fps": 30,
-        "audio_codec": "aac",
-        "scan_utc": "2026-05-17T04:00:00Z",
-        "possible_upscale": false
+      "id": "live-002",
+      "type": "live",
+      "title": "Hallmark Channel",
+      "category": "entertainment",
+      "resolution": "1080p",
+      "has_hdr": false,
+      "codec": "h264",
+      "profile_access": ["mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-live-002",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-live-002",
+            "quality": "excellent",
+            "codec": "h264",
+            "bitrate_bucket": "high",
+            "startup_latency_ms": 510,
+            "buffering_events": 0,
+            "health_score": 91,
+            "health_label": "Excellent",
+            "fallback_available": false,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": null,
+        "duration_min": null,
+        "plot": "Feel-good movies, holiday specials, and original romantic series.",
+        "rating_mpaa": "NR",
+        "cast_ids": []
       },
-      "epg": {
-        "status": "matched",
-        "channel_id": "mock.channel.001",
-        "next_program": "Mock Program Name"
-      },
-      "catch_up_available": true,
-      "provider_health": { "apollo": "ok", "xtremehd": "ok" },
-      "profile_access": ["dave_tv", "mom_tv"]
+      "poster_url": "https://hermestv.local/mock/posters/live-002.jpg",
+      "logo_url": "https://hermestv.local/mock/logos/live-002.jpg",
+      "backdrop_url": "https://hermestv.local/mock/backdrops/live-002.jpg"
     },
     {
-      "item_id": "MOCK-LIVE-002",
-      "title": "Mock Live Channel 2 (Apollo Only)",
-      "content_type": "live",
-      "provider_tags": ["apollo"],
-      "preferred_source": "apollo",
-      "duplicate_count": 1,
-      "quality": {
-        "resolution": "720p",
-        "codec": "h264",
-        "bitrate_bucket": "medium",
-        "fps": 30,
-        "audio_codec": "aac",
-        "scan_utc": "2026-05-17T04:00:00Z",
-        "possible_upscale": false
+      "id": "live-003",
+      "type": "live",
+      "title": "NFL RedZone",
+      "category": "sports",
+      "resolution": "1080p",
+      "has_hdr": false,
+      "codec": "h264",
+      "profile_access": ["dave_tv"],
+      "provider_id": "xtremehd",
+      "providers": [
+        {
+          "provider_id": "xtremehd",
+          "source_id": "mock-src-xtremehd-live-003",
+          "source_health": {
+            "provider_id": "xtremehd",
+            "source_id": "mock-src-xtremehd-live-003",
+            "quality": "good",
+            "codec": "h264",
+            "bitrate_bucket": "high",
+            "startup_latency_ms": 780,
+            "buffering_events": 2,
+            "health_score": 80,
+            "health_label": "Good",
+            "fallback_available": false,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": null,
+        "duration_min": null,
+        "plot": "Every touchdown from every Sunday afternoon NFL game — whip-around coverage all season long.",
+        "rating_mpaa": "NR",
+        "cast_ids": []
       },
-      "epg": {
-        "status": "partial",
-        "channel_id": "mock.channel.002",
-        "next_program": null
-      },
-      "catch_up_available": false,
-      "provider_health": { "apollo": "ok" },
-      "profile_access": ["dave_tv", "mom_tv"]
+      "poster_url": "https://hermestv.local/mock/posters/live-003.jpg",
+      "logo_url": "https://hermestv.local/mock/logos/live-003.jpg",
+      "backdrop_url": "https://hermestv.local/mock/backdrops/live-003.jpg"
     },
     {
-      "item_id": "MOCK-LIVE-003",
-      "title": "Mock 4K Channel (Dave Only)",
-      "content_type": "live",
-      "provider_tags": ["xtremehd"],
-      "preferred_source": "xtremehd",
-      "duplicate_count": 1,
-      "quality": {
-        "resolution": "4K",
-        "codec": "h265",
-        "bitrate_bucket": "ultra",
-        "fps": 60,
-        "audio_codec": "aac",
-        "scan_utc": "2026-05-17T04:00:00Z",
-        "possible_upscale": false
+      "id": "vod-001",
+      "type": "vod",
+      "title": "Top Gun: Maverick",
+      "category": "action",
+      "resolution": "4K",
+      "has_hdr": true,
+      "codec": "h265",
+      "profile_access": ["dave_tv", "mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-vod-001",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-vod-001",
+            "quality": "excellent",
+            "codec": "h265",
+            "bitrate_bucket": "ultra",
+            "startup_latency_ms": 450,
+            "buffering_events": 0,
+            "health_score": 94,
+            "health_label": "Excellent",
+            "fallback_available": true,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        },
+        {
+          "provider_id": "xtremehd",
+          "source_id": "mock-src-xtremehd-vod-001",
+          "source_health": {
+            "provider_id": "xtremehd",
+            "source_id": "mock-src-xtremehd-vod-001",
+            "quality": "good",
+            "codec": "h265",
+            "bitrate_bucket": "high",
+            "startup_latency_ms": 1200,
+            "buffering_events": 2,
+            "health_score": 71,
+            "health_label": "Good",
+            "fallback_available": true,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": 2022,
+        "duration_min": 130,
+        "plot": "After thirty years, Maverick is still pushing the envelope as a top naval aviator, but must confront ghosts of his past when he leads a mission that demands the ultimate sacrifice.",
+        "rating_mpaa": "PG-13",
+        "cast_ids": ["actor-001"]
       },
-      "epg": {
-        "status": "missing",
-        "channel_id": null,
-        "next_program": null
-      },
-      "catch_up_available": false,
-      "provider_health": { "xtremehd": "ok" },
-      "profile_access": ["dave_tv"]
+      "poster_url": "https://hermestv.local/mock/posters/vod-001.jpg",
+      "logo_url": null,
+      "backdrop_url": "https://hermestv.local/mock/backdrops/vod-001.jpg"
     },
     {
-      "item_id": "MOCK-VOD-001",
-      "title": "Mock Movie 1",
-      "content_type": "movie",
-      "provider_tags": ["apollo"],
-      "preferred_source": "apollo",
-      "duplicate_count": 1,
-      "quality": {
-        "resolution": "1080p",
-        "codec": "h265",
-        "bitrate_bucket": "high",
-        "fps": 24,
-        "audio_codec": "ac3",
-        "scan_utc": "2026-05-17T04:00:00Z",
-        "possible_upscale": false
+      "id": "vod-002",
+      "type": "vod",
+      "title": "The Notebook",
+      "category": "romance",
+      "resolution": "1080p",
+      "has_hdr": false,
+      "codec": "h264",
+      "profile_access": ["dave_tv", "mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-vod-002",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-vod-002",
+            "quality": "good",
+            "codec": "h264",
+            "bitrate_bucket": "high",
+            "startup_latency_ms": 580,
+            "buffering_events": 0,
+            "health_score": 88,
+            "health_label": "Good",
+            "fallback_available": true,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        },
+        {
+          "provider_id": "xtremehd",
+          "source_id": "mock-src-xtremehd-vod-002",
+          "source_health": {
+            "provider_id": "xtremehd",
+            "source_id": "mock-src-xtremehd-vod-002",
+            "quality": "fair",
+            "codec": "h264",
+            "bitrate_bucket": "medium",
+            "startup_latency_ms": 1450,
+            "buffering_events": 3,
+            "health_score": 62,
+            "health_label": "Fair",
+            "fallback_available": true,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": 2004,
+        "duration_min": 123,
+        "plot": "A poor yet passionate young man falls in love with a rich young woman, giving her a sense of freedom, before they are forced apart by her demanding parents.",
+        "rating_mpaa": "PG-13",
+        "cast_ids": ["actor-002"]
       },
-      "epg": { "status": "missing", "channel_id": null, "next_program": null },
-      "catch_up_available": false,
-      "provider_health": { "apollo": "ok" },
-      "profile_access": ["dave_tv", "mom_tv"]
+      "poster_url": "https://hermestv.local/mock/posters/vod-002.jpg",
+      "logo_url": null,
+      "backdrop_url": "https://hermestv.local/mock/backdrops/vod-002.jpg"
     },
     {
-      "item_id": "MOCK-SERIES-001",
-      "title": "Mock Series 1",
-      "content_type": "series",
-      "provider_tags": ["apollo", "xtremehd"],
-      "preferred_source": "apollo",
-      "duplicate_count": 2,
-      "quality": {
-        "resolution": "1080p",
-        "codec": "h264",
-        "bitrate_bucket": "high",
-        "fps": 24,
-        "audio_codec": "aac",
-        "scan_utc": "2026-05-17T04:00:00Z",
-        "possible_upscale": false
+      "id": "vod-003",
+      "type": "vod",
+      "title": "John Wick: Chapter 4",
+      "category": "action",
+      "resolution": "4K",
+      "has_hdr": true,
+      "codec": "h265",
+      "profile_access": ["dave_tv", "mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-vod-003",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-vod-003",
+            "quality": "excellent",
+            "codec": "h265",
+            "bitrate_bucket": "ultra",
+            "startup_latency_ms": 390,
+            "buffering_events": 0,
+            "health_score": 96,
+            "health_label": "Excellent",
+            "fallback_available": false,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": 2023,
+        "duration_min": 169,
+        "plot": "John Wick uncovers a path to defeating the High Table but before he can earn his freedom, he must face a new enemy who has powerful alliances across the globe.",
+        "rating_mpaa": "R",
+        "cast_ids": ["actor-003"]
       },
-      "epg": { "status": "missing", "channel_id": null, "next_program": null },
-      "catch_up_available": false,
-      "provider_health": { "apollo": "ok", "xtremehd": "ok" },
-      "profile_access": ["dave_tv", "mom_tv"]
+      "poster_url": "https://hermestv.local/mock/posters/vod-003.jpg",
+      "logo_url": null,
+      "backdrop_url": "https://hermestv.local/mock/backdrops/vod-003.jpg"
+    },
+    {
+      "id": "vod-004",
+      "type": "vod",
+      "title": "Steel Magnolias",
+      "category": "drama",
+      "resolution": "1080p",
+      "has_hdr": false,
+      "codec": "h264",
+      "profile_access": ["mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-vod-004",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-vod-004",
+            "quality": "good",
+            "codec": "h264",
+            "bitrate_bucket": "medium",
+            "startup_latency_ms": 670,
+            "buffering_events": 1,
+            "health_score": 82,
+            "health_label": "Good",
+            "fallback_available": false,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": 1989,
+        "duration_min": 118,
+        "plot": "A close-knit group of women share laughter and tears through the events of their lives in a small Louisiana town.",
+        "rating_mpaa": "PG",
+        "cast_ids": ["actor-004"]
+      },
+      "poster_url": "https://hermestv.local/mock/posters/vod-004.jpg",
+      "logo_url": null,
+      "backdrop_url": "https://hermestv.local/mock/backdrops/vod-004.jpg"
+    },
+    {
+      "id": "ser-001",
+      "type": "series",
+      "title": "Yellowstone",
+      "category": "drama",
+      "resolution": "4K",
+      "has_hdr": true,
+      "codec": "h265",
+      "profile_access": ["dave_tv", "mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-ser-001",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-ser-001",
+            "quality": "excellent",
+            "codec": "h265",
+            "bitrate_bucket": "ultra",
+            "startup_latency_ms": 480,
+            "buffering_events": 0,
+            "health_score": 93,
+            "health_label": "Excellent",
+            "fallback_available": true,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        },
+        {
+          "provider_id": "xtremehd",
+          "source_id": "mock-src-xtremehd-ser-001",
+          "source_health": {
+            "provider_id": "xtremehd",
+            "source_id": "mock-src-xtremehd-ser-001",
+            "quality": "good",
+            "codec": "h265",
+            "bitrate_bucket": "high",
+            "startup_latency_ms": 950,
+            "buffering_events": 1,
+            "health_score": 76,
+            "health_label": "Good",
+            "fallback_available": true,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": 2018,
+        "duration_min": null,
+        "plot": "A ranching family in Montana faces constant attacks from land developers, politicians, and others in this sweeping modern Western drama.",
+        "rating_mpaa": "NR",
+        "cast_ids": ["actor-005"]
+      },
+      "poster_url": "https://hermestv.local/mock/posters/ser-001.jpg",
+      "logo_url": null,
+      "backdrop_url": "https://hermestv.local/mock/backdrops/ser-001.jpg"
+    },
+    {
+      "id": "ser-002",
+      "type": "series",
+      "title": "Blue Bloods",
+      "category": "drama",
+      "resolution": "1080p",
+      "has_hdr": false,
+      "codec": "h264",
+      "profile_access": ["dave_tv", "mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-ser-002",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-ser-002",
+            "quality": "good",
+            "codec": "h264",
+            "bitrate_bucket": "high",
+            "startup_latency_ms": 590,
+            "buffering_events": 0,
+            "health_score": 87,
+            "health_label": "Good",
+            "fallback_available": false,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": 2010,
+        "duration_min": null,
+        "plot": "A family of New York City police officers navigates the challenges of law enforcement across multiple generations.",
+        "rating_mpaa": "NR",
+        "cast_ids": []
+      },
+      "poster_url": "https://hermestv.local/mock/posters/ser-002.jpg",
+      "logo_url": null,
+      "backdrop_url": "https://hermestv.local/mock/backdrops/ser-002.jpg"
+    },
+    {
+      "id": "ser-003",
+      "type": "series",
+      "title": "Hallmark Mysteries",
+      "category": "mystery",
+      "resolution": "1080p",
+      "has_hdr": false,
+      "codec": "h264",
+      "profile_access": ["mom_tv"],
+      "provider_id": "apollo_group",
+      "providers": [
+        {
+          "provider_id": "apollo_group",
+          "source_id": "mock-src-apollo-ser-003",
+          "source_health": {
+            "provider_id": "apollo_group",
+            "source_id": "mock-src-apollo-ser-003",
+            "quality": "good",
+            "codec": "h264",
+            "bitrate_bucket": "medium",
+            "startup_latency_ms": 640,
+            "buffering_events": 0,
+            "health_score": 84,
+            "health_label": "Good",
+            "fallback_available": false,
+            "session_limit_status": "ok",
+            "checked_at": "2026-05-18T04:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "year": 2014,
+        "duration_min": null,
+        "plot": "Cozy mystery series featuring amateur sleuths solving crimes in charming small-town settings.",
+        "rating_mpaa": "NR",
+        "cast_ids": []
+      },
+      "poster_url": "https://hermestv.local/mock/posters/ser-003.jpg",
+      "logo_url": null,
+      "backdrop_url": "https://hermestv.local/mock/backdrops/ser-003.jpg"
     }
   ]
 }

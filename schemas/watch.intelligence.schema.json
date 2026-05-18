@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermestv.local/schemas/watch.intelligence.schema.json",
+  "title": "HermesTV Watch Intelligence Record",
+  "description": "Per-profile watch state and derived intelligence for a single catalog item. Powers resume, recommendations, and 'More with this actor' UI. Chrome 76 compatible.",
+  "type": "object",
+  "required": [
+    "item_id",
+    "profile_id",
+    "watched_pct",
+    "last_watched_at",
+    "resume_position_sec",
+    "times_watched"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Catalog item ID (matches catalog item 'id' field)."
+    },
+    "profile_id": {
+      "type": "string",
+      "enum": ["dave_tv", "mom_tv"],
+      "description": "Profile this watch record belongs to."
+    },
+    "watched_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Percentage of the item watched (0–100). Used to drive 'Continue Watching' rail threshold."
+    },
+    "last_watched_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of the most recent watch session for this item."
+    },
+    "resume_position_sec": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Playback position in seconds for resume. 0 if not started or if watched to completion."
+    },
+    "times_watched": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of complete or near-complete views."
+    },
+    "provider_preference": {
+      "type": ["string", "null"],
+      "enum": ["apollo_group", "xtremehd", null],
+      "description": "Provider preferred by this profile for this item, if the user has explicitly chosen one."
+    },
+    "similar_item_ids": {
+      "type": "array",
+      "description": "Catalog item IDs recommended as similar content (pre-computed, served from backend).",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "more_with_actor_ids": {
+      "type": "array",
+      "description": "Actor IDs for 'More with this actor' recommendations derived from cast of this item.",
+      "items": {
+        "type": "string",
+        "pattern": "^actor-[0-9]{3,}$"
+      },
+      "uniqueItems": true
+    }
+  }
+}

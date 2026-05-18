@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermestv.local/schemas/source.health.schema.json",
+  "title": "HermesTV Source Health",
+  "description": "Per-source health record captured by the backend probe. Attached to each provider entry on a catalog item. Chrome 76 compatible.",
+  "type": "object",
+  "required": [
+    "provider_id",
+    "source_id",
+    "quality",
+    "codec",
+    "bitrate_bucket",
+    "startup_latency_ms",
+    "buffering_events",
+    "health_score",
+    "health_label",
+    "fallback_available",
+    "session_limit_status",
+    "checked_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "type": "string",
+      "enum": ["apollo_group", "xtremehd"],
+      "description": "Provider that owns this source."
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Provider-internal source identifier (opaque string)."
+    },
+    "quality": {
+      "type": "string",
+      "enum": ["poor", "fair", "good", "excellent"],
+      "description": "Qualitative stream quality as observed by the probe."
+    },
+    "codec": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "description": "Codec string as reported by the source (e.g. h264, h265, av1)."
+    },
+    "bitrate_bucket": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "ultra"],
+      "description": "Bucketed bitrate range for the source stream."
+    },
+    "startup_latency_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 30000,
+      "description": "Time-to-first-frame in milliseconds as measured by probe."
+    },
+    "buffering_events": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Number of buffering stalls observed during probe window."
+    },
+    "health_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Composite health score 0–100 (100 = perfect)."
+    },
+    "health_label": {
+      "type": "string",
+      "enum": ["Down", "Degraded", "Fair", "Good", "Excellent"],
+      "description": "Human-readable health label derived from health_score."
+    },
+    "fallback_available": {
+      "type": "boolean",
+      "description": "Whether at least one alternative source is available if this one fails."
+    },
+    "session_limit_status": {
+      "type": "string",
+      "enum": ["ok", "near_limit", "at_limit"],
+      "description": "Current concurrent-stream slot status for the provider account."
+    },
+    "checked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp when this health record was last probed."
+    }
+  }
+}

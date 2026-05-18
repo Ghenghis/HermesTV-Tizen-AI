@@ -2,7 +2,8 @@
 # Project: hermestv-workstation
 # Run: docker compose -p hermestv-workstation up -d
 # Credentials: All secrets are in G:\private\ — never add keys to this file
-# GPU: Operator must add Ollama GPU config manually for their hardware
+# GPU: RTX 3090 Ti — NVIDIA runtime enabled for Jellyfin (NVENC/NVDEC) and Ollama (LLM inference)
+# Requires: nvidia-container-toolkit installed on host (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
 
 services:
   hermes-tv-api:
@@ -32,8 +33,12 @@ services:
     ports: ['8096:8096']
     restart: unless-stopped
     networks: [hermestv-internal]
+    # RTX 3090 Ti hardware transcoding via NVENC/NVDEC
+    runtime: nvidia
     environment:
       JELLYFIN_PublishedServerUrl: http://hermestv.local:8096
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
 
   tunarr:
     image: ghcr.io/chrisbenincasa/tunarr:edge
@@ -70,7 +75,10 @@ services:
     ports: ['11434:11434']
     restart: unless-stopped
     networks: [hermestv-internal]
-    # GPU passthrough: operator adds 'deploy.resources.reservations.devices' if GPU available
+    # RTX 3090 Ti GPU acceleration for local LLM inference
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
 
 networks:
   hermestv-internal:
