@@ -62,6 +62,14 @@ const profileStore = {
   mom_tv: { ...PROFILES.mom_tv },
 };
 
+// GET /api/profiles — list all profiles (TV-safe metadata only)
+router.get('/api/profiles', (req, res) => {
+  res.json({
+    profiles: VALID_PROFILES.map((id) => profileStore[id]),
+    total: VALID_PROFILES.length,
+  });
+});
+
 // GET /api/profile/:id
 router.get('/api/profile/:id', (req, res) => {
   const { id } = req.params;

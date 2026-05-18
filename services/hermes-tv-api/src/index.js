@@ -17,6 +17,7 @@ const commandsRouter = require('./routes/commands');
 const ttsRouter = require('./routes/tts');
 const setupRouter = require('./routes/setup');
 const versionsRouter = require('./routes/versions');
+const settingsRouter = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -47,13 +48,14 @@ app.use('/', healthRouter);
 app.use('/', profilesRouter);
 app.use('/', providersRouter);
 app.use('/', catalogRouter);
-app.use('/', channelsRouter);
+app.use('/api/channels', channelsRouter);
 app.use('/', epgRouter);
 app.use('/', epgGridRouter);
 app.use('/', commandsRouter);
 app.use('/', ttsRouter);
 app.use('/', setupRouter);
 app.use('/', versionsRouter);
+app.use('/', settingsRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {
