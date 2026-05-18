@@ -38,6 +38,8 @@ function CardRow(props) {
   var onItemSelect = props.onItemSelect;
   var tier = props.tier;
   var fontScale = props.fontScale;
+  var profile = props.profile;
+  var allowMotion = tier === 'enhanced' && !(profile && profile.reduced_motion);
 
   if (!items || items.length === 0) return null;
 
@@ -49,27 +51,35 @@ function CardRow(props) {
           return (
             <div
               key={item.id || idx}
+              data-focusable="true"
+              tabIndex={0}
+              role="button"
               onClick={function() { if (onItemSelect) onItemSelect(item); }}
+              onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
               style={{
                 flexShrink: 0,
                 width: '140px',
                 cursor: 'pointer',
                 borderRadius: '4px',
                 overflow: 'hidden',
-                transition: tier === 'enhanced' ? 'transform 150ms, box-shadow 150ms' : 'none',
+                border: '2px solid transparent',
+                transition: allowMotion ? 'transform 150ms, box-shadow 150ms, border-color 150ms' : 'border-color 150ms, box-shadow 150ms',
+                outline: 'none',
               }}
               onMouseEnter={function(e) {
-                if (tier === 'enhanced') {
+                if (allowMotion) {
                   e.currentTarget.style.transform = 'scale(1.05)';
                   e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.6)';
                 }
               }}
               onMouseLeave={function(e) {
-                if (tier === 'enhanced') {
+                if (allowMotion) {
                   e.currentTarget.style.transform = 'scale(1)';
                   e.currentTarget.style.boxShadow = 'none';
                 }
               }}
+              onFocus={function(e) { e.currentTarget.style.borderColor = '#e50914'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(229,9,20,0.35)'; }}
+              onBlur={function(e) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
             >
               <div style={{ height: '210px', background: posterBg(item, idx), borderRadius: '4px', position: 'relative' }}>
                 {item.quality && (
@@ -115,7 +125,7 @@ function NetflixShell(props) {
         <nav style={{ display: 'flex', gap: '20px' }}>
           {NAV_TABS.map(function(tab, i) {
             return (
-              <button key={tab} style={{ background: 'none', border: 'none', color: i === 0 ? '#fff' : '#b3b3b3', fontSize: 'calc(13px * ' + fontScale + ')', fontWeight: i === 0 ? 600 : 400, cursor: 'pointer', padding: '4px 0', borderBottom: i === 0 ? '2px solid #e50914' : 'none' }}>
+              <button key={tab} style={{ background: 'none', border: 'none', color: i === 0 ? '#fff' : '#b3b3b3', fontSize: 'calc(13px * ' + fontScale + ')', fontWeight: i === 0 ? 600 : 400, cursor: 'pointer', padding: '12px 0', borderBottom: i === 0 ? '2px solid #e50914' : 'none' }}>
                 {tab}
               </button>
             );
@@ -157,10 +167,10 @@ function NetflixShell(props) {
 
         {/* Content rows */}
         <div style={{ paddingTop: '24px' }}>
-          <CardRow title="Top Picks For You" items={filtered} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} />
-          <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 8)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} />
-          <CardRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(4)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} />
-          <CardRow title="New Arrivals" items={filtered.slice().reverse()} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} />
+          <CardRow title="Top Picks For You" items={filtered} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 8)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(4)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="New Arrivals" items={filtered.slice().reverse()} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
         </div>
       </div>
     </div>

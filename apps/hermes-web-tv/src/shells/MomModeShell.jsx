@@ -146,17 +146,23 @@ function MomModeShell(props) {
               return (
                 <div
                   key={item.id || idx}
+                  data-focusable="true"
+                  tabIndex={0}
+                  role="button"
                   onClick={function() { if (onItemSelect) onItemSelect(item); }}
+                  onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
                   style={{
                     borderRadius: '14px',
                     overflow: 'hidden',
                     cursor: 'pointer',
                     border: '2px solid #2a2a4a',
-                    transition: 'border-color 150ms, transform 150ms',
+                    transition: 'border-color 150ms, transform 150ms, box-shadow 150ms',
                     background: '#16213e',
                   }}
-                  onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#ff7eb3'; e.currentTarget.style.transform = 'scale(1.02)'; }}
+                  onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#ff7eb3'; if (!(profile && profile.reduced_motion)) e.currentTarget.style.transform = 'scale(1.02)'; }}
                   onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#2a2a4a'; e.currentTarget.style.transform = 'scale(1)'; }}
+                  onFocus={function(e) { e.currentTarget.style.borderColor = '#ff7eb3'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,126,179,0.35)'; }}
+                  onBlur={function(e) { e.currentTarget.style.borderColor = '#2a2a4a'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   <div style={{ height: '260px', background: posterBg(item, idx), position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,126,179,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>▶</div>

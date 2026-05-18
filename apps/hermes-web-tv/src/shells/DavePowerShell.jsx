@@ -143,16 +143,23 @@ function DavePowerShell(props) {
               return (
                 <div
                   key={item.id || idx}
+                  data-focusable="true"
+                  tabIndex={0}
+                  role="button"
                   onClick={function() { if (onItemSelect) onItemSelect(item); }}
+                  onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
                   style={{
                     borderRadius: '4px',
                     overflow: 'hidden',
                     cursor: 'pointer',
                     border: '1px solid #1a2030',
-                    transition: 'border-color 100ms',
+                    transition: 'border-color 100ms, box-shadow 100ms',
+                    outline: 'none',
                   }}
                   onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#00d4aa'; }}
                   onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#1a2030'; }}
+                  onFocus={function(e) { e.currentTarget.style.borderColor = '#00d4aa'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0,212,170,0.35)'; }}
+                  onBlur={function(e) { e.currentTarget.style.borderColor = '#1a2030'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   <div style={{ height: '90px', background: posterBg(item, idx), position: 'relative' }}>
                     {item.quality && <div style={{ position: 'absolute', top: '3px', right: '3px', background: 'rgba(0,212,170,0.9)', color: '#000', fontSize: '8px', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>{item.quality}</div>}

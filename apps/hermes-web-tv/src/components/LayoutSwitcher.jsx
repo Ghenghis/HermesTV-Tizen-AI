@@ -71,15 +71,15 @@ function LayoutSwitcher(props) {
           flexShrink: 0,
         }}>
           <div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#e8edf5' }}>Choose Your Look</div>
-            <div style={{ fontSize: '0.8rem', color: '#6b7384', marginTop: '2px' }}>Pick any style — you can change it anytime</div>
+            <div style={{ fontSize: 'calc(1.2rem * var(--font-scale, 1))', fontWeight: 700, color: '#e8edf5' }}>Choose Your Look</div>
+            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#6b7384', marginTop: '2px' }}>Pick any style — you can change it anytime</div>
           </div>
           <button
             onClick={onClose}
             autoFocus
-            style={{ background: 'none', border: 'none', color: '#6b7384', fontSize: '1.4rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', outline: 'none', lineHeight: 1 }}
-            onFocus={function(e) { e.currentTarget.style.color = '#e8edf5'; }}
-            onBlur={function(e) { e.currentTarget.style.color = '#6b7384'; }}
+            style={{ background: 'none', border: 'none', color: '#6b7384', fontSize: 'calc(1.4rem * var(--font-scale, 1))', cursor: 'pointer', padding: '10px 14px', borderRadius: '6px', outline: 'none', lineHeight: 1, minWidth: '44px', minHeight: '44px' }}
+            onFocus={function(e) { e.currentTarget.style.color = '#e8edf5'; e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; }}
+            onBlur={function(e) { e.currentTarget.style.color = '#6b7384'; e.currentTarget.style.outline = 'none'; }}
           >
             &times;
           </button>
@@ -92,7 +92,7 @@ function LayoutSwitcher(props) {
             if (!items || items.length === 0) return null;
             return (
               <div key={cat} style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#5b6373', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>{cat}</div>
+                <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', fontWeight: 700, color: '#5b6373', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>{cat}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
                   {items.map(function(layout) {
                     var isActive = layout.id === activeLayout;
@@ -141,21 +141,21 @@ function LayoutSwitcher(props) {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: isActive ? layout.accent : '#c8d0db' }}>
+                          <span style={{ fontWeight: 700, fontSize: 'calc(0.9rem * var(--font-scale, 1))', color: isActive ? layout.accent : '#c8d0db' }}>
                             {layout.name}
                           </span>
                           {isActive && (
-                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: layout.accent, border: '1px solid ' + layout.accent, borderRadius: '3px', padding: '1px 5px', letterSpacing: '0.05em' }}>
+                            <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 700, color: layout.accent, border: '1px solid ' + layout.accent, borderRadius: '3px', padding: '1px 5px', letterSpacing: '0.05em' }}>
                               ACTIVE
                             </span>
                           )}
                           {isDisabled && (
-                            <span style={{ fontSize: '0.6rem', color: '#5b6373', border: '1px solid #2a2b3a', borderRadius: '3px', padding: '1px 5px' }}>
+                            <span style={{ fontSize: 'calc(0.6rem * var(--font-scale, 1))', color: '#5b6373', border: '1px solid #2a2b3a', borderRadius: '3px', padding: '1px 5px' }}>
                               QN85 only
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7384', lineHeight: 1.4 }}>{layout.description}</div>
+                        <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#6b7384', lineHeight: 1.4 }}>{layout.description}</div>
                       </button>
                     );
                   })}
@@ -166,7 +166,7 @@ function LayoutSwitcher(props) {
 
           {/* Default grid option */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#5b6373', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>Default</div>
+            <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', fontWeight: 700, color: '#5b6373', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>Default</div>
             <button
               onClick={function() { if (onSelect) onSelect(''); }}
               style={{
@@ -181,17 +181,17 @@ function LayoutSwitcher(props) {
                 transition: 'border-color 120ms',
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: (!activeLayout || activeLayout === '') ? '#1f6feb' : '#c8d0db', marginBottom: '4px' }}>
-                Standard Grid {(!activeLayout || activeLayout === '') ? <span style={{ fontSize: '0.65rem', border: '1px solid #1f6feb', borderRadius: '3px', padding: '1px 5px', marginLeft: '6px' }}>ACTIVE</span> : ''}
+              <div style={{ fontWeight: 700, fontSize: 'calc(0.9rem * var(--font-scale, 1))', color: (!activeLayout || activeLayout === '') ? '#1f6feb' : '#c8d0db', marginBottom: '4px' }}>
+                Standard Grid {(!activeLayout || activeLayout === '') ? <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', border: '1px solid #1f6feb', borderRadius: '3px', padding: '1px 5px', marginLeft: '6px' }}>ACTIVE</span> : ''}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7384' }}>Classic catalog grid view — works on all devices</div>
+              <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#6b7384' }}>Classic catalog grid view — works on all devices</div>
             </button>
           </div>
         </div>
 
         {/* Footer */}
         <div style={{ padding: '12px 24px 16px', borderTop: '1px solid #2a2b3a', flexShrink: 0 }}>
-          <div style={{ fontSize: '0.75rem', color: '#5b6373', textAlign: 'center' }}>
+          <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#5b6373', textAlign: 'center' }}>
             💬 Tip: Ask Hermes to change your layout anytime — try &quot;switch to Netflix look&quot;
           </div>
         </div>
