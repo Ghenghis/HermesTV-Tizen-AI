@@ -10,7 +10,9 @@ import CatalogGrid from './components/CatalogGrid.jsx';
 import FloatingChatbot from './components/FloatingChatbot.jsx';
 import QROnboarding from './components/QROnboarding.jsx';
 import MediaDetailPanel from './components/MediaDetailPanel.jsx';
-import StreamingQualityBar from './components/StreamingQualityBar.jsx';
+// StreamingQualityBar is imported by MediaDetailPanel where it's actually
+// rendered; App.jsx previously imported it but never used it (per audit
+// W3-A3). Dropped to trim the App.jsx bundle entry by ~6 kB.
 import ShellRenderer from './engine/ShellRenderer.jsx';
 import LayoutSwitcher from './components/LayoutSwitcher.jsx';
 import VoicePickerModal from './components/VoicePickerModal.jsx';
