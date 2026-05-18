@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/Ghenghis/HermesTV-Tizen-AI/schemas/provider.capabilities.schema.json",
   "title": "HermesTV Provider Capabilities (Backend-Internal)",
+  "$comment": "BACKEND-INTERNAL ONLY. This schema contains credential_ref — it must NEVER be used for TV-facing API responses. The TV-safe shape is provider.profile.schema.json.",
   "description": "Provider capability flags from backend probe. Backend-only. Never returned to TV. See docs/07_PROVIDER_CATALOG_AND_QR_ONBOARDING_CONTRACT.md.",
   "type": "object",
   "required": ["provider_id", "access_type", "capabilities_probed_utc", "capabilities", "health"],
