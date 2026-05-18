@@ -20,6 +20,9 @@
 const { Router } = require('express');
 const router = Router();
 const { SEED_CATALOG } = require('../data/seedCatalog');
+const streamResolver = require('../lib/streamResolver');
+const m3uClient = require('../lib/m3uClient');
+const iptvOrg = require('../lib/iptvOrg');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const TICKET_TTL_MS = 5 * 60 * 1000;
@@ -33,9 +36,26 @@ function _makeTicketId() {
   return 'play-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+// Resolve a HermesTV item by ID across all enabled catalog sources.
+// ID prefixes:
+//   "live-" / "vod-" / "series-" → seed catalog
+//   "m3u-<provider>-..."         → m3uClient cache (operator-pasted M3U)
+//   "iptv-..."                   → iptv-org public catalog
+// Synchronous — relies on the per-source caches already being warm.
+// /api/catalog should have been called before /api/play on any normal
+// user journey, so the caches are primed; cold-cache requests get 404.
 function _findItem(itemId) {
   for (var i = 0; i < SEED_CATALOG.length; i++) {
     if (SEED_CATALOG[i].id === itemId) { return SEED_CATALOG[i]; }
+  }
+  if (typeof itemId === 'string') {
+    if (itemId.indexOf('m3u-') === 0) {
+      var m3uItem = m3uClient.getCachedItemById(itemId);
+      if (m3uItem) { return m3uItem; }
+    } else if (itemId.indexOf('iptv-') === 0) {
+      var orgItem = iptvOrg.getCachedItemById(itemId);
+      if (orgItem) { return orgItem; }
+    }
   }
   return null;
 }
@@ -131,9 +151,22 @@ router.post('/api/play', (req, res) => {
 
 /**
  * GET /api/play/:ticket/stream
- * For now returns 503 — the actual streaming proxy lands in Phase 4 when
- * Threadfin / Jellyfin URL resolution is wired through the play-time
- * resolver. The surface exists so the frontend PlayerModal can wire to it.
+ *
+ * Resolution path (best-effort, never throws):
+ *   1. Look up the ticket; 404/410 on miss/expired.
+ *   2. Ask lib/streamResolver for the upstream URL for this item.
+ *   3. If the URL is credential-bearing (Apollo/xTremeHD style with
+ *      embedded user/pass): 503 with `threadfin_proxy_required` —
+ *      handing the operator a clear next step. We deliberately do not
+ *      302 the client because the credential would appear in the
+ *      Location header.
+ *   4. If the URL is clean (iptv-org public CDN): 302 to the upstream.
+ *   5. Otherwise: 503 with `stream_unresolved`.
+ *
+ * The "real" Threadfin proxy path lands when the operator has
+ * THREADFIN_URL pointing at a tuner — at that point this route can
+ * 302 to threadfin's stream endpoint instead. That layer is in the
+ * Phase 4 hardening checklist.
  */
 router.get('/api/play/:ticket/stream', (req, res) => {
   const t = tickets[req.params.ticket];
@@ -144,14 +177,34 @@ router.get('/api/play/:ticket/stream', (req, res) => {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired', message: 'Re-request /api/play to get a fresh ticket.' });
   }
-  return res.status(503).json({
-    status: 'player_pipeline_not_implemented',
-    message: 'Server-side stream proxy lands in Phase 4 (Threadfin / Jellyfin URL resolution). The ticket is valid; the actual byte stream is pending operator wiring.',
-    ticket: req.params.ticket,
-    provider: t.ticket.provider,
-    item: t.ticket.item,
-    expires_at: t.ticket.expires_at,
-  });
+
+  const itemId = t.ticket.item && t.ticket.item.id;
+  const resolved = streamResolver.resolveStreamUrl(itemId);
+
+  if (!resolved) {
+    return res.status(503).json({
+      status: 'stream_unresolved',
+      message: 'Could not resolve a stream URL for this item. Operator must wire credentials per docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md.',
+      ticket: req.params.ticket,
+      provider: t.ticket.provider,
+      item: t.ticket.item,
+    });
+  }
+
+  if (resolved.credential_bearing) {
+    return res.status(503).json({
+      status: 'threadfin_proxy_required',
+      message: 'This stream URL embeds upstream credentials. Operator must set THREADFIN_URL and route playback through the Threadfin proxy before this item can be played.',
+      ticket: req.params.ticket,
+      provider: t.ticket.provider,
+      item: t.ticket.item,
+    });
+  }
+
+  // Clean public URL — safe to redirect. credentialGuard middleware
+  // is wrapping res.json only; Location-header redirects are
+  // separately covered by the credential-bearing check above.
+  return res.redirect(302, resolved.url);
 });
 
 /**

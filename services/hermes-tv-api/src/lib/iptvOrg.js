@@ -280,6 +280,26 @@ function _resolveStreamUrl(channelId) {
   return stream ? stream.url : null;
 }
 
+/**
+ * Synchronous lookup for routes/play.js — finds an item by its HermesTV
+ * channel ID (format: "iptv-<raw-channel-id>") in the currently-loaded
+ * index. Triggers a normal lazy reload via _maybeReload if the cache
+ * is cold. Returns null on miss.
+ */
+function getCachedItemById(hermesId) {
+  if (typeof hermesId !== 'string' || hermesId.indexOf('iptv-') !== 0) { return null; }
+  var rawId = hermesId.slice('iptv-'.length);
+  var idx;
+  try { idx = _maybeReload(); } catch (_) { return null; }
+  if (!idx) { return null; }
+  for (var i = 0; i < idx.channels.length; i++) {
+    if (idx.channels[i] && idx.channels[i].id === rawId) {
+      return _mapChannelToItem(idx.channels[i], idx.streamsByChannel, idx.logosByChannel);
+    }
+  }
+  return null;
+}
+
 function getDataAgeHours() {
   if (!_index) { return null; }
   var ms = _now() - _index.dataAgeBaselineMs;
@@ -298,10 +318,18 @@ function _clearCache() {
 module.exports = {
   loadIndex: loadIndex,
   fetchCatalog: fetchCatalog,
-  // Stream URL resolver is intentionally NOT exported. See _resolveStreamUrl
-  // above for the rationale; play-time URL resolution lives behind a
-  // separate server-side module that routes never directly call.
+  getCachedItemById: getCachedItemById,
   getDataAgeHours: getDataAgeHours,
   isEnabled: isEnabled,
   _clearCache: _clearCache,
+  // INTERNAL — stream URL resolver lives behind this curated namespace.
+  // lib/streamResolver.js is the single audited consumer (called from
+  // routes/play.js at play-time only). The bare `fetchStreamUrl` /
+  // `_resolveStreamUrl` names are intentionally NOT exported so a route
+  // author cannot accidentally call `iptvOrg.fetchStreamUrl(id)` and
+  // leak the upstream URL — they have to traverse `.internal.` which
+  // makes the security boundary explicit. See audit W3-B2 P0.
+  internal: {
+    resolveStreamUrl: _resolveStreamUrl,
+  },
 };
