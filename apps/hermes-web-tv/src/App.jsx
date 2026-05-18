@@ -1,5 +1,6 @@
 import React from 'react';
 import * as profileStore from './store/profileStore.js';
+import * as voicePrefStore from './store/voicePrefStore.js';
 import * as hermesApi from './api/hermesApi.js';
 import * as mockApi from './api/mockApi.js';
 import ThemeProvider from './components/ThemeProvider.jsx';
@@ -472,6 +473,11 @@ function App() {
           var metaSource = rawCatalog._meta && rawCatalog._meta.source ? rawCatalog._meta.source : null;
           var catalogSource = isOnline ? (sourceHeader || metaSource || null) : 'dev-mock';
 
+          // Restore per-profile Azure voice preference from localStorage
+          // (set when the user last picked a voice in VoicePickerModal).
+          // Null when never picked — the UI falls back to a default voice.
+          var persistedVoiceId = voicePrefStore.getVoiceId(profileId);
+
           patchState({
             loading: false,
             profile: profile,
@@ -483,6 +489,7 @@ function App() {
             online: isOnline,
             showProfilePicker: false,
             catalogSource: catalogSource,
+            activeVoiceId: persistedVoiceId || '',
           });
         });
       }).catch(function(profileErr) {
@@ -1372,7 +1379,13 @@ function App() {
           profileId={profile.profile_id || 'mom_tv'}
           currentVoiceId={state.activeVoiceId}
           onClose={function() { patchState({ showVoicePicker: false }); }}
-          onVoiceChange={function(voiceId) { patchState({ activeVoiceId: voiceId }); }}
+          onVoiceChange={function(voiceId) {
+            // Persist per-profile so the pick survives reload, profile switch,
+            // and TV reboot. Falsy voiceId clears the stored preference.
+            var pid = (state.profile && state.profile.profile_id) || profile.profile_id || 'mom_tv';
+            voicePrefStore.setVoiceId(pid, voiceId);
+            patchState({ activeVoiceId: voiceId });
+          }}
         />
 
       </LayoutShell>
