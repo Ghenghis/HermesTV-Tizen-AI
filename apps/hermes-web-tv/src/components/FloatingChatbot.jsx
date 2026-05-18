@@ -3,6 +3,7 @@ import { validateCommand, generateCommandId } from './CommandValidator.jsx';
 import * as commandStore from '../store/commandStore.js';
 import * as hermesApi from '../api/hermesApi.js';
 import * as mockApi from '../api/mockApi.js';
+import * as voiceClient from '../api/azureVoiceClient.js';
 import { getResponseText } from '../utils/commandResponseText.js';
 import CommandChips from './CommandChips.jsx';
 import CommandHelpModal from './CommandHelpModal.jsx';
@@ -51,6 +52,12 @@ function FloatingChatbot(props) {
       e.preventDefault();
       setChatState(STATES.compact);
     }
+  }
+
+  function speakIfEnabled(text) {
+    if (!profile || !profile.audio_feedback) return;
+    if (!online) return;
+    voiceClient.speak(text, profileId).catch(function() {});
   }
 
   function handleSend() {
@@ -102,16 +109,21 @@ function FloatingChatbot(props) {
         setHistory(function(prev) {
           return prev.concat([{ role: 'agent', text: responseText }]);
         });
+        speakIfEnabled(responseText);
       } else {
+        var errMsg = result.error || 'Command not recognized.';
         setHistory(function(prev) {
-          return prev.concat([{ role: 'agent', text: result.error || 'Command not recognized.' }]);
+          return prev.concat([{ role: 'agent', text: errMsg }]);
         });
+        speakIfEnabled(errMsg);
       }
     }).catch(function() {
       setSubmitting(false);
+      var fallback = 'Couldn\'t reach the server. Try again in a moment.';
       setHistory(function(prev) {
-        return prev.concat([{ role: 'agent', text: 'Couldn\'t reach the server. Try again in a moment.' }]);
+        return prev.concat([{ role: 'agent', text: fallback }]);
       });
+      speakIfEnabled(fallback);
     });
   }
 
@@ -137,17 +149,22 @@ function FloatingChatbot(props) {
         setHistory(function(prev) {
           return prev.concat([{ role: 'agent', text: responseText }]);
         });
+        speakIfEnabled(responseText);
       } else {
+        var chipErr = result.error || 'Command not recognized.';
         setHistory(function(prev) {
-          return prev.concat([{ role: 'agent', text: result.error || 'Command not recognized.' }]);
+          return prev.concat([{ role: 'agent', text: chipErr }]);
         });
+        speakIfEnabled(chipErr);
       }
     }).catch(function() {
       setSubmitting(false);
       setInputText('');
+      var chipFallback = 'Couldn\'t reach the server. Try again.';
       setHistory(function(prev) {
-        return prev.concat([{ role: 'agent', text: 'Couldn\'t reach the server. Try again.' }]);
+        return prev.concat([{ role: 'agent', text: chipFallback }]);
       });
+      speakIfEnabled(chipFallback);
     });
   }
 

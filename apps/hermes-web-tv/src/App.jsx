@@ -14,6 +14,7 @@ import StreamingQualityBar from './components/StreamingQualityBar.jsx';
 import ShellRenderer from './engine/ShellRenderer.jsx';
 import LayoutSwitcher from './components/LayoutSwitcher.jsx';
 import VoicePickerModal from './components/VoicePickerModal.jsx';
+import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -329,6 +330,26 @@ function App() {
     document.addEventListener('keydown', onCtrlL);
     return function() { document.removeEventListener('keydown', onCtrlL); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Samsung Tizen remote — color buttons + Smart Hub route to chatbot commands
+  React.useEffect(function() {
+    var cleanup = installTizenKeyHandler(function(commandText) {
+      var api = state.online ? hermesApi : mockApi;
+      api.validateCommand({ command_text: commandText, profile_id: (state.profile && state.profile.profile_id) || 'mom_tv' })
+        .then(function(result) {
+          if (result && result.valid) {
+            handleChatbotCommand({ action: result.action, params: result.params });
+          } else if (commandText === 'toggle layout switcher') {
+            patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
+          }
+        }).catch(function() {
+          if (commandText === 'toggle layout switcher') {
+            patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
+          }
+        });
+    });
+    return cleanup;
+  }, [state.online, state.profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
