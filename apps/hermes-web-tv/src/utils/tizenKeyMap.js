@@ -37,11 +37,27 @@ function getKeyCommand(keyCode) {
   return KEY_TO_COMMAND[keyCode] || null;
 }
 
-function installTizenKeyHandler(onCommand) {
+// installTizenKeyHandler — global Tizen remote handler.
+// onCommand: invoked for color/Smart-Hub/Guide keys that map to chatbot commands.
+// onBack: invoked for the Back (10009) / Exit (10182) keys. If the handler
+// returns truthy the default browser behavior is suppressed (e.preventDefault).
+// Tizen TVs hard-exit the app if Back bubbles to the OS, so the handler MUST
+// preventDefault when the app has an open modal it wants to close instead.
+function installTizenKeyHandler(onCommand, onBack) {
   if (typeof window === 'undefined') {
     return function() {};
   }
   function handler(e) {
+    if (e.keyCode === 10009 || e.keyCode === 10182) {
+      if (typeof onBack === 'function') {
+        var handled = onBack(e.keyCode);
+        if (handled) {
+          if (typeof e.preventDefault === 'function') { e.preventDefault(); }
+          if (typeof e.stopPropagation === 'function') { e.stopPropagation(); }
+        }
+      }
+      return;
+    }
     var cmd = getKeyCommand(e.keyCode);
     if (cmd && typeof onCommand === 'function') {
       onCommand(cmd);

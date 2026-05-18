@@ -75,7 +75,14 @@ function SamsungShell(props) {
               <div
                 key={item.id || idx}
                 data-focusable="true"
+                role="button"
                 onClick={function() { if (onItemSelect) onItemSelect(item); }}
+                onKeyDown={function(e) {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (onItemSelect) onItemSelect(item);
+                  }
+                }}
                 style={{ flexShrink: 0, width: cardW + 'px', cursor: 'pointer', borderRadius: '6px', overflow: 'hidden', border: '2px solid transparent', transition: 'border-color 120ms, box-shadow 120ms' }}
                 onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#1428a0'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,40,160,0.25)'; }}
                 onMouseLeave={function(e) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
@@ -114,7 +121,14 @@ function SamsungShell(props) {
               <button
                 key={tab}
                 data-focusable="true"
+                tabIndex={0}
                 onClick={function() { setActiveTab(i); }}
+                onKeyDown={function(e) {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveTab(i);
+                  }
+                }}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -126,7 +140,10 @@ function SamsungShell(props) {
                   padding: '0 14px',
                   height: '56px',
                   transition: 'color 120ms',
+                  outline: 'none',
                 }}
+                onFocus={function(e) { e.currentTarget.style.outline = '2px solid #1428a0'; e.currentTarget.style.outlineOffset = '-2px'; }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
               >
                 {tab}
               </button>
@@ -151,8 +168,17 @@ function SamsungShell(props) {
               </div>
               <button
                 data-focusable="true"
+                tabIndex={0}
                 onClick={function() { if (onItemSelect) onItemSelect(featured); }}
-                style={{ padding: '10px 24px', background: '#1428a0', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 600, fontSize: 'calc(13px * ' + fontScale + ')', cursor: 'pointer' }}
+                onKeyDown={function(e) {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (onItemSelect) onItemSelect(featured);
+                  }
+                }}
+                style={{ padding: '10px 24px', background: '#1428a0', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 600, fontSize: 'calc(13px * ' + fontScale + ')', cursor: 'pointer', outline: 'none' }}
+                onFocus={function(e) { e.currentTarget.style.outline = '3px solid #fff'; e.currentTarget.style.outlineOffset = '2px'; }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
               >
                 ▶ Watch
               </button>
