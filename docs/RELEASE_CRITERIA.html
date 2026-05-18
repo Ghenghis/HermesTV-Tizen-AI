@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>HermesTV Release Criteria</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; margin: 1.5rem; line-height: 1.5; max-width: 1180px; }
+  h1 { color: #58a6ff; border-bottom: 2px solid #30363d; padding-bottom: 0.3em; }
+  h2 { color: #58a6ff; margin-top: 2em; border-bottom: 1px solid #30363d; padding-bottom: 0.2em; }
+  h3 { color: #79c0ff; margin-top: 1.4em; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.9rem; }
+  th, td { border: 1px solid #30363d; padding: 6px 10px; vertical-align: top; }
+  th { background: #161b22; text-align: left; color: #c9d1d9; }
+  tr:nth-child(even) td { background: #11161d; }
+  .done { color: #56d364; font-weight: 700; white-space: nowrap; }
+  .partial { color: #e3b341; font-weight: 600; white-space: nowrap; }
+  .missing { color: #f85149; font-weight: 700; white-space: nowrap; }
+  .deferred { color: #8b949e; white-space: nowrap; }
+  code { background: #161b22; padding: 1px 5px; border-radius: 3px; font-size: 0.85em; color: #d2a8ff; }
+  .summary-box { background: #161b22; border-left: 4px solid #58a6ff; padding: 1em 1.3em; margin: 1em 0; border-radius: 4px; }
+  .verdict-ready { color: #56d364; font-weight: 700; font-size: 1.1em; }
+  .verdict-notready { color: #e3b341; font-weight: 700; font-size: 1.1em; }
+  details { margin: 0.4em 0; }
+  details summary { cursor: pointer; padding: 0.4em; color: #79c0ff; }
+  details > div { padding: 0.4em 0.8em; background: #11161d; border-left: 2px solid #30363d; margin-left: 0.4em; }
+  .stat-grid { display: flex; gap: 1.2em; flex-wrap: wrap; margin: 0.8em 0; }
+  .stat { background: #161b22; padding: 0.6em 1em; border-radius: 4px; border: 1px solid #30363d; }
+  .stat .n { font-size: 1.5em; font-weight: 700; }
+  .stat .l { color: #8b949e; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; }
+  .n-done { color: #56d364; }
+  .n-partial { color: #e3b341; }
+  .n-missing { color: #f85149; }
+  .n-deferred { color: #8b949e; }
+  .icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+  a { color: #58a6ff; }
+  small { color: #8b949e; }
+</style>
+</head>
+<body>
+
+<h1>HermesTV Release Criteria</h1>
+
+<div class="summary-box">
+  <strong>Date:</strong> 2026-05-18 &middot;
+  <strong>Branch:</strong> <code>main</code> &middot;
+  <strong>Commit:</strong> <code>1f33bd2</code> &middot;
+  <strong>Verdict:</strong> <span class="verdict-notready">NOT READY (one P0 outstanding: Phase 4 streaming proxy)</span>
+  <p style="margin-bottom:0;">Surface area is complete. Every release-blocker except the streaming proxy is green. The
+  <code>/api/play</code> ticket endpoint, <code>PlayerModal</code>, and Watch button are all wired, but
+  <code>/api/play/:ticket/stream</code> intentionally returns <code>503</code> until Threadfin/Jellyfin URL resolution
+  lands in Phase 4. Until then HermesTV is shippable as a discovery surface but cannot play streams.</p>
+</div>
+
+<div class="stat-grid">
+  <div class="stat"><div class="n n-done">38</div><div class="l">Done</div></div>
+  <div class="stat"><div class="n n-partial">6</div><div class="l">Partial</div></div>
+  <div class="stat"><div class="n n-missing">1</div><div class="l">Missing (P0)</div></div>
+  <div class="stat"><div class="n n-deferred">5</div><div class="l">Deferred</div></div>
+  <div class="stat"><div class="n">50</div><div class="l">Total</div></div>
+</div>
+
+<div class="summary-box">
+  <strong>P0 outstanding:</strong> 1 &mdash; Phase 4 streaming proxy resolver (<code>/api/play/:ticket/stream</code> currently returns <code>503</code>).<br/>
+  <strong>P1 outstanding:</strong> 4 &mdash; Tizen <code>.wgt</code> CI build, Playwright E2E, signed release pipeline, performance budget tracker.
+</div>
+
+<svg style="display:none">
+  <symbol id="i-done" viewBox="0 0 16 16"><path fill="#56d364" d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></symbol>
+  <symbol id="i-partial" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="#e3b341" stroke-width="2"/><path fill="#e3b341" d="M7 4h2v5H7z"/><circle cx="8" cy="11.5" r="1" fill="#e3b341"/></symbol>
+  <symbol id="i-missing" viewBox="0 0 16 16"><path fill="#f85149" d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z"/></symbol>
+  <symbol id="i-deferred" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="#8b949e" stroke-width="2"/><circle cx="5" cy="8" r="1" fill="#8b949e"/><circle cx="8" cy="8" r="1" fill="#8b949e"/><circle cx="11" cy="8" r="1" fill="#8b949e"/></symbol>
+</svg>
+
+<h2>1. CI / Quality gates</h2>
+<p>All 4 gates must be green on every PR to <code>main</code>. Source: <code>.github/workflows/ci.yml</code>.</p>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Schema validation gate &mdash; 61 PASS / 0 FAIL</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>tools/schema-validate.js</code>; CI job <code>schema-validation</code> enforces exact &ldquo;Results: 61 PASS, 0 FAIL&rdquo; line. Verified locally 2026-05-18.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Web build gate (Vite, target chrome76)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>CI job <code>web-build</code> &rarr; <code>npm run build</code> in <code>apps/hermes-web-tv</code>; <code>dist/</code> uploaded as artifact.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Chatbot integration gate &mdash; 40 PASS / 0 FAIL</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>CI job <code>chatbot-integration</code> boots API, waits for <code>/health</code>, runs <code>tools/test-chatbot-commands.js</code>, enforces exact &ldquo;40 PASS, 0 FAIL&rdquo;.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Secret scan gate &mdash; zero new credential matches</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>tools/secret-scan.sh</code> + inline patterns in CI job <code>secret-scan</code>. Local sweep 2026-05-18 returns only protocol-name false positives (<code>xtream</code> in schema enum, upstream app catalog).</td>
+  <td>Sec</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>2. Tizen 6.5 / Chrome 76 compatibility</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>No optional chaining (<code>?.</code>)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Grep across <code>apps/hermes-web-tv/src/**/*.{js,jsx}</code> returns only the safety comment in <code>components/PlayerModal.jsx:9</code>. No runtime use.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>No nullish coalescing (<code>??</code>)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Same grep &mdash; zero runtime occurrences. <code>PlayerModal.jsx</code> ships explicit <code>(x !== null &amp;&amp; x !== undefined) ? x : fallback</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>No <code>Array.prototype.flat</code></td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Grep <code>.flat(</code> across <code>apps/hermes-web-tv/src/</code> &rarr; zero matches.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Vite build target = <code>chrome76</code></td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>apps/hermes-web-tv/vite.config.js:6</code> &rarr; <code>build: { outDir: 'dist', target: 'chrome76' }</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Definite-height chain so shells render edge-to-edge</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #30 &mdash; <em>fix(web): definite-height chain so shells don&rsquo;t render cut off</em>. Applies to all 7 shells in <code>apps/hermes-web-tv/src/shells/</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>3. Accessibility / TV remote</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Tizen Back key (10009) closes modals</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #40 (just shipped). 9 surfaces handle the back key &mdash; <code>FloatingChatbot</code>, <code>PlayerModal</code>, <code>VoicePickerModal</code>, <code>ShellDetailDrawer</code>, <code>QROnboarding</code>, <code>MediaDetailPanel</code>, <code>LayoutSwitcher</code>, <code>CommandHelpModal</code>, plus key map in <code>utils/tizenKeyMap.js</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Arrow / Enter / colored-button mapping</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>apps/hermes-web-tv/src/utils/tizenKeyMap.js</code> &mdash; full Samsung remote map (up/down/left/right/enter, red/green/yellow/blue, play/pause/stop, FF/RW, info, guide, smart_hub).</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Every interactive element focusable</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL</td>
+  <td>Components use native <code>&lt;button&gt;</code> / <code>&lt;input&gt;</code> so Tab order works. No automated Lighthouse run yet to enforce on every PR.</td>
+  <td>Web</td>
+  <td>Add axe-core / Lighthouse a11y gate to CI (P1).</td>
+</tr>
+<tr>
+  <td>Mom Mode font_scale floor &ge; 1.25</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Enforced by <code>tools/schema-validate.js</code> (last gate row); ships in <code>services/hermes-tv-api/src/routes/profiles.js</code>.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>4. Catalog coverage</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Seed catalog &ge; 100 items so every shell renders full</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>services/hermes-tv-api/src/data/seedCatalog.js</code> &mdash; 147 items (live + VOD + series). PR #31 populated it.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td><code>X-Catalog-Source</code> header surfaces real source</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>routes/catalog.js:24</code> defines <code>CATALOG_SOURCE_HEADER = 'X-Catalog-Source'</code>; flips between <code>seed</code>, <code>iptv-org</code>, <code>jellyfin</code>, <code>merged-with-iptv-org</code> based on active providers.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Honest data-source badge in Settings</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #36 &mdash; <em>fix(web): honest data-source badge in Settings (replaces static B2 - Mock Mode)</em>. Reads <code>X-Catalog-Source</code> header.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Chatbot filter commands return non-empty</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>40-case chatbot integration suite covers <code>show movies</code>, <code>show 4K</code>, <code>show sports</code>, <code>show hallmark</code>, etc. Seed mix tuned for breadth (see header comment in <code>seedCatalog.js</code>).</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>5. Provider integrations</h2>
+<table>
+<tr><th>Provider</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Jellyfin catalog adapter</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #28. Live in <code>services/hermes-tv-api/src/lib/jellyfin.js</code>; mock fallback when not configured.</td>
+  <td>API</td>
+  <td>Operator credential paste verification per <code>docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md</code>.</td>
+</tr>
+<tr>
+  <td>iptv-org public catalog adapter (~300 channels)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #37. <code>lib/iptvOrg.js</code> + cron in <code>lib/iptvOrgRefresh.js</code>. Active when <code>IPTV_ORG_ENABLED=true</code>; currently live in production.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Apollo Group (xtream) via Threadfin</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL</td>
+  <td>Schema enum widened to <code>apollo_group</code> (PR #32). Threadfin compose service ready (<code>upstream/docker-vps/VPS_COMPOSE.yml</code>). Resolver lands with Phase 4 streaming proxy.</td>
+  <td>API/Ops</td>
+  <td>Phase 4 streaming proxy; operator credential paste.</td>
+</tr>
+<tr>
+  <td>xTremeHD via Threadfin</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL</td>
+  <td>Same as Apollo &mdash; schema, seed entries, and Threadfin service all present. Resolver pending Phase 4.</td>
+  <td>API/Ops</td>
+  <td>Phase 4 streaming proxy.</td>
+</tr>
+<tr>
+  <td>Provider <code>provider_id</code> enum widened</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #32 &mdash; enum now <code>['apollo_group', 'xtremehd', 'iptv_org', 'jellyfin']</code>. Old <code>apollo</code> renamed.</td>
+  <td>Schema</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>6. TTS &mdash; Azure only</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Azure live voice catalog (~99-110 English voices)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #29. <code>services/hermes-tv-api/src/lib/azureVoices.js</code> &mdash; filters to <code>en-*</code>, caches 24h, falls back to 12-voice curated list when key missing.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>VoicePicker shows real catalog</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>apps/hermes-web-tv/src/components/VoicePickerModal.jsx</code> pulls from <code>/api/tts/voices</code> &rarr; <code>azureVoices.getAllVoices()</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Voice persistence (per-profile)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>File-based settings store (PR #34) survives restart. Stored under <code>voice.preferred_voice_id</code>.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Voice source badge (curated vs. azure-live vs. fallback)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>azureVoices.getAllVoices()</code> returns <code>{ voices, source, cachedAt }</code>; <code>VoicePickerModal</code> displays the source label.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>No Bixby / Samsung AI in the path</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Repo-wide grep confirms only Samsung mic capture (input only). Azure is the sole synthesis path; documented in memory rule.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>7. Chatbot</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>22-command table wired</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>services/hermes-tv-api/src/routes/uiCommand.js</code> &mdash; schema-validate asserts <code>&ge; 20</code> entries; current count 22 (passes).</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>40-case integration suite green</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>CI gate (see Section 1).</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>LLM fallback for unrecognized intents</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #26. <code>services/hermes-tv-api/src/lib/llmFallback.js</code>; wired in <code>uiCommand.js</code>.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Voice input (Web Speech API)</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL</td>
+  <td>Walkie-talkie state exists in <code>FloatingChatbot.jsx</code>. Recognition wired via <code>api/azureVoiceClient.js</code>.</td>
+  <td>Web</td>
+  <td>Samsung Internet permission flow verified end-to-end on a QN85 TV (not yet captured as evidence).</td>
+</tr>
+<tr>
+  <td>Profile-aware nickname / agent name</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>FloatingChatbot.jsx:23</code> &rarr; <code>profile.agent_name || 'Hermes'</code>. Memory rule satisfied.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>8. Player</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Watch button on MediaDetailPanel</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #38. <code>apps/hermes-web-tv/src/components/MediaDetailPanel.jsx</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td><code>/api/play</code> ticket endpoint</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>services/hermes-tv-api/src/routes/play.js</code>. Returns 5-min ticket; raw stream URL never returned to client.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>PlayerModal component</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>apps/hermes-web-tv/src/components/PlayerModal.jsx</code> &mdash; Tizen Back-key aware, no <code>?.</code> / <code>??</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td><code>/api/play/:ticket/stream</code> streaming proxy</td>
+  <td class="missing"><svg class="icon"><use href="#i-missing"/></svg>MISSING (P0)</td>
+  <td>Stub returns <code>503</code> by design until Phase 4. Comment in <code>routes/play.js</code>: &ldquo;the actual streaming proxy is operator-side (Threadfin / Jellyfin / iptv-org) and lands in Phase 4.&rdquo;</td>
+  <td>API/Ops</td>
+  <td><strong>Phase 4 plan:</strong> wire Threadfin URL resolver for Apollo/xTremeHD; direct fetch for Jellyfin; HLS pass-through for iptv-org. Single endpoint, ticket-gated.</td>
+</tr>
+</table>
+
+<h2>9. Security</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Admin UIs bound to 127.0.0.1 only</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #39. <code>upstream/docker-vps/VPS_COMPOSE.yml</code> &mdash; Threadfin (34400), m3u-editor (4200), xtreamfilter (3456), API (3011), Web (3080) all <code>127.0.0.1:port</code>.</td>
+  <td>Sec</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Credential containment (no echo, no logging)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>middleware/credentialGuard.js</code> wraps <code>res.json</code>; <code>middleware/requestLogger.js</code> never logs body. Memory rule for private folder enforced.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>CORS origin allowlist</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>services/hermes-tv-api/src/index.js:32</code> &mdash; regex matches <code>localhost</code>, <code>hermestv.local</code>, <code>192.168.x.x</code> only.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Schema validation clean</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>61/61 (see Section 1).</td>
+  <td>Sec</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Secret scan clean</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>tools/secret-scan.sh</code> + CI gate.</td>
+  <td>Sec</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Stream URL never returned to client</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>routes/play.js</code> contract: ticket carries only <code>stream_endpoint</code> pointer, never the raw URL.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>10. Observability</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td><code>/health</code> endpoint</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>services/hermes-tv-api/src/routes/health.js</code>. Used by CI startup wait + container healthcheck.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Request logging (method, path, status, ms)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>middleware/requestLogger.js</code>. Body never logged.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Source-health HEAD probes</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #27. <code>lib/streamProbe.js</code> + <code>routes/sourceHealth.js</code> feed <code>StreamingQualityBar.jsx</code>.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Consistent error JSON shape</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>index.js</code> 404 + 500 handlers return <code>{ error, message? }</code>; route handlers follow the same shape.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Centralized metrics / Prometheus</td>
+  <td class="deferred"><svg class="icon"><use href="#i-deferred"/></svg>DEFERRED</td>
+  <td>Not in scope for v0.1. Single VPS, single-tenant.</td>
+  <td>Ops</td>
+  <td>Reassess if multi-tenant in v0.3.</td>
+</tr>
+</table>
+
+<h2>11. Operator runbook</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Credential paste flow documented</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #33. <code>docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md</code> covers Apollo, xTremeHD, iptv-org, Jellyfin. Explicit warning that vault files stay outside the repo tree.</td>
+  <td>Docs</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Settings persistence (survives restart)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #34. <code>services/hermes-tv-api/src/lib/settingsStore.js</code> + <code>routes/settings.js</code>.</td>
+  <td>API</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Switch Profile from Settings</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #35.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>12. Deploy</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td><code>git pull &amp;&amp; docker compose up -d --build</code> flow</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>upstream/docker-vps/VPS_COMPOSE.yml</code>; documented in <code>docs/29_HERMESTV_DEPLOY_RUNBOOK.md</code>.</td>
+  <td>Ops</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td><code>env_file</code> reaches API container</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>PR #25 fixed the directive.</td>
+  <td>Ops</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Host nginx terminates TLS at <code>hermestv.daveai.tech</code></td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>upstream/nginx/hermestv.daveai.tech.conf.example</code>; proxies to loopback ports.</td>
+  <td>Ops</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Production smoke evidence captured</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Commit 5651df0 &mdash; <code>https://hermestv.daveai.tech</code> LIVE.</td>
+  <td>Ops</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>13. Tizen <code>.wgt</code></h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Build script for <code>.wgt</code></td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>tools/tizen-package.js</code> + <code>tools/tizen-prep.js</code>; inspector at <code>tools/wgt-inspect.sh</code>.</td>
+  <td>Web/Ops</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td><code>config.xml</code> privileges</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>apps/hermes-tv-tizen/config.xml.example</code> declares <code>internet</code>, <code>tv.audio</code>, <code>network.get</code>; <code>hwkey-event="enable"</code> for Back key.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Signing process documented</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td><code>docs/34_TIZEN_BUILD_AND_SIDELOAD.md</code>, <code>docs/35_TIZEN_DEVELOPER_MODE_SHERRI.md</code>.</td>
+  <td>Docs</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td><code>.wgt</code> built &amp; uploaded by CI</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL (P1)</td>
+  <td>CI comment explicitly defers: &ldquo;Tizen needs the Samsung SDK on a real or emulated TV (separate job, future).&rdquo;</td>
+  <td>Ops</td>
+  <td>Stand up Samsung SDK container or runner; emit signed <code>.wgt</code> as a release artifact.</td>
+</tr>
+<tr>
+  <td>End-to-end sideload verified on QN85</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL</td>
+  <td>Documented procedure exists; needs fresh sideload of v0.1 build on Dave&rsquo;s QN85 with evidence capture.</td>
+  <td>Ops</td>
+  <td>Sideload + screen-capture + capture both TV models per <code>docs/18_REAL_TV_DEPLOYMENT_CHECKLIST.md</code>.</td>
+</tr>
+</table>
+
+<h2>14. Browser support</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Samsung Internet on QN85 (primary)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Tizen 6.5 / Chrome 76 syntax discipline (Section 2); production URL loads cleanly.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Chrome on Windows (PC monitor mode)</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Vite dev + production build target chrome76 baseline &mdash; modern Chrome is a strict superset.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>UN-class graceful degradation</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Tier detection in <code>apps/hermes-web-tv/src/utils/tierDetect.js</code> (covered by <code>tools/tier-detect-test.js</code>); QN85 = enhanced, UN55CU8000 = baseline.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+</table>
+
+<h2>15. Performance</h2>
+<table>
+<tr><th>Criterion</th><th>Status</th><th>Evidence</th><th>Owner</th><th>Remaining</th></tr>
+<tr>
+  <td>Bundle size budget</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL</td>
+  <td>Vite reports size on build; no explicit budget enforced in CI.</td>
+  <td>Web</td>
+  <td>Add bundle-size budget check to CI (P1, &le; 350 KB JS gzipped).</td>
+</tr>
+<tr>
+  <td>Lazy loading for non-default shells</td>
+  <td class="partial"><svg class="icon"><use href="#i-partial"/></svg>PARTIAL</td>
+  <td>7 shells live in <code>apps/hermes-web-tv/src/shells/</code>; not yet code-split per shell.</td>
+  <td>Web</td>
+  <td>Convert shell imports to <code>React.lazy</code> + Suspense fallback.</td>
+</tr>
+<tr>
+  <td>Image optimization for tile thumbnails</td>
+  <td class="deferred"><svg class="icon"><use href="#i-deferred"/></svg>DEFERRED</td>
+  <td>Seed catalog uses upstream provider posters; no per-image pipeline yet.</td>
+  <td>Web</td>
+  <td>Revisit when Phase 4 streaming proxy lands &mdash; same pipeline can resize.</td>
+</tr>
+<tr>
+  <td>Animation gating on Mom Mode</td>
+  <td class="done"><svg class="icon"><use href="#i-done"/></svg>DONE</td>
+  <td>Profile carries <code>animation_intensity</code>; <code>low memory mode</code> / <code>performance mode</code> chatbot commands reach <code>update_motion</code>.</td>
+  <td>Web</td>
+  <td>None</td>
+</tr>
+<tr>
+  <td>Performance regression tracker</td>
+  <td class="deferred"><svg class="icon"><use href="#i-deferred"/></svg>DEFERRED</td>
+  <td>Out of scope for v0.1. Single-user, single-VPS deployment.</td>
+  <td>Ops</td>
+  <td>Add Lighthouse-CI when audience expands beyond the two operator TVs.</td>
+</tr>
+</table>
+
+<h2>Appendix &mdash; PR cross-reference</h2>
+<details><summary>Recent PRs that informed this checklist</summary>
+<div>
+<ul>
+  <li>PR #25 &mdash; <code>fix: VPS_COMPOSE.yml env_file directive</code></li>
+  <li>PR #26 &mdash; <code>feat(api): LLM fallback for chatbot intent parsing</code></li>
+  <li>PR #27 &mdash; <code>feat(api): real source-health HEAD probes</code></li>
+  <li>PR #28 &mdash; <code>feat(api): Jellyfin catalog integration with mock fallback</code></li>
+  <li>PR #29 &mdash; <code>feat(api): expand Azure TTS voice catalog to all English voices</code></li>
+  <li>PR #30 &mdash; <code>fix(web): definite-height chain so shells render edge-to-edge</code></li>
+  <li>PR #31 &mdash; <code>feat(api): populated seed catalog (147 items)</code></li>
+  <li>PR #32 &mdash; <code>chore(schemas): widen provider_id enum</code></li>
+  <li>PR #33 &mdash; <code>docs: operator runbook for IPTV credential paste</code></li>
+  <li>PR #34 &mdash; <code>feat(api): file-based settings persistence</code></li>
+  <li>PR #35 &mdash; <code>fix(web): Switch Profile button in Settings panel</code></li>
+  <li>PR #36 &mdash; <code>fix(web): honest data-source badge in Settings</code></li>
+  <li>PR #37 &mdash; <code>feat(api): iptv-org public catalog adapter</code></li>
+  <li>PR #38 &mdash; <code>feat(web,api): Play button + /api/play stream-ticket + PlayerModal</code></li>
+  <li>PR #39 &mdash; <code>sec: bind admin-UI ports to 127.0.0.1</code></li>
+  <li>PR #40 &mdash; <code>feat(web): Tizen Back key closes modals</code></li>
+</ul>
+</div>
+</details>
+
+<details><summary>Verification commands</summary>
+<div>
+<pre><code>node tools/schema-validate.js   # expect: Results: 61 PASS, 0 FAIL
+bash tools/secret-scan.sh        # expect: zero new matches
+cd apps/hermes-web-tv &amp;&amp; npm run build   # expect: dist/ built clean
+cd services/hermes-tv-api &amp;&amp; npm start    # listen on 3001
+curl -fsS http://127.0.0.1:3001/health    # {"status":"ok",...}
+node tools/test-chatbot-commands.js       # expect: Results: 40 PASS, 0 FAIL</code></pre>
+</div>
+</details>
+
+<p><small>Generated 2026-05-18 against <code>main@1f33bd2</code>. Next review trigger: Phase 4 streaming proxy merge.</small></p>
+
+</body>
+</html>
