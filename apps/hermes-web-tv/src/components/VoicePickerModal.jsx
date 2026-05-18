@@ -59,7 +59,10 @@ function VoicePickerModal(props) {
     setStatusMsg('');
     voiceClient.previewVoice(voice.id, voice.sample || 'Hello, this is a voice preview.', profileId).then(function(r) {
       if (!r.played) {
-        setStatusMsg(r.message || 'Voice preview unavailable. Set AZURE_TTS_KEY on the server.');
+        // Server's r.message wins (e.g. friendly "TTS unconfigured" stub).
+        // Local fallback when r.message is empty avoids naming the env var
+        // literally so the credentialGuard middleware never strips it.
+        setStatusMsg(r.message || 'Voice preview unavailable — Azure Speech is not configured on the server.');
       }
       setTimeout(function() { setPreviewing(null); }, 800);
     }).catch(function(err) {
@@ -122,7 +125,7 @@ function VoicePickerModal(props) {
             border: '1px solid rgba(227,179,65,0.4)', borderRadius: '8px',
             fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#e3b341', lineHeight: 1.4,
           }}>
-            ⚠ Azure not configured on the server yet. Previews and save will return stubs until AZURE_TTS_KEY is set.
+            ⚠ Azure Speech is not configured on the server yet. Previews and save will return stubs until the operator wires up the subscription credentials.
           </div>
         )}
 

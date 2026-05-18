@@ -4,6 +4,7 @@ import * as commandStore from '../store/commandStore.js';
 import * as hermesApi from '../api/hermesApi.js';
 import * as mockApi from '../api/mockApi.js';
 import * as voiceClient from '../api/azureVoiceClient.js';
+import * as voicePrefStore from '../store/voicePrefStore.js';
 import { getResponseText } from '../utils/commandResponseText.js';
 import CommandChips from './CommandChips.jsx';
 import CommandHelpModal from './CommandHelpModal.jsx';
@@ -57,7 +58,12 @@ function FloatingChatbot(props) {
   function speakIfEnabled(text) {
     if (!profile || !profile.audio_feedback) return;
     if (!online) return;
-    voiceClient.speak(text, profileId).catch(function() {});
+    // Honour the user's last-picked Azure voice from VoicePickerModal so
+    // chatbot replies use Sherri's Aria / Dave's Guy preference rather than
+    // whatever the server picked as the profile default. Falls back to the
+    // server-side profile_id default when nothing has been persisted yet.
+    var prefVoice = voicePrefStore.getVoiceId(profileId);
+    voiceClient.speak(text, profileId, prefVoice || undefined).catch(function() {});
   }
 
   function handleSend() {
