@@ -2,22 +2,41 @@ import mockData from '../../mock/catalog.mock.json';
 
 var VALID_PROFILE_IDS = ['dave_tv', 'mom_tv'];
 
+var FALLBACK_PROFILES = {
+  dave_tv: {
+    profile_id: 'dave_tv', display_name: 'Dave', tv_model: 'UN55CU8000BXZA',
+    tier: 'degraded', is_primary_target: false, mom_mode: false,
+    active_layout: 'grid-standard', active_theme: 'night-blue',
+    font_scale: 1.1, reduced_motion: false, audio_feedback: false,
+    agent_name: 'Hermes', agent_voice: 'azure-en-us-guy-neural',
+    display_size_inches: 55,
+    quality_preference: { resolution_floor: '720p', prefer_4k: false, hdr_preferred: false, bitrate_floor_kbps: 2000 },
+  },
+  mom_tv: {
+    profile_id: 'mom_tv', display_name: 'Sherri', tv_model: 'QN85Q7FAAFXZA',
+    tier: 'enhanced', is_primary_target: true, mom_mode: true,
+    active_layout: 'jumbo-rail', active_theme: 'mom-calm',
+    font_scale: 1.35, reduced_motion: true, audio_feedback: true,
+    agent_name: 'Hermes', agent_voice: 'azure-en-us-aria-neural',
+    display_size_inches: 85,
+    quality_preference: { resolution_floor: '1080p', prefer_4k: true, hdr_preferred: true, bitrate_floor_kbps: 4000 },
+  },
+};
+
 function getProfile(profileId) {
   if (VALID_PROFILE_IDS.indexOf(profileId) === -1) {
     return Promise.reject(new Error('Invalid profile ID: ' + profileId));
   }
   var profiles = mockData.profiles || [];
-  var found = null;
   for (var i = 0; i < profiles.length; i++) {
     if (profiles[i].profile_id === profileId) {
-      found = profiles[i];
-      break;
+      return Promise.resolve(Object.assign({}, profiles[i]));
     }
   }
-  if (!found) {
-    return Promise.reject(new Error('Profile not found in mock data: ' + profileId));
+  if (FALLBACK_PROFILES[profileId]) {
+    return Promise.resolve(Object.assign({}, FALLBACK_PROFILES[profileId]));
   }
-  return Promise.resolve(Object.assign({}, found));
+  return Promise.reject(new Error('Profile not found: ' + profileId));
 }
 
 function getProviders() {
