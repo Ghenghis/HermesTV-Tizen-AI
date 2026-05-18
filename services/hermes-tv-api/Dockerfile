@@ -15,6 +15,12 @@ COPY apps/hermes-web-tv/src/layouts/manifests/ /app-resources/layouts/
 COPY upstream/apps-catalog.json /app-resources/apps-catalog.json
 ENV HERMES_MANIFESTS_DIR=/app-resources/layouts
 ENV HERMES_UPSTREAM_CATALOG=/app-resources/apps-catalog.json
+# Persistence dir for file-backed settings (and sibling stores). The compose
+# stack mounts hermestv-vps-settings-store here. Creating the dir at build
+# time makes local dev (no volume) also work — settingsStore.js creates it
+# again with mkdirSync(recursive) as a belt-and-suspenders measure.
+RUN mkdir -p /var/lib/hermestv && chown -R node:node /var/lib/hermestv
+ENV HERMES_SETTINGS_STORE=/var/lib/hermestv/settings.json
 ENV NODE_ENV=production
 # Phase 1.5: container defaults to 3011 (VPS port 3001 already bound by
 # Dave's next-server — see docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md). Local dev
