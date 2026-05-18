@@ -219,7 +219,9 @@ router.post('/api/ui-command/validate', async (req, res) => {
   } catch (err) {
     // Defensive: tryParse should always resolve (returns null on error).
     // If it somehow throws, treat as a no-match rather than a 500.
-    console.error('[uiCommand] llmFallback.tryParse threw:', err.message);
+    // sanitize — LLM proxy error strings may echo the OAuth credential
+    // when an upstream returns the auth header inside its error envelope.
+    console.error('[uiCommand] llmFallback.tryParse threw:', require('../lib/sanitizeLog').sanitizeForLog(err && err.message));
     llmResult = null;
   }
 

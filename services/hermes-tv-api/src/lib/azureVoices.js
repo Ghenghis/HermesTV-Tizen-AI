@@ -204,7 +204,10 @@ function getAllVoices(opts) {
       inFlight = null;
       // On error, if we have any stale cache, keep serving it (gracefully).
       if (cache) {
-        console.warn('[azureVoices] refresh failed (' + err.message + ') — serving stale cache');
+        // sanitize — Azure SDK error strings have included the subscription
+        // key in pathological cases. See lib/sanitizeLog.js.
+        var sanLog = require('./sanitizeLog').sanitizeForLog;
+        console.warn('[azureVoices] refresh failed (' + sanLog(err.message) + ') — serving stale cache');
         return cache;
       }
       // No cache and no key → fallback curated.
@@ -219,7 +222,7 @@ function getAllVoices(opts) {
         return cache;
       }
       // Have a key but Azure refused — return fallback so UI still works.
-      console.error('[azureVoices] Azure unreachable: ' + err.message);
+      console.error('[azureVoices] Azure unreachable: ' + require('./sanitizeLog').sanitizeForLog(err.message));
       cache = {
         voices: CURATED_VOICES.map(function(v) {
           return Object.assign({}, v, { recommended: true });
@@ -265,7 +268,7 @@ function getCacheStats() {
 // getAllVoices().
 try {
   getAllVoices().catch(function(err) {
-    console.warn('[azureVoices] initial warm failed: ' + err.message);
+    console.warn('[azureVoices] initial warm failed: ' + require('./sanitizeLog').sanitizeForLog(err.message));
   });
 } catch (e) {
   // Defensive: never let module init blow up the server boot.

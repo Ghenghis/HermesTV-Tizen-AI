@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const requestLogger = require('./middleware/requestLogger');
 const credentialGuard = require('./middleware/credentialGuard');
+const { sanitizeForLog } = require('./lib/sanitizeLog');
 
 // Route modules
 const healthRouter = require('./routes/health');
@@ -80,7 +81,10 @@ app.use((req, res) => {
 // --- Error handler ---
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(`[HermesAPI] Unhandled error on ${req.method} ${req.path}:`, err.message);
+  // Run err.message through sanitizeForLog so any embedded credential in the
+  // raw error string (TTS subscription keys, IPTV provider URLs, OAuth tokens)
+  // never reaches the operator's log pipeline. Audit W3-X1 P1.
+  console.error('[HermesAPI] Unhandled error on ' + req.method + ' ' + req.path + ':', sanitizeForLog(err && err.message));
   res.status(500).json({ error: 'internal_error', message: 'An unexpected error occurred.' });
 });
 

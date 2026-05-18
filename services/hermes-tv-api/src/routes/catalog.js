@@ -143,7 +143,8 @@ async function resolveCatalog() {
         baseSource = SRC_MOCK_FALLBACK;
       }
     } catch (err) {
-      console.warn('[catalog] Jellyfin fetch failed (' + (err && err.code ? err.code : 'unknown') + '): ' + (err && err.message ? err.message : 'no message') + ' — serving mock');
+      var sanLogJ = require('../lib/sanitizeLog').sanitizeForLog;
+      console.warn('[catalog] Jellyfin fetch failed (' + (err && err.code ? err.code : 'unknown') + '): ' + sanLogJ(err && err.message ? err.message : 'no message') + ' — serving mock');
       baseItems = [...CATALOG_ITEMS];
       baseSource = SRC_MOCK_FALLBACK;
     }
@@ -162,7 +163,7 @@ async function resolveCatalog() {
         baseSource = SRC_MERGED_IPTV_ORG;
       }
     } catch (err) {
-      console.warn('[catalog] iptv-org merge failed: ' + (err && err.message ? err.message : 'unknown'));
+      console.warn('[catalog] iptv-org merge failed: ' + require('../lib/sanitizeLog').sanitizeForLog(err && err.message ? err.message : 'unknown'));
     }
   }
 
