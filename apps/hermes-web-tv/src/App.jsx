@@ -333,6 +333,15 @@ var INITIAL_STATE = {
   // the operator can tell at a glance whether real providers are wired vs
   // the mock seed is being served.
   catalogSource: null,
+  // Per-provider diagnostics from /api/catalog _meta.m3u_providers. Shape:
+  //   { apollo_group: { configured, label, count, error, age_ms }, xtremehd: {...} }
+  // null when the response had no m3u block (older API or no providers
+  // configured). Settings panel renders a row per configured provider so the
+  // operator sees at a glance whether their M3U URL fetches succeeded.
+  m3uProviders: null,
+  // Count of iptv-org channels merged into the catalog this request.
+  // Surfaced in Settings so the operator can confirm the cron is running.
+  iptvOrgCount: 0,
 };
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -470,8 +479,14 @@ function App() {
           // source signal for the Settings badge. When we're on the dev-mock
           // path the badge shows 'dev-mock' so it's obvious in DevTools.
           var sourceHeader = rawCatalog._source_header || null;
-          var metaSource = rawCatalog._meta && rawCatalog._meta.source ? rawCatalog._meta.source : null;
+          var meta = rawCatalog._meta || {};
+          var metaSource = meta.source || null;
           var catalogSource = isOnline ? (sourceHeader || metaSource || null) : 'dev-mock';
+          // m3u_providers and iptv_org_count land on _meta when the API has
+          // the Threadfin/M3U client wired (PR #53). Older mockApi responses
+          // and dev-mock paths leave them undefined — coalesce to null/0.
+          var m3uProviders = meta.m3u_providers || null;
+          var iptvOrgCount = (typeof meta.iptv_org_count === 'number') ? meta.iptv_org_count : 0;
 
           // Restore per-profile Azure voice preference from localStorage
           // (set when the user last picked a voice in VoicePickerModal).
@@ -490,6 +505,8 @@ function App() {
             showProfilePicker: false,
             catalogSource: catalogSource,
             activeVoiceId: persistedVoiceId || '',
+            m3uProviders: m3uProviders,
+            iptvOrgCount: iptvOrgCount,
           });
         });
       }).catch(function(profileErr) {
@@ -1209,7 +1226,7 @@ function App() {
                   var src = state.catalogSource || 'unknown';
                   var label;
                   var color;
-                  if (src === 'jellyfin' || src === 'threadfin-merged' || src === 'merged-with-iptv-org') {
+                  if (src === 'jellyfin' || src === 'threadfin-merged' || src === 'merged-with-iptv-org' || src === 'merged-with-providers') {
                     label = 'Live · ' + src;
                     color = '#22c55e'; // green
                   } else if (src === 'mock-fallback' || src === 'mock-threadfin-failed') {
@@ -1243,6 +1260,42 @@ function App() {
                       </span>
                     </div>
                   );
+                })()}
+
+                {/* iptv-org count row — only render when the operator has
+                    flipped IPTV_ORG_ENABLED=true and the cron has produced
+                    a non-empty merge. Hidden when 0 to keep Settings tight. */}
+                {state.iptvOrgCount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--muted)' }}>iptv-org</span>
+                    <span style={{ fontWeight: '700', color: '#22c55e' }}>
+                      {state.iptvOrgCount} channels
+                    </span>
+                  </div>
+                )}
+
+                {/* Per-provider M3U diagnostics — Apollo / xTremeHD.
+                    Shows configured/count/error per provider so the operator
+                    can spot a bad M3U URL without opening DevTools. */}
+                {state.m3uProviders && (function() {
+                  var rows = [];
+                  var pids = Object.keys(state.m3uProviders);
+                  for (var pi = 0; pi < pids.length; pi++) {
+                    var pid = pids[pi];
+                    var p = state.m3uProviders[pid] || {};
+                    if (!p.configured) { continue; } // hide unconfigured slots
+                    var ok = !p.error && (p.count > 0);
+                    var pcolor = ok ? '#22c55e' : (p.error ? '#ef4444' : '#e3b341');
+                    var pmsg = ok ? (p.count + ' channels')
+                                  : (p.error ? 'fetch failed' : 'fetch pending');
+                    rows.push(
+                      <div key={pid} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--muted)' }}>{p.label || pid}</span>
+                        <span style={{ fontWeight: '700', color: pcolor }}>{pmsg}</span>
+                      </div>
+                    );
+                  }
+                  return rows.length > 0 ? rows : null;
                 })()}
               </div>
 
