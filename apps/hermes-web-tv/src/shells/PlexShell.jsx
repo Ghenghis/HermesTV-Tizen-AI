@@ -134,7 +134,14 @@ function PlexShell(props) {
               <button
                 key={s.label}
                 data-focusable="true"
+                tabIndex={0}
                 onClick={function() { setActiveSection(i); }}
+                onKeyDown={function(e) {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveSection(i);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -197,7 +204,21 @@ function PlexShell(props) {
                 {featured.year && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#b2b9c1' }}>{featured.year}</span>}
                 {featured.genre && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#b2b9c1' }}>{featured.genre}</span>}
               </div>
-              <button onClick={function(e) { e.stopPropagation(); if (onItemSelect) onItemSelect(featured); }} style={{ padding: '9px 20px', background: '#e5a00d', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: 'calc(13px * ' + fontScale + ')', cursor: 'pointer' }}>
+              <button
+                data-focusable="true"
+                tabIndex={0}
+                onClick={function(e) { e.stopPropagation(); if (onItemSelect) onItemSelect(featured); }}
+                onKeyDown={function(e) {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onItemSelect) onItemSelect(featured);
+                  }
+                }}
+                style={{ padding: '9px 20px', background: '#e5a00d', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: 'calc(13px * ' + fontScale + ')', cursor: 'pointer', outline: 'none' }}
+                onFocus={function(e) { e.currentTarget.style.outline = '3px solid #e5a00d'; e.currentTarget.style.outlineOffset = '2px'; }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              >
                 ▶ Play
               </button>
             </div>
