@@ -168,7 +168,10 @@ services:
     depends_on:
       - hermes-tv-api
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      # Use 127.0.0.1 not 'localhost': alpine wget prefers ::1 and our nginx
+      # only listens on IPv4 (0.0.0.0:80), so 'localhost' returns Connection
+      # refused. Discovered during Phase 2 deploy 2026-05-18.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
       interval: 30s
       timeout: 10s
       retries: 3
