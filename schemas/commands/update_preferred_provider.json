@@ -9,7 +9,7 @@
   "properties": {
     "provider_id": {
       "type": "string",
-      "enum": ["apollo", "xtremehd"],
+      "enum": ["apollo_group", "xtremehd", "iptv-org", "jellyfin"],
       "description": "Must be a known provider. Backend validates provider is enabled for this profile."
     }
   }
