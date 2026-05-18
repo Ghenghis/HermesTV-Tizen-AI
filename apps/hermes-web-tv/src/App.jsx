@@ -21,6 +21,7 @@ import VoicePickerModal from './components/VoicePickerModal.jsx';
 import PlayerModal from './components/PlayerModal.jsx';
 import DownloadModal from './components/DownloadModal.jsx';
 import SettingsPanelTabbed from './components/SettingsPanelTabbed.jsx';
+import { SkeletonCard } from './components/Skeleton.jsx';
 import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
 
 // Determine tier from TV model prefix
@@ -755,37 +756,62 @@ function App() {
     return <ProfilePicker onSelect={handleProfileSelect} />;
   }
 
-  // ── Loading spinner ──
+  // ── Loading: skeleton catalog grid ──
+  // SOTA streaming UX never shows a blank canvas while the boot fetch runs.
+  // We paint the layout-to-be (6×4 poster cards on enhanced, 4×3 on degraded)
+  // so Mom sees where her library is about to land instead of a spinner.
+  // The CatalogGrid + CatalogCard 2:3 aspect ratio is mirrored by SkeletonCard.
   if (state.loading) {
+    var skeletonCols = state.tier === 'enhanced' ? 6 : 4;
+    var skeletonRows = 4;
+    var skeletonCount = skeletonCols * skeletonRows;
+    var skeletonCells = [];
+    for (var sIdx = 0; sIdx < skeletonCount; sIdx++) {
+      skeletonCells.push(<SkeletonCard key={'sk-' + sIdx} />);
+    }
     return (
       <div
+        role="status"
+        aria-label="Loading your library"
+        aria-live="polite"
         style={{
           minHeight: '100vh',
           backgroundColor: '#0d1117',
+          color: '#e6edf3',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '1.5rem',
-          color: '#e6edf3',
         }}
       >
-        {/* Spinner ring */}
+        {/* Branded skeleton header — mirrors the real app header height */}
         <div
           style={{
-            width: '56px',
-            height: '56px',
-            border: '4px solid #30363d',
-            borderTopColor: '#1f6feb',
-            borderRadius: '50%',
-            animation: 'spin 0.9s linear infinite',
+            padding: '0.75rem 1.5rem',
+            backgroundColor: '#161b22',
+            borderBottom: '1px solid #30363d',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
           }}
-        />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{ fontSize: '1.5rem', fontWeight: '600', letterSpacing: '0.05em' }}>
-          Hermes<span style={{ color: '#1f6feb' }}>TV</span>
+        >
+          <div style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '0.03em' }}>
+            Hermes<span style={{ color: '#1f6feb' }}>TV</span>
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#8b949e' }}>Loading your library...</div>
         </div>
-        <div style={{ fontSize: '0.875rem', color: '#8b949e' }}>Loading your profile...</div>
+        {/* Skeleton catalog grid */}
+        <div
+          style={{
+            flex: 1,
+            padding: '1rem 1.5rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(' + skeletonCols + ', 1fr)',
+            gap: '1rem',
+            overflow: 'hidden',
+          }}
+        >
+          {skeletonCells}
+        </div>
       </div>
     );
   }

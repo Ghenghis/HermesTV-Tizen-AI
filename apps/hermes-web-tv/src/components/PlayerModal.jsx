@@ -1,4 +1,5 @@
 import React from 'react';
+import { SkeletonBlock } from './Skeleton.jsx';
 
 // PlayerModal — shown after /api/play returns a ticket. Renders the item
 // title, provider chip, resolution badge, source-health dot, and a video
@@ -204,19 +205,40 @@ function PlayerModal(props) {
             />
           )}
           {!error && streamState.status !== 'streaming' && (
-            <div style={{ textAlign: 'center', maxWidth: '560px' }}>
-              <div style={{ fontSize: '2.25rem', color: streamState.status === 'pending_operator' ? '#e3b341' : 'var(--accent, #1f6feb)', marginBottom: '0.75rem' }}>
-                {streamState.status === 'loading' ? '⏳' : (streamState.status === 'pending_operator' ? '🔧' : '▶')}
-              </div>
-              <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
-                {streamState.status === 'loading' && 'Preparing stream…'}
-                {streamState.status === 'pending_operator' && 'Stream pipeline pending'}
-                {streamState.status === 'error' && 'Stream unavailable'}
-                {streamState.status === 'idle' && 'Ready'}
-              </div>
-              <div style={{ color: 'var(--muted, #8b949e)', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                {streamState.message}
-              </div>
+            <div style={{ width: '100%', maxWidth: '880px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+              {/* 16:9 skeleton player frame — Mom never sees a blank rectangle
+                  while the play-ticket round-trip runs. The shimmer keeps
+                  the modal feeling alive even when the backend takes a
+                  second to return. */}
+              {(streamState.status === 'loading' || streamState.status === 'idle') && !ticket && (
+                <SkeletonBlock width="100%" height={0} radius="10px" style={{ paddingBottom: '56.25%', height: 0 }} />
+              )}
+              {(streamState.status === 'loading' || streamState.status === 'idle') && ticket && (
+                <SkeletonBlock width="100%" height={0} radius="10px" style={{ paddingBottom: '56.25%', height: 0 }} />
+              )}
+              {(streamState.status === 'pending_operator' || streamState.status === 'error') && (
+                <div style={{ textAlign: 'center', maxWidth: '560px' }}>
+                  <div style={{ fontSize: '2.25rem', color: streamState.status === 'pending_operator' ? '#e3b341' : 'var(--accent, #1f6feb)', marginBottom: '0.75rem' }}>
+                    {streamState.status === 'pending_operator' ? '🔧' : '⚠'}
+                  </div>
+                  <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                    {streamState.status === 'pending_operator' && 'Stream pipeline pending'}
+                    {streamState.status === 'error' && 'Stream unavailable'}
+                  </div>
+                  <div style={{ color: 'var(--muted, #8b949e)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                    {streamState.message}
+                  </div>
+                </div>
+              )}
+              {(streamState.status === 'loading' || streamState.status === 'idle') && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  style={{ color: 'var(--muted, #8b949e)', fontSize: '0.9rem', textAlign: 'center' }}
+                >
+                  {streamState.status === 'loading' ? (streamState.message || 'Preparing stream…') : 'Requesting playback ticket…'}
+                </div>
+              )}
             </div>
           )}
         </div>
