@@ -1,9 +1,54 @@
+# Claude working files
 .claude/
+
+# Environment / secrets — never commit real values
 .env
 .env.*
 !.env.example
+**/.env.hermestv
+**/.env.local
+*.authkey
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+private/
+
+# Docker env files
+docker/**/.env
+docker/**/secrets/
+
+# Node
 node_modules/
 dist/
 build/
+.parcel-cache/
+.vite/
+
+# OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Tizen build artifacts
+*.wgt
+tizen-build/
+.tizen/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Logs (never commit logs that may contain provider data)
+logs/
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+.nyc_output/

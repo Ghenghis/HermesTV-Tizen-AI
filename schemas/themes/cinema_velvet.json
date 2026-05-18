@@ -1,0 +1,46 @@
+{
+  "theme_id": "cinema_velvet",
+  "version": "1.0.0",
+  "name": "Cinema Velvet",
+  "family": "cinema",
+  "intent": "Deep red-black with crimson accent for theatrical cinema experience",
+  "tokens": {
+    "bg_0": "#110005",
+    "bg_1": "#190009",
+    "bg_2": "#22000E",
+    "surface_0": "#2A0012",
+    "surface_1": "#330016",
+    "text_primary": "#F5ECEC",
+    "text_secondary": "#C4A0A0",
+    "text_disabled": "#7A4848",
+    "accent": "#B71C1C",
+    "accent_hover": "#D32F2F",
+    "accent_pressed": "#8E0000",
+    "focus_ring": "#FFD86B",
+    "focus_ring_pressed": "#FFB300",
+    "ok": "#3EC97A",
+    "warn": "#F5A524",
+    "danger": "#FF5A5A",
+    "badge_quality_4k": "#9F7CFF",
+    "badge_quality_1080": "#B71C1C",
+    "badge_quality_720": "#9CB0C9",
+    "badge_quality_low": "#7A4848",
+    "badge_provider": "#3EC97A",
+    "shadow_strong": "rgba(0,0,0,0.70)"
+  },
+  "typography": {
+    "font_family_primary": "Inter, Samsung One, system-ui",
+    "font_family_display": "Inter, Samsung One, system-ui",
+    "scale_base_px": 22,
+    "scale_step": 1.125
+  },
+  "focus_ring": {
+    "style": "static_thick",
+    "thickness_px": 4,
+    "glow_enhanced_only": true
+  },
+  "high_contrast_partner": "hc_dark",
+  "mom_mode_partner": "mom_calm",
+  "default_background_pack": "film_grain_01",
+  "proof_required": ["contrast_audit", "screenshot_per_layout", "focus_ring_visibility"]
+}

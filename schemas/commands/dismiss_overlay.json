@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:dismiss_overlay",
+  "title": "dismiss_overlay params",
+  "description": "Dismiss a specific overlay or the topmost overlay.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "overlay_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Specific overlay to dismiss. If omitted, dismisses topmost overlay."
+    },
+    "reason": {
+      "type": "string",
+      "enum": ["user_action", "timeout", "agent_triggered"],
+      "description": "Why the overlay is being dismissed — for audit log."
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "preset_id": "category_carousels",
+  "version": "2.0.0",
+  "name": "Category Carousels",
+  "intent": "Stacked horizontal category rows (live, movies, series, favorites) — 8-wide tiles per row for QN-class",
+  "tier_floor": "enhanced",
+  "grid": {
+    "columns": 8,
+    "rows": 4,
+    "card_shape": "rounded_16_9"
+  },
+  "grid_note": "columns per row, rows = number of category rows",
+  "regions": ["top_bar", "carousel_stack"],
+  "focus_order": ["carousel_stack", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "medium",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "ambient_motion_01",
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
+    "font_scale": 1.0,
+    "tile_density": "medium",
+    "focus_ring": "static_thick",
+    "animation_density": "low",
+    "columns_override": 4
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "tile_density": "large",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "proof_required": [
+    "screenshot_qn",
+    "screenshot_mom",
+    "screenshot_un_degraded",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

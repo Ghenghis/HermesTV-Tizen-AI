@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Ghenghis/HermesTV-Tizen-AI/schemas/ui-command.schema.json",
+  "title": "HermesTV UI Command Envelope",
+  "description": "Safe agent/chatbot JSON command envelope. See docs/06_AGENTIC_UI_CONTROL_SAFE_JSON_SCHEMA.md.",
+  "type": "object",
+  "required": ["schema", "command_id", "issued_at", "issued_by", "target", "action", "params"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "hermestv.ui.v1"
+    },
+    "command_id": {
+      "type": "string",
+      "description": "ULID. Globally unique. Stored in audit ledger.",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 UTC. Reject if drift > 5 minutes."
+    },
+    "issued_by": {
+      "type": "object",
+      "required": ["agent_id", "agent_role", "session_id"],
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": { "type": "string" },
+        "agent_role": { "type": "string" },
+        "session_id": { "type": "string" },
+        "user_intent_summary": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["profile_id"],
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "enum": ["dave_tv", "mom_tv"]
+        },
+        "tv_model_hint": {
+          "type": "string",
+          "description": "Not trusted for tier routing — telemetry only."
+        }
+      }
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "update_layout",
+        "update_theme",
+        "update_background",
+        "update_font_scale",
+        "update_motion_density",
+        "update_audio_feedback",
+        "update_agent_name",
+        "update_display_name",
+        "update_preferred_provider",
+        "update_quality_filter",
+        "show_notification",
+        "show_action_card",
+        "dismiss_overlay",
+        "recall_memory",
+        "save_memory"
+      ]
+    },
+    "params": {
+      "type": "object",
+      "description": "Action-specific params. Validated against schemas/commands/<action>.json at runtime."
+    },
+    "requires_user_confirm": {
+      "type": "boolean",
+      "default": true
+    },
+    "rollback_token": {
+      "type": "string",
+      "description": "Opaque. Router uses this to look up inverse command on rollback."
+    },
+    "dry_run": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true: full validation, returns diff, applies nothing."
+    }
+  }
+}

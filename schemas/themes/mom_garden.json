@@ -1,0 +1,47 @@
+{
+  "theme_id": "mom_garden",
+  "version": "1.0.0",
+  "name": "Mom Garden",
+  "family": "accessibility",
+  "intent": "Soft dark green background with herb-green accent and warm text — senior-friendly nature theme",
+  "tokens": {
+    "bg_0": "#0E1712",
+    "bg_1": "#151E18",
+    "bg_2": "#1C2620",
+    "surface_0": "#222E28",
+    "surface_1": "#293730",
+    "text_primary": "#EDE8DC",
+    "text_secondary": "#C0B89E",
+    "text_disabled": "#6E7868",
+    "accent": "#558B2F",
+    "accent_hover": "#689F38",
+    "accent_pressed": "#427722",
+    "focus_ring": "#FFD86B",
+    "focus_ring_pressed": "#FFB300",
+    "ok": "#558B2F",
+    "warn": "#F5A524",
+    "danger": "#FF5A5A",
+    "badge_quality_4k": "#9F7CFF",
+    "badge_quality_1080": "#558B2F",
+    "badge_quality_720": "#9CB0C9",
+    "badge_quality_low": "#6E7868",
+    "badge_provider": "#558B2F",
+    "shadow_strong": "rgba(0,0,0,0.55)"
+  },
+  "typography": {
+    "font_family_primary": "Inter, Samsung One, system-ui",
+    "font_family_display": "Inter, Samsung One, system-ui",
+    "scale_base_px": 28,
+    "scale_step": 1.125
+  },
+  "focus_ring": {
+    "style": "static_thick_high_contrast",
+    "thickness_px": 5,
+    "glow_enhanced_only": false
+  },
+  "profile_lock": "mom_tv",
+  "high_contrast_partner": "hc_dark",
+  "mom_mode_partner": null,
+  "default_background_pack": "warm_ambient_01",
+  "proof_required": ["contrast_audit", "screenshot_per_layout", "focus_ring_visibility"]
+}

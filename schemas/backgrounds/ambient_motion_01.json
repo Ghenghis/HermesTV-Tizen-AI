@@ -1,0 +1,18 @@
+{
+  "pack_id": "ambient_motion_01",
+  "version": "2.0.0",
+  "name": "Ambient Motion 1",
+  "intent": "Slow-fading dark ambient animation — primary default for QN-class QLED devices",
+  "tier_required": "qn_primary",
+  "type": "slow_fade",
+  "motion_enabled": true,
+  "static_frame_src": "assets/bg/ambient_motion_01_static.jpg",
+  "motion_src": "assets/bg/ambient_motion_01.mp4",
+  "motion_type": "video_loop",
+  "motion_cycle_ms": 8000,
+  "un_fallback_pack_id": "static_dark_default",
+  "reduced_motion_fallback_pack_id": "static_dark_default",
+  "reduced_motion_fallback_src": "assets/bg/ambient_motion_01_static.jpg",
+  "default_for_themes": [],
+  "proof_required": ["screenshot_qn", "screenshot_un_fallback"]
+}

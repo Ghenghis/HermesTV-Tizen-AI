@@ -1,0 +1,191 @@
+{
+  "_comment": "Safe mock catalog for offline development. No real provider URLs, credentials, M3U links, or Xtream tokens.",
+  "_generated": "2026-05-17",
+  "providers": [
+    {
+      "provider_id": "apollo",
+      "display_label": "Apollo Group",
+      "enabled": true,
+      "health": "ok",
+      "capabilities": {
+        "live": true,
+        "vod": true,
+        "series": true,
+        "catch_up": true,
+        "xmltv": true
+      },
+      "profile_access": ["dave_tv", "mom_tv"],
+      "last_refresh_utc": "2026-05-17T04:00:00Z",
+      "stream_slots_total": 2,
+      "stream_slots_in_use": 0,
+      "priority_order": 1
+    },
+    {
+      "provider_id": "xtremehd",
+      "display_label": "XtremeHD",
+      "enabled": true,
+      "health": "ok",
+      "capabilities": {
+        "live": true,
+        "vod": true,
+        "series": true,
+        "catch_up": false,
+        "xmltv": true
+      },
+      "profile_access": ["dave_tv", "mom_tv"],
+      "last_refresh_utc": "2026-05-17T04:02:00Z",
+      "stream_slots_total": 2,
+      "stream_slots_in_use": 0,
+      "priority_order": 2
+    }
+  ],
+  "profiles": [
+    {
+      "profile_id": "dave_tv",
+      "display_name": "Dave",
+      "tv_model": "UN55CU8000BXZA",
+      "tier": "baseline",
+      "mom_mode": false,
+      "active_layout": "grid-standard",
+      "active_theme": "night-blue",
+      "font_scale": 1.0,
+      "reduced_motion": false,
+      "audio_feedback": false,
+      "agent_name": "Hermes",
+      "agent_voice": "azure-en-us-guy-neural"
+    },
+    {
+      "profile_id": "mom_tv",
+      "display_name": "Sherri",
+      "tv_model": "QN85Q7FAAFXZA",
+      "tier": "enhanced",
+      "mom_mode": true,
+      "active_layout": "jumbo-rail",
+      "active_theme": "mom-calm",
+      "font_scale": 1.35,
+      "reduced_motion": true,
+      "audio_feedback": true,
+      "agent_name": "Hermes",
+      "agent_voice": "azure-en-us-aria-neural"
+    }
+  ],
+  "catalog": [
+    {
+      "item_id": "MOCK-LIVE-001",
+      "title": "Mock Live Channel 1",
+      "content_type": "live",
+      "provider_tags": ["apollo", "xtremehd"],
+      "preferred_source": "apollo",
+      "duplicate_count": 2,
+      "quality": {
+        "resolution": "1080p",
+        "codec": "h264",
+        "bitrate_bucket": "high",
+        "fps": 30,
+        "audio_codec": "aac",
+        "scan_utc": "2026-05-17T04:00:00Z",
+        "possible_upscale": false
+      },
+      "epg": {
+        "status": "matched",
+        "channel_id": "mock.channel.001",
+        "next_program": "Mock Program Name"
+      },
+      "catch_up_available": true,
+      "provider_health": { "apollo": "ok", "xtremehd": "ok" },
+      "profile_access": ["dave_tv", "mom_tv"]
+    },
+    {
+      "item_id": "MOCK-LIVE-002",
+      "title": "Mock Live Channel 2 (Apollo Only)",
+      "content_type": "live",
+      "provider_tags": ["apollo"],
+      "preferred_source": "apollo",
+      "duplicate_count": 1,
+      "quality": {
+        "resolution": "720p",
+        "codec": "h264",
+        "bitrate_bucket": "medium",
+        "fps": 30,
+        "audio_codec": "aac",
+        "scan_utc": "2026-05-17T04:00:00Z",
+        "possible_upscale": false
+      },
+      "epg": {
+        "status": "partial",
+        "channel_id": "mock.channel.002",
+        "next_program": null
+      },
+      "catch_up_available": false,
+      "provider_health": { "apollo": "ok" },
+      "profile_access": ["dave_tv", "mom_tv"]
+    },
+    {
+      "item_id": "MOCK-LIVE-003",
+      "title": "Mock 4K Channel (Dave Only)",
+      "content_type": "live",
+      "provider_tags": ["xtremehd"],
+      "preferred_source": "xtremehd",
+      "duplicate_count": 1,
+      "quality": {
+        "resolution": "4K",
+        "codec": "h265",
+        "bitrate_bucket": "ultra",
+        "fps": 60,
+        "audio_codec": "aac",
+        "scan_utc": "2026-05-17T04:00:00Z",
+        "possible_upscale": false
+      },
+      "epg": {
+        "status": "missing",
+        "channel_id": null,
+        "next_program": null
+      },
+      "catch_up_available": false,
+      "provider_health": { "xtremehd": "ok" },
+      "profile_access": ["dave_tv"]
+    },
+    {
+      "item_id": "MOCK-VOD-001",
+      "title": "Mock Movie 1",
+      "content_type": "movie",
+      "provider_tags": ["apollo"],
+      "preferred_source": "apollo",
+      "duplicate_count": 1,
+      "quality": {
+        "resolution": "1080p",
+        "codec": "h265",
+        "bitrate_bucket": "high",
+        "fps": 24,
+        "audio_codec": "ac3",
+        "scan_utc": "2026-05-17T04:00:00Z",
+        "possible_upscale": false
+      },
+      "epg": { "status": "missing", "channel_id": null, "next_program": null },
+      "catch_up_available": false,
+      "provider_health": { "apollo": "ok" },
+      "profile_access": ["dave_tv", "mom_tv"]
+    },
+    {
+      "item_id": "MOCK-SERIES-001",
+      "title": "Mock Series 1",
+      "content_type": "series",
+      "provider_tags": ["apollo", "xtremehd"],
+      "preferred_source": "apollo",
+      "duplicate_count": 2,
+      "quality": {
+        "resolution": "1080p",
+        "codec": "h264",
+        "bitrate_bucket": "high",
+        "fps": 24,
+        "audio_codec": "aac",
+        "scan_utc": "2026-05-17T04:00:00Z",
+        "possible_upscale": false
+      },
+      "epg": { "status": "missing", "channel_id": null, "next_program": null },
+      "catch_up_available": false,
+      "provider_health": { "apollo": "ok", "xtremehd": "ok" },
+      "profile_access": ["dave_tv", "mom_tv"]
+    }
+  ]
+}

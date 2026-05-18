@@ -1,0 +1,41 @@
+{
+  "preset_id": "mom_jumbo_rail",
+  "version": "2.0.0",
+  "name": "Mom Jumbo Rail",
+  "intent": "Giant tiles on a single horizontal rail, senior-friendly large targets — motion background enabled for QN-class",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 1,
+    "rows": 1,
+    "card_shape": "rounded_jumbo"
+  },
+  "regions": ["top_bar", "main_rail", "now_playing_strip"],
+  "focus_order": ["main_rail", "now_playing_strip", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "standard",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "warm_ambient_01",
+  "motion_enabled": true,
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
+    "font_scale": 1.0,
+    "tile_density": "jumbo",
+    "animation_density": "low",
+    "columns_override": 1
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "tile_density": "jumbo",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "default_for": ["mom_tv"],
+  "proof_required": [
+    "screenshot_qn",
+    "screenshot_mom",
+    "screenshot_un_degraded",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

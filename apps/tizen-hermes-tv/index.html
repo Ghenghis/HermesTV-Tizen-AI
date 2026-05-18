@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920">
+  <!--
+    CSP: scripts, XHR/fetch, and WebSocket are restricted to 'self' plus the
+    HermesTV backend origin (hermestv.local).  The broad "https: wss:" wildcard
+    is intentionally removed — the app must not reach any external host.
+    If the operator uses a different LAN hostname they must update this tag AND
+    the hermes-api-url meta tag below.
+  -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' http://hermestv.local https://hermestv.local; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://hermestv.local https://hermestv.local ws://hermestv.local wss://hermestv.local; img-src 'self' data: http://hermestv.local https://hermestv.local; media-src 'self' http://hermestv.local https://hermestv.local">
+  <!--
+    hermes-api-url: read by main.js to configure hermesApi.setBaseUrl().
+    Change this value (NOT the JS) if the backend runs on a static IP or
+    a different hostname.  Must match the <access> origins in config.xml.
+  -->
+  <meta name="hermes-api-url" content="http://hermestv.local">
+  <title>HermesTV</title>
+  <link rel="stylesheet" href="bundle.css">
+</head>
+<body class="body--loading">
+  <div id="app-root"></div>
+  <script src="bundle.js"></script>
+</body>
+</html>

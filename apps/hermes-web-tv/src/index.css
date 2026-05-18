@@ -1,0 +1,253 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Theme: night-blue (Dave default) ── */
+.theme-night-blue {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-raised: #1c2128;
+  --accent: #1f6feb;
+  --accent-hover: #388bfd;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --border: #30363d;
+  --font-scale: 1.0;
+}
+
+/* ── Theme: mom-calm (Sherri default) ── */
+.theme-mom-calm {
+  --bg: #1a1410;
+  --surface: #2a201a;
+  --surface-raised: #352820;
+  --accent: #e07b39;
+  --accent-hover: #f0924d;
+  --text: #f5ede6;
+  --muted: #c4a882;
+  --border: #4a3828;
+  --font-scale: 1.35;
+}
+
+/* ── Theme: high-contrast ── */
+.theme-high-contrast {
+  --bg: #000000;
+  --surface: #111111;
+  --surface-raised: #1a1a1a;
+  --accent: #ffff00;
+  --accent-hover: #ffffa0;
+  --text: #ffffff;
+  --muted: #cccccc;
+  --border: #666666;
+  --font-scale: 1.1;
+}
+
+/* ── Theme: slate-dark ── */
+.theme-slate-dark {
+  --bg: #0f1621;
+  --surface: #1a2233;
+  --surface-raised: #212d42;
+  --accent: #5b8dee;
+  --accent-hover: #7aa3f5;
+  --text: #dce6f7;
+  --muted: #7a93bc;
+  --border: #2a3f60;
+  --font-scale: 1.0;
+}
+
+/* ── Theme: warm-amber ── */
+.theme-warm-amber {
+  --bg: #16100a;
+  --surface: #241a10;
+  --surface-raised: #2e2014;
+  --accent: #f0a030;
+  --accent-hover: #f5b850;
+  --text: #f5e8d0;
+  --muted: #b89060;
+  --border: #3e2c14;
+  --font-scale: 1.0;
+}
+
+/* ── Theme: deep-purple (enhanced tier only) ── */
+.theme-deep-purple {
+  --bg: #0d0818;
+  --surface: #160f2a;
+  --surface-raised: #1e1438;
+  --accent: #9b59d0;
+  --accent-hover: #b070e8;
+  --text: #e8daf8;
+  --muted: #8868b0;
+  --border: #2e1a50;
+  --font-scale: 1.0;
+}
+
+/* ── QN-class performance vars (enhanced-first design target) ── */
+:root {
+  --enhanced-blur: 12px;
+  --animation-budget: high;
+  --grid-cols-standard: 5;
+  --grid-cols-discovery: 8;
+  --grid-cols-jumbo: 2;
+  --focus-glow: 0 0 14px var(--accent, #5AA1FF);
+  --hero-height: 65vh;
+}
+
+/* UN-class degraded overrides */
+.un-degraded :root {
+  --enhanced-blur: 0px;
+  --animation-budget: low;
+  --grid-cols-standard: 3;
+  --grid-cols-discovery: 4;
+  --focus-glow: none;
+  --hero-height: 50vh;
+}
+
+/* Enhanced focus glow */
+.enhanced .focus-active {
+  box-shadow: var(--focus-glow);
+}
+
+/* Enhanced card transitions */
+.enhanced .catalog-card {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.enhanced .catalog-card:focus,
+.enhanced .catalog-card.focus-active {
+  transform: scale(1.03);
+}
+
+/* Enhanced overlay blur */
+.enhanced .overlay-panel,
+.enhanced .chatbot-panel {
+  backdrop-filter: blur(var(--enhanced-blur));
+}
+
+/* ── Layout mode markers ── */
+.layout-grid-standard {
+  --layout-cols: 3;
+  --card-min-width: 280px;
+}
+
+.layout-rail-hero {
+  --layout-cols: 4;
+  --card-min-width: 240px;
+}
+
+.layout-jumbo-rail {
+  --layout-cols: 2;
+  --card-min-width: 400px;
+}
+
+/* ── Global base styles ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  background-color: var(--bg, #0d1117);
+  color: var(--text, #e6edf3);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  background-color: var(--bg, #0d1117);
+  color: var(--text, #e6edf3);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── Reduced motion: when profile sets reduced_motion=true, add .motion-reduced to body ── */
+.motion-reduced *,
+.motion-reduced *::before,
+.motion-reduced *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── TV focus rings — visible at viewing distance ── */
+:focus {
+  outline: 2px solid var(--accent, #1f6feb);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent, #1f6feb);
+  outline-offset: 2px;
+}
+
+/* ── Font scale utility ── */
+.tv-text {
+  font-size: calc(1rem * var(--font-scale, 1));
+}
+
+.tv-text-sm {
+  font-size: calc(0.875rem * var(--font-scale, 1));
+}
+
+.tv-text-lg {
+  font-size: calc(1.25rem * var(--font-scale, 1));
+}
+
+.tv-text-xl {
+  font-size: calc(1.5rem * var(--font-scale, 1));
+}
+
+.tv-text-2xl {
+  font-size: calc(2rem * var(--font-scale, 1));
+}
+
+.tv-text-3xl {
+  font-size: calc(2.5rem * var(--font-scale, 1));
+}
+
+/* ── Scrollbar styling ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface, #161b22);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted, #8b949e);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent, #1f6feb);
+}
+
+/* ── Quality badge codec — visible only on focus-within ── */
+.codec-label {
+  display: none;
+}
+
+.quality-badge-wrap:focus-within .codec-label {
+  display: inline;
+}

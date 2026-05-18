@@ -1,0 +1,41 @@
+{
+  "preset_id": "ambient_idle",
+  "version": "2.0.0",
+  "name": "Ambient Idle",
+  "intent": "Screensaver/idle with rotating quiet preview and clock — cinematic slow fade is the primary QN-class default",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 1,
+    "rows": 1,
+    "card_shape": "fullbleed"
+  },
+  "regions": ["ambient_canvas", "clock_overlay", "mini_rail"],
+  "focus_order": ["mini_rail", "clock_overlay"],
+  "safe_area_pct": 5,
+  "animation_density_default": "high",
+  "background_mode": "slow_fade_cinematic",
+  "background_pack_default": "ambient_motion_01",
+  "clock_visible": true,
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
+    "font_scale": 1.0,
+    "background_mode": "static_gradient",
+    "clock_visible": true,
+    "animation_density": "off"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "background_mode": "static_gradient",
+    "clock_visible": true,
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "proof_required": [
+    "screenshot_qn",
+    "screenshot_mom",
+    "screenshot_un_degraded",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

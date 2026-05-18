@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="https://hermes.tv/app"
+        version="1.0.0">
+
+  <!-- package: exactly 10 alphanumeric chars (Samsung Tizen signing requirement). -->
+  <!-- required_version: 6.5 — both target TVs (QN85Q7FAAFXZA, UN55CU8000BXZA)   -->
+  <!-- run Tizen 6.5. Do NOT set to 3.0 — that would lie to the TV and skip       -->
+  <!-- capability checks that 6.5 firmware enforces.                               -->
+  <tizen:application id="HermesTVap.app"
+                     package="HermesTVap"
+                     required_version="6.5"/>
+
+  <name>HermesTV</name>
+  <icon src="icon.png"/>
+  <content src="index.html"/>
+
+  <!--
+    Access policy: allow only the HermesTV backend on the LAN.
+    hermestv.local is the default mDNS hostname. Operators may also need to add a
+    raw LAN IP (e.g. http://192.168.1.x) as a separate <access> entry; set that
+    at deploy time — do NOT commit an IP address here.
+
+    HARD RULE: access origin must NEVER be "*".
+    HARD RULE: subdomains must NEVER be "true" for LAN mDNS names.
+    All public internet origins are blocked.
+  -->
+  <access origin="http://hermestv.local" subdomains="false"/>
+  <access origin="https://hermestv.local" subdomains="false"/>
+  <access origin="ws://hermestv.local" subdomains="false"/>
+  <access origin="wss://hermestv.local" subdomains="false"/>
+
+  <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+  <tizen:privilege name="http://developer.samsung.com/privilege/avplay"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:privilege name="http://tizen.org/privilege/voicecontrol"/>
+  <tizen:privilege name="http://tizen.org/privilege/mediacapturer"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/network.get"/>
+  <tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
+  <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
+
+  <tizen:profile name="tv"/>
+
+  <feature name="http://tizen.org/feature/screen.size.all"/>
+
+  <tizen:setting background-support="disable"
+                 encryption="disable"
+                 install-location="auto"
+                 hwkey-event="enable"/>
+</widget>

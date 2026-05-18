@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:recall_memory",
+  "title": "recall_memory params",
+  "description": "Retrieve stored memory for this profile. Never returns credential data.",
+  "type": "object",
+  "required": ["scope"],
+  "additionalProperties": false,
+  "properties": {
+    "scope": {
+      "type": "string",
+      "enum": ["preferences", "watch_history", "favorites", "conversation"],
+      "description": "Memory scope to query."
+    },
+    "query": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Optional semantic query string for fuzzy memory retrieval."
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50,
+      "default": 10
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "preset_id": "classic_cable_grid",
+  "version": "2.0.0",
+  "name": "Classic Cable Grid",
+  "intent": "Familiar live channel grid for IPTV browsing — primary target is QN-class QLED; UN-class gets reduced mode",
+  "tier_floor": "enhanced",
+  "grid": {
+    "columns": 5,
+    "rows": 3,
+    "card_shape": "rounded_16_9"
+  },
+  "regions": ["top_bar", "side_nav", "main_grid", "now_playing_strip"],
+  "focus_order": ["side_nav", "main_grid", "now_playing_strip", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "medium",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "ambient_motion_01",
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
+    "font_scale": 1.0,
+    "tile_density": "medium",
+    "focus_ring": "static_thick",
+    "animation_density": "low",
+    "columns_override": 4
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "tile_density": "large",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "default_for": ["dave_tv"],
+  "proof_required": [
+    "screenshot_qn",
+    "screenshot_mom",
+    "screenshot_un_degraded",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

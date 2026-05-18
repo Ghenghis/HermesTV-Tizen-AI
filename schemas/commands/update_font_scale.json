@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:update_font_scale",
+  "title": "update_font_scale params",
+  "description": "Set font scale multiplier. For mom_tv: backend enforces minimum 1.25 regardless of this value.",
+  "type": "object",
+  "required": ["font_scale"],
+  "additionalProperties": false,
+  "properties": {
+    "font_scale": {
+      "type": "number",
+      "minimum": 0.8,
+      "maximum": 2.0,
+      "multipleOf": 0.05,
+      "description": "Scale multiplier. mom_tv floor is 1.25 — backend rejects values below 1.25 for mom_tv."
+    }
+  }
+}

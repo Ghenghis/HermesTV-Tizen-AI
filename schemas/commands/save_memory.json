@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:save_memory",
+  "title": "save_memory params",
+  "description": "Store a memory entry for this profile. Must not contain credential data.",
+  "type": "object",
+  "required": ["scope", "key", "value"],
+  "additionalProperties": false,
+  "properties": {
+    "scope": {
+      "type": "string",
+      "enum": ["preferences", "favorites", "conversation"],
+      "description": "Memory scope. 'watch_history' is write-restricted (system-managed)."
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_.-]+$"
+    },
+    "value": {
+      "description": "Value to store. Must be JSON-serializable. Must not contain credentials, tokens, or URLs.",
+      "not": {
+        "type": "object",
+        "required": ["password"]
+      }
+    },
+    "ttl_seconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 31536000,
+      "description": "Optional TTL in seconds. Default: no expiry."
+    }
+  }
+}

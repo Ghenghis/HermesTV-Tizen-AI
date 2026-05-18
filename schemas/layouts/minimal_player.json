@@ -1,0 +1,43 @@
+{
+  "preset_id": "minimal_player",
+  "version": "2.0.0",
+  "name": "Minimal Player",
+  "intent": "Full-bleed player with thin overlay rail for long sessions — cinematic blur overlay for QN-class QLED GPU",
+  "tier_floor": "baseline",
+  "grid": {
+    "columns": 1,
+    "rows": 2,
+    "card_shape": "pill"
+  },
+  "grid_note": "rows: player + thin rail",
+  "regions": ["player_fullbleed", "thin_rail_overlay"],
+  "focus_order": ["thin_rail_overlay", "player_fullbleed"],
+  "safe_area_pct": 5,
+  "animation_density_default": "medium",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "ambient_motion_01",
+  "rail_opacity": 0.80,
+  "overlay_blur": "8px",
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
+    "font_scale": 1.0,
+    "rail_opacity": 0.85,
+    "focus_ring": "static_thick",
+    "animation_density": "low",
+    "overlay_blur": "0px"
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "rail_opacity": 0.90,
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "proof_required": [
+    "screenshot_qn",
+    "screenshot_mom",
+    "screenshot_un_degraded",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

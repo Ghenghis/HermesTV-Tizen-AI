@@ -1,0 +1,17 @@
+{
+  "pack_id": "static_gradient_blue",
+  "version": "2.0.0",
+  "name": "Deep Space Gradient",
+  "intent": "Radial gradient from near-black to deep navy — UN-class fallback for aurora and deep-blue themes",
+  "tier_required": "baseline",
+  "type": "static_gradient",
+  "motion_enabled": false,
+  "direction": "radial",
+  "colors": ["#0B0D10", "#0D1A2E"],
+  "static_frame_src": "assets/bg/static_gradient_blue_static.jpg",
+  "motion_src": null,
+  "motion_type": null,
+  "reduced_motion_fallback_src": "assets/bg/static_gradient_blue_static.jpg",
+  "default_for_themes": ["deep_ocean", "cosmic_indigo"],
+  "proof_required": ["screenshot_qn", "screenshot_un_fallback"]
+}

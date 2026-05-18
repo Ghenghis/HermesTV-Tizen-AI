@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:update_theme",
+  "title": "update_theme params",
+  "type": "object",
+  "required": ["theme_id"],
+  "additionalProperties": false,
+  "properties": {
+    "theme_id": {
+      "type": "string",
+      "enum": [
+        "night-blue",
+        "mom-calm",
+        "high-contrast",
+        "slate-dark",
+        "warm-amber",
+        "deep-purple",
+        "sunrise-gold",
+        "midnight-green",
+        "ocean-depth",
+        "lava-dark",
+        "forest-dark",
+        "arctic-blue",
+        "rose-noir",
+        "vintage-tv",
+        "neon-grid",
+        "desert-dusk",
+        "cyber-teal",
+        "storm-grey",
+        "ember-glow",
+        "nordic-frost",
+        "terra-dark",
+        "crimson-dark",
+        "monochrome",
+        "dev-debug"
+      ],
+      "description": "Theme ID. B2 supports: night-blue, mom-calm, high-contrast, slate-dark, warm-amber, deep-purple."
+    }
+  }
+}

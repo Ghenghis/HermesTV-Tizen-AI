@@ -1,0 +1,47 @@
+{
+  "theme_id": "clinic_clear",
+  "version": "1.0.0",
+  "name": "Clinic Clear",
+  "family": "light",
+  "intent": "Clean white background with near-black text and magenta focus ring — WCAG AAA compliant",
+  "tokens": {
+    "bg_0": "#FFFFFF",
+    "bg_1": "#F7F7F7",
+    "bg_2": "#EEEEEE",
+    "surface_0": "#E5E5E5",
+    "surface_1": "#DDDDDD",
+    "text_primary": "#0D0D0D",
+    "text_secondary": "#3D3D3D",
+    "text_disabled": "#8A8A8A",
+    "accent": "#C2185B",
+    "accent_hover": "#E91E8C",
+    "accent_pressed": "#880E4F",
+    "focus_ring": "#E91E8C",
+    "focus_ring_pressed": "#C2185B",
+    "ok": "#1B5E20",
+    "warn": "#BF6000",
+    "danger": "#B00020",
+    "badge_quality_4k": "#4A148C",
+    "badge_quality_1080": "#0D47A1",
+    "badge_quality_720": "#37474F",
+    "badge_quality_low": "#8A8A8A",
+    "badge_provider": "#1B5E20",
+    "shadow_strong": "rgba(0,0,0,0.25)"
+  },
+  "typography": {
+    "font_family_primary": "Inter, Samsung One, system-ui",
+    "font_family_display": "Inter, Samsung One, system-ui",
+    "scale_base_px": 26,
+    "scale_step": 1.125
+  },
+  "focus_ring": {
+    "style": "static_thick",
+    "thickness_px": 5,
+    "glow_enhanced_only": false
+  },
+  "wcag_target": "AAA",
+  "high_contrast_partner": null,
+  "mom_mode_partner": "mom_calm",
+  "default_background_pack": "morning_light_01",
+  "proof_required": ["contrast_audit", "screenshot_per_layout", "focus_ring_visibility", "wcag_aaa_report"]
+}

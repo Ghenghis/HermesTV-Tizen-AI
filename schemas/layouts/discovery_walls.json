@@ -1,0 +1,42 @@
+{
+  "preset_id": "discovery_walls",
+  "version": "2.0.0",
+  "name": "Discovery Walls",
+  "intent": "Dense poster wall with filters for VOD/series browsing — 8-wide grid is the primary QN-class target",
+  "grid": {
+    "columns": 8,
+    "rows": 4,
+    "card_shape": "poster_2_3"
+  },
+  "regions": ["top_bar", "filter_bar", "poster_wall"],
+  "focus_order": ["filter_bar", "poster_wall", "top_bar"],
+  "safe_area_pct": 5,
+  "animation_density_default": "medium",
+  "focus_ring_default": "animated_glow",
+  "background_pack_default": "ambient_motion_01",
+  "parallax_enabled": true,
+  "un_degradation": {
+    "note": "UN-class Crystal UHD TVs may use this reduced mode. Performance not guaranteed.",
+    "font_scale": 1.0,
+    "columns_override": 4,
+    "tile_density": "medium",
+    "focus_ring": "static_thick",
+    "animation_density": "low",
+    "parallax_enabled": false
+  },
+  "mom_variant": {
+    "font_scale": 1.35,
+    "columns": 3,
+    "tile_density": "large",
+    "focus_ring": "static_thick_high_contrast",
+    "animation_density": "off",
+    "audio_feedback": true
+  },
+  "proof_required": [
+    "screenshot_qn",
+    "screenshot_mom",
+    "screenshot_un_degraded",
+    "focus_traversal_log",
+    "frame_budget_proof"
+  ]
+}

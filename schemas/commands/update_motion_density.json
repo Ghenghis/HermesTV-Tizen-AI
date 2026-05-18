@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermestv:commands:update_motion_density",
+  "title": "update_motion_density params",
+  "description": "Set animation motion density. For mom_tv in Mom Mode: 'reduced' is locked ON. Backend rejects non-reduced for mom_tv.",
+  "type": "object",
+  "required": ["density"],
+  "additionalProperties": false,
+  "properties": {
+    "density": {
+      "type": "string",
+      "enum": ["reduced", "standard", "rich"],
+      "description": "reduced: minimal animation. standard: normal. rich: enhanced-tier full animation."
+    }
+  }
+}
