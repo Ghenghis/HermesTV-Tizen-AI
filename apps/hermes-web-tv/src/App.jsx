@@ -14,6 +14,7 @@ import StreamingQualityBar from './components/StreamingQualityBar.jsx';
 import ShellRenderer from './engine/ShellRenderer.jsx';
 import LayoutSwitcher from './components/LayoutSwitcher.jsx';
 import VoicePickerModal from './components/VoicePickerModal.jsx';
+import PlayerModal from './components/PlayerModal.jsx';
 import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
 
 // Determine tier from TV model prefix
@@ -306,6 +307,10 @@ var INITIAL_STATE = {
   // Selected item for detail panel
   selectedItem: null,
   selectedProviderId: null,
+  // Player overlay state — populated by /api/play response
+  showPlayer: false,
+  playerTicket: null,
+  playerError: '',
   // Catalog source signal from /api/catalog's X-Catalog-Source response header
   // or _meta.source field. Used by the Settings panel "data source" badge so
   // the operator can tell at a glance whether real providers are wired vs
@@ -502,6 +507,23 @@ function App() {
 
   function handleSelectProvider(providerId) {
     patchState({ selectedProviderId: providerId });
+  }
+
+  function handlePlay(item, providerId) {
+    var profileId = (state.profile && state.profile.profile_id) || 'mom_tv';
+    var args = { item_id: item.id, profile_id: profileId };
+    if (providerId) { args.provider_id = providerId; }
+    patchState({ showPlayer: true, playerTicket: null, playerError: '' });
+    hermesApi.startPlayback(args).then(function(ticket) {
+      patchState({ playerTicket: ticket, playerError: '' });
+    }).catch(function(err) {
+      var msg = (err && err.message) ? err.message : 'Playback request failed';
+      patchState({ playerTicket: null, playerError: msg });
+    });
+  }
+
+  function handleClosePlayer() {
+    patchState({ showPlayer: false, playerTicket: null, playerError: '' });
   }
 
   function handleResetDefaults() {
@@ -925,8 +947,21 @@ function App() {
             onSelectProvider={handleSelectProvider}
             selectedProviderId={state.selectedProviderId}
             globalProviders={state.providers}
+            onPlay={handlePlay}
           />
         )}
+
+        {/* Player overlay — opened by ▶ Watch in the detail panel. Talks to
+            /api/play and renders the resulting ticket. The actual byte
+            stream is wired in Phase 4 when Threadfin / Jellyfin URL
+            resolution lands on the backend; until then the modal shows a
+            friendly "pipeline pending" state from the 503 response. */}
+        <PlayerModal
+          isOpen={state.showPlayer}
+          ticket={state.playerTicket}
+          error={state.playerError}
+          onClose={handleClosePlayer}
+        />
 
         {/* Settings overlay */}
         {state.showSettings && (

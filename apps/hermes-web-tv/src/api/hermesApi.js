@@ -114,4 +114,24 @@ function validateCommand(payload) {
   });
 }
 
-export { isReachable, getProfile, getProviders, getCatalog, getEpg, submitCommand, validateCommand };
+/**
+ * Request a play ticket for the given catalog item. Returns the ticket envelope
+ * from POST /api/play (no stream URL — server keeps that). Throws on HTTP error
+ * or network failure.
+ */
+function startPlayback(args) {
+  return fetchWithTimeout(BASE_URL + '/api/play', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {}),
+  }).then(function(response) {
+    if (!response.ok) {
+      var err = makeNetworkError('Play ticket request failed: HTTP ' + response.status);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json();
+  });
+}
+
+export { isReachable, getProfile, getProviders, getCatalog, getEpg, submitCommand, validateCommand, startPlayback };
