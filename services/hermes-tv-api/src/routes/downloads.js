@@ -120,10 +120,31 @@ function _trimJobsIfFull() {
   }
 }
 
+// Synthesise per-season episode count from a series item.
+// Front-end renders synthetic titles like "S01E01 — Pilot" and the backend
+// only needs the COUNT for bytes-multiplier math. Default 8 episodes per
+// season when metadata doesn't enumerate — enough breadth for a credible
+// "Download season ~ 6.5 GB" estimate without a real Trakt / TVMaze lookup.
+function _seasonEpisodeCount(item, season) {
+  if (!item) { return 8; }
+  var meta = item.metadata || {};
+  if (Array.isArray(meta.episodes_per_season) && meta.episodes_per_season[season - 1]) {
+    return meta.episodes_per_season[season - 1];
+  }
+  if (typeof meta.episode_count === 'number' && meta.episode_count > 0) {
+    return meta.episode_count;
+  }
+  return 8;
+}
+
 router.post('/api/download', (req, res) => {
   const body = req.body || {};
   const itemId = body.item_id;
   const profileId = body.profile_id;
+  // Optional series-aware fields. `season` alone = "download all episodes
+  // in season N"; `season + episode` = "download single S{nn}E{nn}".
+  const season = (typeof body.season === 'number' && body.season > 0) ? body.season : null;
+  const episode = (typeof body.episode === 'number' && body.episode > 0) ? body.episode : null;
 
   if (!itemId || typeof itemId !== 'string') {
     return res.status(400).json({ error: 'validation_failed', message: 'item_id is required.' });
@@ -154,7 +175,20 @@ router.post('/api/download', (req, res) => {
     });
   }
 
-  const bytes = _estimateBytes(item);
+  // Bytes: single-item by default. Season download multiplies by the
+  // per-season episode count. Single-episode download is identical to a
+  // single-item estimate (one ~45-min unit).
+  let bytes = _estimateBytes(item);
+  let label = item.title;
+  let episodeCount = null;
+  if (season && !episode) {
+    episodeCount = _seasonEpisodeCount(item, season);
+    bytes = bytes * episodeCount;
+    label = item.title + ' — Season ' + season + ' (' + episodeCount + ' eps)';
+  } else if (season && episode) {
+    label = item.title + ' — S' + (season < 10 ? '0' + season : season) + 'E' + (episode < 10 ? '0' + episode : episode);
+  }
+
   const jobId = _makeJobId();
   const now = Date.now();
   const envelope = {
@@ -167,6 +201,14 @@ router.post('/api/download', (req, res) => {
       poster_url: item.poster_url || (item.metadata && item.metadata.poster_url) || null,
       category: item.category || null,
     },
+    // When the operator picks a season or single episode, surface the
+    // labelled form on the envelope so the modal can render
+    // "Smallville — Season 1 (21 eps)" / "Smallville — S01E05" instead
+    // of just the bare series title.
+    label: label,
+    season: season,
+    episode: episode,
+    episode_count: episodeCount,
     profile_id: profileId,
     exact_size_bytes: bytes,
     exact_size_human: _humanBytes(bytes),

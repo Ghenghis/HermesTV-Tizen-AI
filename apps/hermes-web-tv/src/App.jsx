@@ -605,9 +605,14 @@ function App() {
   // 3. Modal opens with "EXACT DOWNLOAD SIZE NNN MB" + Cancel/Proceed
   // 4. Proceed flips downloadConfirmed → modal switches to "queued" view
   // 5. Cancel DELETEs the queued job + closes the modal
-  function handleStartDownload(item) {
+  // opts: optional { season, episode } for series downloads. season alone =
+  // "download whole season N"; season + episode = "download S{nn}E{nn}".
+  function handleStartDownload(item, opts) {
     if (!item || !item.id) { return; }
     var pid = (state.profile && state.profile.profile_id) || 'mom_tv';
+    var args = { item_id: item.id, profile_id: pid };
+    if (opts && typeof opts.season === 'number' && opts.season > 0) { args.season = opts.season; }
+    if (opts && typeof opts.episode === 'number' && opts.episode > 0) { args.episode = opts.episode; }
     patchState({
       showDownload: true,
       downloadItem: item,
@@ -616,7 +621,7 @@ function App() {
       downloadConfirmed: false,
       downloadError: null,
     });
-    hermesApi.startDownload({ item_id: item.id, profile_id: pid })
+    hermesApi.startDownload(args)
       .then(function(body) {
         if (body && body.job_id) {
           patchState({ downloadEnvelope: body, downloadPending: false, downloadError: null });

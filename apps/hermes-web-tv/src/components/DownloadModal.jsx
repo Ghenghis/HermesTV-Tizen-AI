@@ -43,7 +43,12 @@ function DownloadModal(props) {
 
   if (!isOpen) { return null; }
 
-  var title = (item && item.title) || 'Untitled';
+  // envelope.label (when present) carries the series-aware string like
+  // "Smallville — Season 1 (21 eps)" or "Smallville — S01E05". Falls back
+  // to the bare item title for movies and live items.
+  var title = (envelope && envelope.label)
+    || (item && item.title)
+    || 'Untitled';
   var sizeHuman = envelope && envelope.exact_size_human ? envelope.exact_size_human : null;
   // "queued" view fires after the user clicks Proceed (parent flips `confirmed`).
   // The envelope.status is always 'queued' on success — that's the API contract —

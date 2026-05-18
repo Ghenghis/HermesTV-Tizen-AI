@@ -2,6 +2,7 @@ import React from 'react';
 import ActorCard from './ActorCard.jsx';
 import StreamingQualityBar from './StreamingQualityBar.jsx';
 import SourceComparePanel from './SourceComparePanel.jsx';
+import SeriesEpisodesBlock from './SeriesEpisodesBlock.jsx';
 
 function MediaDetailPanel(props) {
   var item = props.item || {};
@@ -447,6 +448,17 @@ function MediaDetailPanel(props) {
             />
           </div>
 
+          {/* Episodes block (series only) — Zero / Smallville-style episode
+              list with per-season + per-episode download buttons. Movies
+              and live channels never see this block. */}
+          {item.type === 'series' && (
+            <SeriesEpisodesBlock
+              item={item}
+              onPlay={onPlay}
+              onDownload={onDownload}
+            />
+          )}
+
           {/* Similar titles placeholder */}
           <div
             style={{
@@ -457,6 +469,7 @@ function MediaDetailPanel(props) {
               color: 'var(--muted)',
               fontStyle: 'italic',
               textAlign: 'center',
+              marginTop: '1.25rem',
             }}
           >
             More like this — coming in B3
