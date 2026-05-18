@@ -17,7 +17,8 @@
 | Scope | Status |
 |---|---|
 | `apps/hermes-web-tv/src/**` | CLEAN |
-| `apps/tizen-hermes-tv/src/**` | CLEAN |
+| `apps/hermes-tv-tizen-native/src/**` (renamed from `apps/tizen-hermes-tv/` on 2026-05-18) | CLEAN |
+| `apps/hermes-tv-tizen/**` (current canonical Tizen build) | CLEAN |
 | `services/hermes-tv-api/src/**` | CLEAN |
 | `services/hermes-quality-scanner/src/**` | CLEAN |
 | `schemas/**` | CLEAN |
@@ -49,7 +50,7 @@
 | `services/hermes-tv-api/package-lock.json` | `https://registry.npmjs.org/...` | SAFE — npm registry references |
 | `services/hermes-tv-api/src/middleware/credentialGuard.js` | `password`, `api_key`, etc. | SAFE — these are the regex patterns used to BLOCK credentials |
 | `apps/hermes-web-tv/src/components/FloatingChatbot.jsx` | `password`, `api_key` | SAFE — guard patterns for input rejection |
-| `apps/tizen-hermes-tv/src/core/commandRouter.js` | `password`, `api_key` | SAFE — credential field blocklist |
+| `apps/hermes-tv-tizen-native/src/core/commandRouter.js` (renamed 2026-05-18) | `password`, `api_key` | SAFE — credential field blocklist |
 | `services/hermes-tv-api/src/routes/setup.js` | `username`, `password` | SAFE — HTML form field names for the provider setup UI (data posted to local backend only) |
 | `apps/catalog.mock.json` | `https://hermestv.local/...` | SAFE — local dev host only |
 

@@ -167,7 +167,7 @@ if (profilesText.indexOf('MOM_FONT_SCALE_FLOOR') !== -1 && profilesText.indexOf(
 // --- Security: no credential patterns in source ---
 // Looks for actual credential assignments, skips comments and guard arrays
 console.log('\n--- Secret pattern check (source files) ---');
-var srcDirs = ['apps/hermes-web-tv/src', 'apps/tizen-hermes-tv/src', 'services/hermes-tv-api/src'];
+var srcDirs = ['apps/hermes-web-tv/src', 'apps/hermes-tv-tizen-native/src', 'services/hermes-tv-api/src'];
 // Match: assignment of a non-placeholder string value to a credential key
 // Excludes: comment lines, guard/pattern arrays, placeholder values like <KEY> or ENV_VAR
 var CRED_ASSIGN = /(?:password|api_key)\s*=\s*['"][^'"<>A-Z_]{4,}['"]/i;

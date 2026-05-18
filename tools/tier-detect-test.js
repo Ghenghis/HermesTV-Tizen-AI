@@ -18,7 +18,7 @@ global.webapis = {
   },
 };
 
-const capPath = path.join(__dirname, '../apps/tizen-hermes-tv/src/platform/capabilities.js');
+const capPath = path.join(__dirname, '../apps/hermes-tv-tizen-native/src/platform/capabilities.js');
 
 const CASES = [
   { model: 'QN85Q7FAAFXZA', expectedTier: 'enhanced', expectedProfile: 'mom_tv' },

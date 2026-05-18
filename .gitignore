@@ -62,3 +62,8 @@ docs/research/vps-phase-1-audit-RUN-*.md
 # screenshots from MCP-driven scrapes). These accumulate locally as side
 # effects of running playwright tests and should never be committed.
 .playwright-mcp/
+
+# Playwright test runtime output (HTML reports, traces, screenshots, run state).
+# These are produced on every test run and never belong in source control.
+tests/playwright/test-results/
+tests/playwright/report/

@@ -187,7 +187,7 @@ With the TV remote, verify:
 - Focus ring is visible on all focusable elements at TV viewing distance
 
 The `focusEngine.js` module at
-`apps/tizen-hermes-tv/src/ui/navigation/focusEngine.js` handles keycode mapping. Any
+`apps/hermes-tv-tizen-native/src/ui/navigation/focusEngine.js` handles keycode mapping. Any
 navigation regression on the real remote surfaces here.
 
 ### 5.5 Touch / click fallback in Samsung Internet
@@ -246,5 +246,5 @@ on items 1–9. Item 10 requires Azure credentials in the environment.
 
 - `apps/hermes-web-tv/vite.config.js` — Vite server host/port config
 - `apps/hermes-web-tv/package.json` — dev script (`--host 0.0.0.0 --port 5173`)
-- `apps/tizen-hermes-tv/src/ui/navigation/focusEngine.js` — D-pad keycode handler
+- `apps/hermes-tv-tizen-native/src/ui/navigation/focusEngine.js` — D-pad keycode handler
 - `upstream/mirror-testing/VITE_LAN_CONFIG.md` — concise LAN binding quick-reference

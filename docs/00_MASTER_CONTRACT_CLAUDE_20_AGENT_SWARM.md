@@ -86,7 +86,8 @@ Deliver:
 Create:
 
 ```text
-apps/tizen-hermes-tv/
+apps/hermes-tv-tizen/         ← current canonical Tizen build (web-mirror wrapper)
+apps/hermes-tv-tizen-native/  ← LEGACY native scaffold (was apps/tizen-hermes-tv/ before consolidation 2026-05-18)
 apps/hermes-web-tv/
 services/hermes-tv-api/
 docker/

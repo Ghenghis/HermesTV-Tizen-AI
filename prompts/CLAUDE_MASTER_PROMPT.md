@@ -91,7 +91,8 @@ When fanning out work, assign agents by lane number. Each agent writes a report 
 ## Key directories
 
 ```
-apps/tizen-hermes-tv/     — Samsung Tizen .wgt app (thin shell)
+apps/hermes-tv-tizen/         — Samsung Tizen .wgt app (canonical, web-mirror wrapper)
+apps/hermes-tv-tizen-native/  — Samsung Tizen .wgt app (legacy native scaffold, AVPlay reference)
 apps/hermes-web-tv/       — React web TV UI (dev + hosted-app delivery)
 services/hermes-tv-api/   — Backend API (FastAPI or Express)
 schemas/                  — JSON schemas (command envelope, provider, session, theme, layout)
