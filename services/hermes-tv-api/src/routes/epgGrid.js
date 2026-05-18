@@ -77,34 +77,53 @@ router.get('/', function(req, res) {
 
   // profile_id
   if (!profile_id) {
-    return res.status(400).json({ error: 'profile_id query parameter is required' });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'profile_id query parameter is required',
+    });
   }
   if (!VALID_PROFILES.has(profile_id)) {
     return res.status(400).json({
-      error: 'profile_id must be one of: ' + Array.from(VALID_PROFILES).join(', '),
+      error: 'validation_failed',
+      message: 'profile_id must be one of: ' + Array.from(VALID_PROFILES).join(', '),
     });
   }
 
   // start / end
   if (!start || !end) {
-    return res.status(400).json({ error: 'start and end query parameters are required (ISO 8601)' });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'start and end query parameters are required (ISO 8601)',
+    });
   }
 
   var startMs = Date.parse(start);
   var endMs   = Date.parse(end);
 
   if (isNaN(startMs)) {
-    return res.status(400).json({ error: 'start is not a valid ISO 8601 date', received: start });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'start is not a valid ISO 8601 date',
+      received: start,
+    });
   }
   if (isNaN(endMs)) {
-    return res.status(400).json({ error: 'end is not a valid ISO 8601 date', received: end });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'end is not a valid ISO 8601 date',
+      received: end,
+    });
   }
   if (endMs <= startMs) {
-    return res.status(400).json({ error: 'end must be after start' });
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'end must be after start',
+    });
   }
   if ((endMs - startMs) > MAX_WINDOW_MS) {
     return res.status(400).json({
-      error: 'Requested window exceeds maximum of 4 hours',
+      error: 'window_too_large',
+      message: 'Requested window exceeds maximum of 4 hours',
       max_hours: 4,
       requested_ms: endMs - startMs,
     });
