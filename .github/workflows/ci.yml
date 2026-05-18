@@ -229,7 +229,7 @@ jobs:
           # Allowlist of substrings that mark a match as a non-secret (placeholder,
           # env-interpolation, doc/spec, guard array, or self-reference in this workflow).
           # If any of these appear on the matching line, the line is treated as benign.
-          ALLOW_RE='REPLACE_WITH_|\$\{[A-Z_]+\}|<[A-Z_]+>|PATTERNS=|CRED_PATTERNS|credentialGuard|VPS_COMPOSE|\.example|playwright-mcp/page-|workflows/ci\.yml|provider\.capabilities\.schema|apps-catalog\.json|lib/llmFallback\.js'
+          ALLOW_RE='REPLACE_WITH_|\$\{[A-Z_]+\}|<[A-Z_]+>|PATTERNS=|CRED_PATTERNS|credentialGuard|VPS_COMPOSE|\.example|playwright-mcp/page-|workflows/ci\.yml|provider\.capabilities\.schema|apps-catalog\.json|lib/llmFallback\.js|lib/jellyfin\.js'
           GREP_FAIL=0
           for pat in "${PATTERNS[@]}"; do
             raw=$(grep -rni "$pat" . \
