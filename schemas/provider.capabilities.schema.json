@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Ghenghis/HermesTV-Tizen-AI/schemas/provider.capabilities.schema.json",
+  "title": "HermesTV Provider Capabilities (Backend-Internal)",
+  "description": "Provider capability flags from backend probe. Backend-only. Never returned to TV. See docs/07_PROVIDER_CATALOG_AND_QR_ONBOARDING_CONTRACT.md.",
+  "type": "object",
+  "required": ["provider_id", "access_type", "capabilities_probed_utc", "capabilities", "health"],
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "type": "string",
+      "enum": ["apollo", "xtremehd"]
+    },
+    "display_label": { "type": "string", "maxLength": 64 },
+    "enabled": { "type": "boolean" },
+    "credential_ref": {
+      "type": "string",
+      "description": "Pointer to vault entry only (e.g. vault:providers/apollo). Never the credential value.",
+      "pattern": "^vault:"
+    },
+    "access_type": {
+      "type": "string",
+      "enum": ["xtream", "m3u", "m3u_xtream_hybrid"]
+    },
+    "capabilities_probed_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["live", "vod", "series", "catch_up", "xmltv", "multi_stream"],
+      "additionalProperties": false,
+      "properties": {
+        "live": { "type": "boolean" },
+        "vod": { "type": "boolean" },
+        "series": { "type": "boolean" },
+        "catch_up": { "type": "boolean" },
+        "xmltv": { "type": "boolean" },
+        "multi_stream": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Max concurrent streams this account allows."
+        }
+      }
+    },
+    "priority_order": { "type": "integer", "minimum": 1 },
+    "profile_access": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["dave_tv", "mom_tv"] }
+    },
+    "refresh_schedule_cron": {
+      "type": "string",
+      "description": "Standard 5-field cron expression."
+    },
+    "last_catalog_refresh_utc": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "last_epg_refresh_utc": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "health": {
+      "type": "string",
+      "enum": ["ok", "degraded", "down", "unknown"]
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Ghenghis/HermesTV-Tizen-AI/schemas/layout-preset.schema.json",
+  "title": "HermesTV Layout Preset",
+  "description": "Layout preset definition for one of the 12 static layout modes. See docs/04_LAYOUT_LIBRARY_12_STATIC_MODES.md.",
+  "type": "object",
+  "required": ["preset_id", "display_name", "tier", "grid", "focus_order"],
+  "additionalProperties": false,
+  "properties": {
+    "preset_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Kebab-case preset ID."
+    },
+    "display_name": { "type": "string", "maxLength": 64 },
+    "tier": {
+      "type": "string",
+      "enum": ["baseline", "enhanced", "both"]
+    },
+    "profile_default": {
+      "type": ["string", "null"],
+      "enum": ["dave_tv", "mom_tv", null]
+    },
+    "grid": {
+      "type": "object",
+      "required": ["columns", "rows", "card_aspect_ratio"],
+      "additionalProperties": false,
+      "properties": {
+        "columns": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "rows": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "card_aspect_ratio": {
+          "type": "string",
+          "enum": ["16:9", "2:3", "1:1", "4:3"],
+          "description": "Card thumbnail aspect ratio."
+        },
+        "gap_px": { "type": "integer", "minimum": 0 },
+        "show_title": { "type": "boolean" },
+        "show_quality_badge": { "type": "boolean" },
+        "show_provider_badge": { "type": "boolean" },
+        "show_epg_bar": { "type": "boolean" }
+      }
+    },
+    "focus_order": {
+      "type": "string",
+      "enum": ["row-first", "column-first"],
+      "description": "Remote directional navigation order."
+    },
+    "hero_rail": {
+      "type": ["object", "null"],
+      "description": "Optional hero/featured-content rail at top.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "height_px": { "type": "integer" },
+        "auto_rotate_interval_s": { "type": ["integer", "null"] }
+      }
+    },
+    "sidebar": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "position": { "type": "string", "enum": ["left", "right"] },
+        "width_px": { "type": "integer" }
+      }
+    }
+  }
+}

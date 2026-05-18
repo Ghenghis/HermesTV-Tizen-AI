@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Ghenghis/HermesTV-Tizen-AI/schemas/provider.session.schema.json",
+  "title": "HermesTV Provider Stream Session",
+  "description": "Active stream session record. No credentials, no stream URLs. See docs/07_PROVIDER_CATALOG_AND_QR_ONBOARDING_CONTRACT.md — Backend session tracking schema.",
+  "type": "object",
+  "required": ["session_id", "provider_id", "profile_id", "device_id", "item_id", "started_utc", "last_heartbeat_utc", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Opaque unique session identifier. Prefixed sess_."
+    },
+    "provider_id": {
+      "type": "string",
+      "enum": ["apollo", "xtremehd"]
+    },
+    "profile_id": {
+      "type": "string",
+      "enum": ["dave_tv", "mom_tv"]
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Opaque TV device identifier. Not a credential."
+    },
+    "item_id": {
+      "type": "string",
+      "description": "Catalog item ULID."
+    },
+    "started_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_heartbeat_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "stopped", "expired"]
+    },
+    "stopped_utc": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}

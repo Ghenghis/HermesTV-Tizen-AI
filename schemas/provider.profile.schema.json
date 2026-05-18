@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Ghenghis/HermesTV-Tizen-AI/schemas/provider.profile.schema.json",
+  "title": "HermesTV TV-Safe Provider Summary",
+  "description": "What the backend returns to the TV app for a provider. No credentials, no portal URL, no tokens. See docs/07_PROVIDER_CATALOG_AND_QR_ONBOARDING_CONTRACT.md.",
+  "type": "object",
+  "required": ["provider_id", "display_label", "enabled", "health", "capabilities", "profile_access", "last_refresh_utc"],
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "type": "string",
+      "enum": ["apollo", "xtremehd"],
+      "description": "Internal provider ID. Fixed. Not displayed to users."
+    },
+    "display_label": {
+      "type": "string",
+      "description": "Operator-configurable display name.",
+      "maxLength": 64
+    },
+    "enabled": { "type": "boolean" },
+    "health": {
+      "type": "string",
+      "enum": ["ok", "degraded", "down", "unknown"]
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["live", "vod", "series", "catch_up", "xmltv"],
+      "additionalProperties": false,
+      "properties": {
+        "live": { "type": "boolean" },
+        "vod": { "type": "boolean" },
+        "series": { "type": "boolean" },
+        "catch_up": { "type": "boolean" },
+        "xmltv": { "type": "boolean" }
+      }
+    },
+    "profile_access": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["dave_tv", "mom_tv"] },
+      "minItems": 1
+    },
+    "last_refresh_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stream_slots_total": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stream_slots_in_use": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "priority_order": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
