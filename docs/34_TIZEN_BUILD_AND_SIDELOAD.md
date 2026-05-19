@@ -257,7 +257,8 @@ LAN IP.
 ### 5.4 CSP warnings in the on-TV inspector
 
 The web app's CSP currently allows `http://localhost:3001` (dev API) and
-`https://hermestv.daveai.tech` (prod). Tizen Chrome 76 sometimes logs
+`https://tv.daveai.tech` plus its alias `https://hermestv.daveai.tech`
+(prod). Tizen Chrome 76 sometimes logs
 warnings about CSP wildcards even when the policy is valid; verify with:
 
 1. Open Chrome on the workstation.
@@ -290,7 +291,7 @@ All of the following must hold:
 - [ ] App launches and the profile picker shows.
 - [ ] Switching between all 7 dynamic layouts works (per doc 25).
 - [ ] Network panel in DevTools shows requests going to
-      `https://hermestv.daveai.tech/api/…` (or to the dev override URL if
+      `https://tv.daveai.tech/api/…` (or to the dev override URL if
       one is set in `localStorage.hermestv.api_base`).
 - [ ] No CSP errors in console.
 - [ ] No credential strings show up in
@@ -305,7 +306,7 @@ All of the following must hold:
 | `apps/hermes-tv-tizen/package.json` | Build orchestrator scripts |
 | `apps/hermes-tv-tizen/config.xml.example` | Tizen widget manifest template |
 | `apps/hermes-tv-tizen/.gitignore` | Hides build artefacts and certs |
-| `apps/hermes-tv-tizen/src/api/apiBase.js` | Default API base — `https://hermestv.daveai.tech` |
+| `apps/hermes-tv-tizen/src/api/apiBase.js` | Default API base — `https://tv.daveai.tech` (canonical); `https://hermestv.daveai.tech` is an additive nginx alias for backwards compatibility |
 | `tools/tizen-prep.js` | Stages web `dist/` into Tizen `dist/` |
 | `tools/tizen-package.js` | Invokes Tizen CLI, produces `.wgt` |
 | `tools/wgt-inspect.sh` | Post-build secret + manifest gate |

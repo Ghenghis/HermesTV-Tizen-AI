@@ -28,7 +28,8 @@ apply quality caps only to Dave's TV.
 
 ```
                        Cloudflare (proxied, Flexible TLS at edge)
-                                  │   https://hermestv.daveai.tech
+                                  │   https://tv.daveai.tech (canonical)
+                                  │   https://hermestv.daveai.tech (alias)
                                   ▼
                        ┌────────────────────────────────────────┐
                        │   Hostinger Linux VPS  (Ubuntu 24.04)  │
@@ -62,7 +63,7 @@ apply quality caps only to Dave's TV.
                        │  Workstation Jellyfin   │ (Phase 3)
                        └─────────────────────────┘
 
-       Public access:  https://hermestv.daveai.tech/*
+       Public access:  https://tv.daveai.tech/*  (alias: https://hermestv.daveai.tech/*)
        ┌──────────────────────┴──────────────────────┐
        ▼                                             ▼
 ┌─────────────────┐                       ┌──────────────────┐
@@ -74,8 +75,9 @@ apply quality caps only to Dave's TV.
 
 The web app is served by an nginx container (`hermes-web-tv` on host port
 3080) which serves the Vite-built SPA. The **host nginx** (NOT an in-stack
-Caddy) is the public edge; it terminates HTTP on port 80 and proxies
-`hermestv.daveai.tech` to the container loopback ports. Cloudflare proxies
+Caddy) is the public edge; it terminates HTTP on port 80 and proxies both
+`tv.daveai.tech` (canonical) and `hermestv.daveai.tech` (additive alias —
+historical) to the container loopback ports. Cloudflare proxies
 the public HTTPS:443 to the VPS port 80 (Flexible mode, matching every other
 daveai.tech site).
 

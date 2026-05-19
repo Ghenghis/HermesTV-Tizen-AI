@@ -226,8 +226,8 @@ services:
   # Decision: HermesTV's edge is the existing host nginx, configured by the
   # operator-installed site config in upstream/nginx/hermestv.daveai.tech.conf
   # (already deployed in Phase 1.5). HermesTV exposes only 127.0.0.1:3011 and
-  # 127.0.0.1:3080; host nginx proxies hermestv.daveai.tech → those loopback
-  # ports.
+  # 127.0.0.1:3080; host nginx proxies tv.daveai.tech (canonical) AND
+  # hermestv.daveai.tech (additive alias) → those loopback ports.
   #
   # The Caddyfile at upstream/docker-vps/Caddyfile is preserved as reference
   # for a future option to switch to Caddy edge if the operator deprecates

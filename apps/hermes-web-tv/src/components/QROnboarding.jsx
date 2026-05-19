@@ -9,7 +9,7 @@ var POLL_INTERVAL_MS = 5000;
 
 // Simple static SVG QR code placeholder — black squares pattern.
 // Phase 2 will replace this with a real QR encoding the pairing URL
-// (hermestv.local/setup/provider?code=HRM-XXXX). For Phase 1 the pairing
+// (tv.daveai.tech/setup/provider?code=HRM-XXXX). For Phase 1 the pairing
 // code itself is the surface the operator types into their phone — the
 // QR pattern is decorative.
 function QRPlaceholder() {
@@ -413,7 +413,7 @@ function QROnboarding(props) {
           }}
         >
           Scan this code on your phone to add a provider at{' '}
-          <span style={{ color: 'var(--accent)', fontWeight: '600' }}>hermestv.local</span>
+          <span style={{ color: 'var(--accent)', fontWeight: '600' }}>tv.daveai.tech</span>
         </p>
 
         {statusBlock}

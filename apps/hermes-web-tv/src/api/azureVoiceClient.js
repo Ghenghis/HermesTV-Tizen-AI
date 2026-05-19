@@ -1,6 +1,7 @@
 'use strict';
 
-// Production (https://hermestv.daveai.tech) → same-origin (BASE_URL = '').
+// Production (https://tv.daveai.tech, with hermestv.daveai.tech as an
+// additive alias) → same-origin (BASE_URL = '').
 // Local dev / LAN mirror → cross-origin to the workstation API on :3001.
 var BASE_URL = (function() {
   if (typeof window === 'undefined') return '';

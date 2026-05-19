@@ -55,7 +55,7 @@ The other three services in the compose file (`threadfin`, `m3u-editor`, `xtream
 
 ## Smoke probes (run from your workstation against the public edge)
 
-Once both containers are healthy the script runs five probes against `https://hermestv.daveai.tech`:
+Once both containers are healthy the script runs five functional probes against `https://tv.daveai.tech` (the canonical short URL added 2026-05-18) plus one extra HEAD probe against the additive alias `https://hermestv.daveai.tech` to confirm both Host headers route to the same upstream:
 
 | # | Probe | Expected | Why it matters |
 | --- | --- | --- | --- |

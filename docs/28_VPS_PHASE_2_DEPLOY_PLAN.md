@@ -16,8 +16,8 @@
 | Phase 1 audit complete + classified | ✅ | `docs/research/vps-phase-1-audit-RUN-2026-05-18T09-52-17Z.md` (gitignored) |
 | Phase 1.5 PR merged | ✅ | `ac5ba8d` on main |
 | `operator` user created | ✅ | uid 1001, sudo + docker groups, key auth verified |
-| DNS A record `hermestv.daveai.tech` → VPS IP | ✅ | Cloudflare-proxied |
-| Host nginx site config installed + reloaded | ✅ | `/etc/nginx/sites-enabled/hermestv.daveai.tech`, all 9 existing sites still 200 |
+| DNS A record `hermestv.daveai.tech` → VPS IP | ✅ | Cloudflare-proxied. `tv.daveai.tech` was later added as an additive short canonical (same IP, same nginx site) — both Host headers route to the same upstream. |
+| Host nginx site config installed + reloaded | ✅ | `/etc/nginx/sites-enabled/hermestv.daveai.tech`, all 9 existing sites still 200. Its `server_name` now lists both `tv.daveai.tech` and `hermestv.daveai.tech`. |
 | Re-audit as `operator@` | ✅ | `docs/research/vps-phase-1-audit-RUN-2026-05-18T10-50-45Z.md` (gitignored) |
 | Re-audit shows only expected deltas | ✅ | new operator user + new nginx site only — no service changes |
 
@@ -126,20 +126,21 @@ for s in daveai.tech diy.daveai.tech fleet.daveai.tech game.daveai.tech \
   curl -sI -o /dev/null -w "%{http_code} %{url_effective}\n" "https://$s/"
 done
 
-# 2. HermesTV health endpoint returns 200
+# 2. HermesTV health endpoint returns 200 (both canonical and alias must answer)
+curl -sI https://tv.daveai.tech/health
 curl -sI https://hermestv.daveai.tech/health
-# expect: HTTP/1.1 200 OK
+# expect: HTTP/1.1 200 OK on both
 # body: {"status":"ok","service":"hermes-tv-api","version":"0.1.0", ...}
 
 # 3. HermesTV /api/layouts returns 200 with 7 layouts
-curl -s https://hermestv.daveai.tech/api/layouts | grep -c '"id"'
+curl -s https://tv.daveai.tech/api/layouts | grep -c '"id"'
 # expect: 7
 
 # 4. HermesTV web app loads (returns HTML containing <div id="root">)
-curl -s https://hermestv.daveai.tech/ | grep -c '<div id="root">'
+curl -s https://tv.daveai.tech/ | grep -c '<div id="root">'
 # expect: 1
 
-# 5. From a real browser, https://hermestv.daveai.tech/ renders the profile picker
+# 5. From a real browser, https://tv.daveai.tech/ renders the profile picker
 #    Sherri + Dave appear, clicking either loads the main app, header shows "🎨 Look",
 #    7 layouts available in the switcher modal. No console errors.
 ```

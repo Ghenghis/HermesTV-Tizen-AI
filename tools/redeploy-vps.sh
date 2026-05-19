@@ -7,7 +7,9 @@
 # Hostinger VPS, fast-forwards /home/operator/hermestv to origin/main,
 # rebuilds and restarts ONLY the two HermesTV containers (hermes-tv-api
 # and hermes-web-tv), waits for both healthchecks to flip to "healthy",
-# and then runs five smoke probes against https://hermestv.daveai.tech.
+# and then runs five smoke probes against https://tv.daveai.tech (the
+# new canonical) plus one alias probe against https://hermestv.daveai.tech
+# to confirm the additive nginx server_name entry still resolves.
 #
 # Why this exists:
 #   On 2026-05-18 the agent triaging prod confirmed hermestv.daveai.tech
@@ -54,9 +56,13 @@ set -euo pipefail
 # no env vars. Anyone else exports OPERATOR_HOST=operator@<their-host>.
 OPERATOR_HOST="${OPERATOR_HOST:-srv1376124}"
 
-# Public domain we smoke-probe after the deploy. Hard-coded because it is
-# the production HermesTV edge — there is no staging tier today.
-PUBLIC_HOST="hermestv.daveai.tech"
+# Public domain we smoke-probe after the deploy. tv.daveai.tech is the
+# canonical short URL (added 2026-05-18). hermestv.daveai.tech remains a
+# valid alias served by the same nginx server_name line. We probe the
+# canonical for the five functional smokes, and run one extra HEAD probe
+# against the alias to confirm both Host headers route to the same upstream.
+PUBLIC_HOST="tv.daveai.tech"
+ALIAS_HOST="hermestv.daveai.tech"
 
 # Compose project + file paths, mirroring docs/29 exactly. If these drift,
 # rollback / log-grep instructions in the runbook stop matching reality.
@@ -80,7 +86,7 @@ done
 
 echo "=== HermesTV VPS redeploy ==="
 echo "Operator host : $OPERATOR_HOST"
-echo "Public domain : https://$PUBLIC_HOST"
+echo "Public domain : https://$PUBLIC_HOST  (alias: https://$ALIAS_HOST)"
 echo "Repo on VPS   : $REPO_DIR"
 echo "Compose file  : $COMPOSE_FILE (project: $COMPOSE_PROJECT)"
 echo
@@ -154,12 +160,14 @@ echo "[2/3] Containers healthy. Pausing 3s for nginx → upstream warm-up..."
 sleep 3
 
 # --- Step 2: smoke probes -------------------------------------------------
-# We run five probes against the public HTTPS edge (not the VPS loopback)
-# so we are exercising the full path the user's browser sees: Cloudflare
-# → host nginx → docker container. A loopback probe would miss any nginx
-# or CF misconfiguration.
+# We run five functional probes against the public HTTPS edge (not the VPS
+# loopback) so we are exercising the full path the user's browser sees:
+# Cloudflare → host nginx → docker container. A loopback probe would miss
+# any nginx or CF misconfiguration. A sixth probe hits the alias host
+# (hermestv.daveai.tech) to confirm both Host headers route to the same
+# upstream after the 2026-05-18 short-canonical change.
 echo
-echo "[3/3] Smoke-probing https://$PUBLIC_HOST ..."
+echo "[3/3] Smoke-probing https://$PUBLIC_HOST (and alias https://$ALIAS_HOST) ..."
 
 pass_count=0
 fail_count=0
@@ -246,6 +254,20 @@ if [ -n "$CATALOG_SOURCE" ]; then
   probe_pass "/api/catalog _meta.source='$CATALOG_SOURCE'"
 else
   probe_fail "/api/catalog _meta.source missing"
+fi
+
+# --- Probe 6: alias host /health returns 200 -----------------------------
+# The nginx server_name on the VPS lists BOTH tv.daveai.tech and
+# hermestv.daveai.tech (additive change so existing bookmarks/QR codes
+# never break). This probe confirms the legacy Host header still routes
+# to the same upstream. A failure here means the nginx server_name line
+# was reverted or the DNS A record for hermestv.* drifted.
+echo "  probe 6: GET /health on alias host $ALIAS_HOST"
+ALIAS_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://$ALIAS_HOST/health" 2>/dev/null || echo "000")
+if [ "$ALIAS_CODE" = "200" ]; then
+  probe_pass "alias /health → 200 (hermestv.daveai.tech still resolves)"
+else
+  probe_fail "alias /health → $ALIAS_CODE (expected 200 — nginx server_name missing $ALIAS_HOST?)"
 fi
 
 # --- Final summary --------------------------------------------------------
