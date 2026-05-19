@@ -8,6 +8,10 @@ var PlaybackSettings = React.lazy(function() { return import('./settings/Playbac
 var ParentalControls = React.lazy(function() { return import('./settings/ParentalControls.jsx'); });
 var BackupRestore = React.lazy(function() { return import('./settings/BackupRestore.jsx'); });
 var Diagnostics = React.lazy(function() { return import('./settings/Diagnostics.jsx'); });
+// Recordings (DVR) lives inside the Playback tab — wraps the
+// RecordingsListModal launcher and the global DVR settings form. The
+// underlying client hits /api/dvr/* on hermes-tv-api.
+var RecordingsSection = React.lazy(function() { return import('./settings/RecordingsSection.jsx'); });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SettingsPanelTabbed — IPTV-Player-Zero-style centred-modal Settings panel.
@@ -399,6 +403,7 @@ function SettingsPanelTabbed(props) {
     return (
       <React.Suspense fallback={<_Card icon="▶" header="Playback"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
         <PlaybackSettings />
+        <RecordingsSection profile={profile} />
       </React.Suspense>
     );
   }
