@@ -1,5 +1,6 @@
 import React from 'react';
-import { applyShellFilters, posterBg } from './shellHelpers.js';
+import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
+import { debounce } from '../utils/debounce.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZeroShell — HermesTV's clone of the IPTV Player Zero look (8th layout).
@@ -85,6 +86,14 @@ function ZeroShell(props) {
   var pinnedResult = React.useState(true); // "Pin top section" toggle (default on)
   var pinned = pinnedResult[0];
   var setPinned = pinnedResult[1];
+  // Two-state search: searchInput is the immediate textbox value (drives the
+  // controlled <input>), search is the debounced value that actually feeds
+  // the filter pass. Typing "spo" produces 3 keystrokes but only 1 filter
+  // run at most. 120 ms keeps the UI feeling instant while collapsing
+  // bursty typing — well under the ~150 ms motor-to-visual threshold.
+  var searchInputResult = React.useState('');
+  var searchInput = searchInputResult[0];
+  var setSearchInput = searchInputResult[1];
   var searchResult = React.useState('');
   var search = searchResult[0];
   var setSearch = searchResult[1];
@@ -97,6 +106,17 @@ function ZeroShell(props) {
   var nowResult = React.useState(new Date());
   var now = nowResult[0];
   var setNow = nowResult[1];
+
+  // Build the debouncer once with useMemo so we don't re-create the timer
+  // on every render (which would defeat the whole point).
+  var debouncedSetSearch = React.useMemo(function() {
+    return debounce(function(v) { setSearch(v); }, 120);
+  }, []);
+  // Cancel any pending timer on unmount so a setState doesn't fire after
+  // React has dropped the shell from the tree.
+  React.useEffect(function() {
+    return function() { debouncedSetSearch.cancel(); };
+  }, [debouncedSetSearch]);
 
   // Tick the clock once a minute so the top bar timestamp stays fresh.
   // Skipping seconds keeps Tizen 6.5 CPU draw effectively zero.
@@ -146,6 +166,22 @@ function ZeroShell(props) {
 
   // Grid columns scale with tier — QN85 stretches wider on enhanced.
   var cols = tier === 'enhanced' ? 7 : 5;
+
+  // Virtualize the poster grid when the catalog exceeds the threshold
+  // (~100 items). Below the threshold the helper short-circuits to a full
+  // render so there's zero overhead. Row height = poster aspect-ratio 2:3
+  // at the current column width + label/gap padding; on QN85 enhanced this
+  // hovers around 280 px — we use a fixed estimate which is close enough
+  // because we paint 1 row of overscan on either side. This is the chunk
+  // that turns a 200+ item Apollo catalog from a stutter into a smooth scroll.
+  var gridScrollRef = React.useRef(null);
+  var virt = useGridVirtualizer({
+    scrollRef: gridScrollRef,
+    itemCount: displayItems.length,
+    columns: cols,
+    rowHeight: 280,
+    overscan: 1,
+  });
 
   var tabs = [
     { id: 'live', icon: '📡', label: 'Live TV' },
@@ -467,8 +503,14 @@ function ZeroShell(props) {
             </label>
             <input
               type="search"
-              value={search}
-              onChange={function(e) { setSearch(e.target.value); }}
+              value={searchInput}
+              onChange={function(e) {
+                var v = e.target.value;
+                // Keep the controlled input instant — only debounce the
+                // filter pass, never the keystroke echo.
+                setSearchInput(v);
+                debouncedSetSearch(v);
+              }}
               placeholder="Search"
               aria-label="Search catalog"
               style={{
@@ -485,6 +527,7 @@ function ZeroShell(props) {
 
         {/* Grid */}
         <div
+          ref={gridScrollRef}
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -497,14 +540,21 @@ function ZeroShell(props) {
               <div>No items match the current filters.</div>
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
-                gap: '0.85rem',
-              }}
-            >
-              {displayItems.map(function(item, idx) {
+            <React.Fragment>
+              {/* Top spacer — preserves scrollbar geometry for the rows we
+                  haven't mounted yet. height=0 when virtualization is off. */}
+              {virt.topSpacer > 0 && (
+                <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
+              )}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
+                  gap: '0.85rem',
+                }}
+              >
+                {displayItems.slice(virt.startIndex, virt.endIndex).map(function(item, sliceIdx) {
+                  var idx = virt.startIndex + sliceIdx;
                 var star = _deriveStarRating(item);
                 // posterBg lives in ./shellHelpers.js — single source of truth
                 // across all 8 shells. It checks poster_url → poster →
@@ -593,7 +643,13 @@ function ZeroShell(props) {
                   </button>
                 );
               })}
-            </div>
+              </div>
+              {/* Bottom spacer — preserves scrollbar geometry for unmounted
+                  trailing rows. height=0 when virtualization is off. */}
+              {virt.bottomSpacer > 0 && (
+                <div aria-hidden="true" style={{ height: virt.bottomSpacer + 'px' }} />
+              )}
+            </React.Fragment>
           )}
         </div>
       </main>
