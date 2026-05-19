@@ -113,11 +113,12 @@ function PlayerModal(props) {
       role="dialog"
       aria-modal="true"
       onClick={function(e) { if (e.target === e.currentTarget && onClose) { onClose(); } }}
+      className="hermes-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 60,
-        backgroundColor: 'rgba(0,0,0,0.92)',
+        backgroundColor: 'rgba(5,8,14,0.86)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -125,41 +126,52 @@ function PlayerModal(props) {
       }}
     >
       <div
+        className="hermes-modal-panel"
         style={{
           width: '100%',
           maxWidth: '1200px',
           maxHeight: '92vh',
           backgroundColor: 'var(--surface, #161b22)',
           border: '1px solid var(--border, #30363d)',
-          borderRadius: '12px',
+          borderRadius: '20px',
           color: 'var(--text, #e6edf3)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          boxShadow: '0 28px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02) inset',
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border, #30363d)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: 'calc(1.05rem * var(--font-scale, 1))' }}>
+        {/* Header — gradient surface-raised → surface */}
+        <div
+          className="hermes-gradient-header"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '1rem 1.25rem',
+            borderBottom: '1px solid var(--border, #30363d)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, fontSize: 'calc(1.05rem * var(--font-scale, 1))', letterSpacing: '0.01em' }}>
               {error ? 'Playback failed' : (item.title || 'Now Playing')}
             </span>
             {item.resolution && (
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#e5a00d', border: '1px solid #e5a00d', borderRadius: '3px', padding: '1px 5px' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#e5a00d', border: '1px solid #e5a00d', borderRadius: '999px', padding: '2px 8px', background: 'rgba(229,160,13,0.08)' }}>
                 {item.resolution}
               </span>
             )}
             {item.hdr_format && (
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#fff', background: 'linear-gradient(90deg,#e5a00d,#e50914)', borderRadius: '3px', padding: '1px 5px' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#e5a00d,#e50914)', borderRadius: '999px', padding: '2px 8px', boxShadow: '0 0 6px rgba(229,160,13,0.4) inset' }}>
                 HDR
               </span>
             )}
             {pid && (
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#fff', background: pColor, borderRadius: '3px', padding: '1px 6px' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', background: pColor, borderRadius: '999px', padding: '2px 9px' }}>
                 {provider.display_name || pid}
               </span>
             )}
-            <span title={'Source health: ' + healthStatus} style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: healthDot }} />
+            <span title={'Source health: ' + healthStatus} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: healthDot, boxShadow: '0 0 6px ' + healthDot + '99' }} />
             {ticket && ticket.expires_at && (
               <span style={{ fontSize: '0.75rem', color: 'var(--muted, #8b949e)', marginLeft: '0.5rem' }}>
                 Ticket expires in {fmtExpiresIn(ticket.expires_at)}
@@ -172,16 +184,26 @@ function PlayerModal(props) {
             onClick={onClose}
             aria-label="Close player"
             style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--muted, #8b949e)',
-              fontSize: '1.5rem',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--border, #30363d)',
+              color: 'var(--text, #e6edf3)',
+              fontSize: '1.2rem',
               cursor: 'pointer',
-              padding: '0.25rem 0.6rem',
+              padding: 0,
               outline: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
+              lineHeight: 1,
             }}
-            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)'; }}
-            onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+            onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
+            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+            onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
           >
             &times;
           </button>
@@ -200,7 +222,7 @@ function PlayerModal(props) {
             <video
               controls
               autoPlay
-              style={{ width: '100%', maxHeight: '72vh', borderRadius: '6px', background: '#000' }}
+              style={{ width: '100%', maxHeight: '72vh', borderRadius: '14px', background: '#000', boxShadow: '0 12px 32px rgba(0,0,0,0.55)' }}
               src={ticket && ticket.stream_endpoint}
             />
           )}

@@ -254,8 +254,8 @@ function QROnboarding(props) {
           color: 'var(--accent)',
           fontWeight: '600',
           backgroundColor: 'rgba(0,128,0,0.15)',
-          borderRadius: '6px',
-          padding: '0.6rem 1rem',
+          borderRadius: '999px',
+          padding: '0.55rem 1.1rem',
         }}
       >
         Provider added — closing…
@@ -268,8 +268,8 @@ function QROnboarding(props) {
           fontSize: 'calc(0.85rem * var(--font-scale, 1))',
           color: 'var(--muted)',
           backgroundColor: 'rgba(255,128,0,0.12)',
-          borderRadius: '6px',
-          padding: '0.6rem 1rem',
+          borderRadius: '999px',
+          padding: '0.55rem 1.1rem',
           textAlign: 'center',
         }}
       >
@@ -283,8 +283,8 @@ function QROnboarding(props) {
           fontSize: 'calc(0.85rem * var(--font-scale, 1))',
           color: '#ff8080',
           backgroundColor: 'rgba(255,0,0,0.10)',
-          borderRadius: '6px',
-          padding: '0.6rem 1rem',
+          borderRadius: '999px',
+          padding: '0.55rem 1.1rem',
           textAlign: 'center',
         }}
       >
@@ -298,8 +298,9 @@ function QROnboarding(props) {
           fontSize: 'calc(0.8rem * var(--font-scale, 1))',
           color: 'var(--muted)',
           backgroundColor: 'rgba(0,0,0,0.3)',
-          borderRadius: '6px',
-          padding: '0.5rem 1rem',
+          borderRadius: '999px',
+          padding: '0.5rem 1.1rem',
+          border: '1px solid var(--border, #30363d)',
         }}
       >
         This code expires in <strong style={{ color: 'var(--text)' }}>{formatCountdown(pairState.remainingMs)}</strong>
@@ -321,10 +322,11 @@ function QROnboarding(props) {
       aria-label="Add a Provider"
       onKeyDown={handleKeyDown}
       onClick={handleOverlayClick}
+      className="hermes-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.8)',
+        backgroundColor: 'rgba(5,8,14,0.78)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -332,10 +334,11 @@ function QROnboarding(props) {
       }}
     >
       <div
+        className="hermes-modal-panel"
         style={{
           backgroundColor: 'var(--surface)',
           border: '1px solid var(--border, #30363d)',
-          borderRadius: '16px',
+          borderRadius: '20px',
           padding: '2.5rem',
           maxWidth: '420px',
           width: '90%',
@@ -344,6 +347,8 @@ function QROnboarding(props) {
           alignItems: 'center',
           gap: '1.25rem',
           color: 'var(--text)',
+          boxShadow: '0 28px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02) inset',
+          background: 'linear-gradient(180deg, var(--surface-raised, var(--surface)) 0%, var(--surface) 28%)',
         }}
       >
         <h2
@@ -361,10 +366,11 @@ function QROnboarding(props) {
         <div
           style={{
             backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            padding: '12px',
+            borderRadius: '14px',
+            padding: '14px',
             display: 'inline-block',
             opacity: pairState.status === 'completed' || pairState.status === 'expired' ? 0.4 : 1,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.05)',
             transition: 'opacity 0.2s',
           }}
         >
@@ -418,25 +424,29 @@ function QROnboarding(props) {
           onClick={primaryButtonHandler}
           style={{
             marginTop: '0.5rem',
-            padding: '0.75rem 2rem',
-            backgroundColor: 'var(--surface-raised, var(--surface))',
-            border: '2px solid var(--border, #30363d)',
-            borderRadius: '8px',
-            color: 'var(--text)',
+            padding: '0.8rem 2.2rem',
+            background: 'linear-gradient(135deg, var(--accent), #6366f1)',
+            border: 'none',
+            borderRadius: '999px',
+            color: '#ffffff',
             fontSize: 'calc(1rem * var(--font-scale, 1))',
             cursor: 'pointer',
-            fontWeight: '600',
+            fontWeight: '800',
             outline: 'none',
-            transition: 'border-color 0.15s',
+            boxShadow: '0 6px 18px rgba(99,102,241,0.32)',
+            transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), box-shadow 160ms ease',
+            letterSpacing: '0.02em',
           }}
+          onMouseEnter={function(e) { e.currentTarget.style.transform = 'scale(1.04)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
           onFocus={function(e) {
-            e.currentTarget.style.borderColor = 'var(--accent)';
-            e.currentTarget.style.outline = '2px solid var(--accent)';
-            e.currentTarget.style.outlineOffset = '2px';
+            e.currentTarget.style.outline = '3px solid var(--accent)';
+            e.currentTarget.style.outlineOffset = '3px';
+            e.currentTarget.style.transform = 'scale(1.06)';
           }}
           onBlur={function(e) {
-            e.currentTarget.style.borderColor = 'var(--border, #30363d)';
             e.currentTarget.style.outline = 'none';
+            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
           {primaryButtonLabel}

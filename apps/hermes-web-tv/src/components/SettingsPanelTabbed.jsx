@@ -134,9 +134,10 @@ function _Card(props) {
       style={{
         background: 'var(--surface-raised, #1c2128)',
         border: '1px solid var(--border, #30363d)',
-        borderRadius: '10px',
-        padding: '1rem',
-        marginBottom: '0.75rem',
+        borderRadius: '12px',
+        padding: '1rem 1.1rem',
+        marginBottom: '0.85rem',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
       }}
     >
       {props.header && (
@@ -376,17 +377,20 @@ function SettingsPanelTabbed(props) {
                   onClick={function() { if (typeof onThemeChange === 'function') { onThemeChange(t.id); } }}
                   onKeyDown={function(e) { if ((e.key === 'Enter' || e.key === ' ') && typeof onThemeChange === 'function') { e.preventDefault(); onThemeChange(t.id); } }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '0.45rem',
-                    padding: '0.4rem 0.5rem',
-                    background: isActive ? 'rgba(0,212,255,0.08)' : 'transparent',
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.5rem 0.65rem',
+                    background: isActive ? 'rgba(0,212,255,0.12)' : 'transparent',
                     border: '1px solid ' + (isActive ? 'var(--accent, #00d4ff)' : 'var(--border, #30363d)'),
-                    borderRadius: '8px',
+                    borderRadius: '12px',
                     color: 'var(--text, #e6edf3)',
                     fontSize: 'calc(0.78rem * var(--font-scale, 1))',
                     fontWeight: 600,
                     cursor: 'pointer',
                     outline: 'none',
+                    transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
                   }}
+                  onMouseEnter={function(e) { if (!isActive) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; } }}
+                  onMouseLeave={function(e) { if (!isActive) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = 'transparent'; } }}
                   onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent, #00d4ff)'; }}
                   onBlur={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
                 >
@@ -495,11 +499,12 @@ function SettingsPanelTabbed(props) {
       onClick={function(e) {
         if (e.target === e.currentTarget && typeof onClose === 'function') { onClose(); }
       }}
+      className="hermes-modal-overlay"
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
         zIndex: 55,
-        background: 'rgba(0, 0, 0, 0.78)',
+        background: 'rgba(5,8,14,0.74)',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
@@ -508,27 +513,27 @@ function SettingsPanelTabbed(props) {
       }}
     >
       <div
+        className="hermes-modal-panel"
         style={{
           width: '100%',
           maxWidth: '880px',
           background: 'var(--surface, #161b22)',
           color: 'var(--text, #e6edf3)',
           border: '1px solid var(--border, #30363d)',
-          borderRadius: '14px',
-          boxShadow: '0 16px 60px rgba(0,0,0,0.6)',
+          borderRadius: '20px',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02) inset',
+          overflow: 'hidden',
         }}
       >
-        {/* Header */}
+        {/* Header — gradient surface-raised → surface */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1rem 1.25rem',
+            padding: '1.1rem 1.4rem',
             borderBottom: '1px solid var(--border, #30363d)',
             background: 'linear-gradient(180deg, var(--surface-raised, #1c2128), var(--surface, #161b22))',
-            borderTopLeftRadius: '14px',
-            borderTopRightRadius: '14px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
@@ -569,17 +574,24 @@ function SettingsPanelTabbed(props) {
               onClick={onClose}
               aria-label="Close settings"
               style={{
-                width: '32px', height: '32px',
+                width: '38px', height: '38px',
                 borderRadius: '50%',
                 background: 'rgba(255,255,255,0.06)',
                 border: '1px solid var(--border, #30363d)',
                 color: 'var(--text, #e6edf3)',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '16px',
                 outline: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
+                lineHeight: 1,
               }}
-              onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #00d4ff)'; e.currentTarget.style.outlineOffset = '2px'; }}
-              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
+              onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #00d4ff)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
             >&times;</button>
           </div>
         </div>
@@ -607,18 +619,22 @@ function SettingsPanelTabbed(props) {
                 onClick={function() { setActiveTab(t.id); }}
                 onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab(t.id); } }}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                  padding: '0.4rem 0.85rem',
-                  background: isActive ? 'var(--surface-raised, #1c2128)' : 'transparent',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                  padding: '0.45rem 1rem',
+                  background: isActive
+                    ? 'linear-gradient(135deg, rgba(0,212,255,0.18), rgba(99,102,241,0.12))'
+                    : 'transparent',
                   border: '1px solid ' + (isActive ? 'var(--accent, #00d4ff)' : 'transparent'),
-                  borderBottom: isActive ? '2px solid var(--accent, #00d4ff)' : '2px solid transparent',
-                  borderRadius: '6px',
+                  borderRadius: '999px',
                   color: isActive ? 'var(--accent, #00d4ff)' : 'var(--text, #e6edf3)',
                   fontSize: 'calc(0.82rem * var(--font-scale, 1))',
                   fontWeight: 700,
                   cursor: 'pointer',
                   outline: 'none',
+                  transition: 'background-color 160ms ease, color 160ms ease',
                 }}
+                onMouseEnter={function(e) { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                onMouseLeave={function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                 onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent, #00d4ff)'; }}
                 onBlur={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
               >
@@ -644,16 +660,18 @@ function SettingsPanelTabbed(props) {
 function zeroButtonStyle(variant) {
   var filled = variant === 'filled';
   return {
-    padding: '0.55rem 1rem',
+    padding: '0.65rem 1.15rem',
     background: filled ? 'linear-gradient(135deg, var(--accent, #00d4ff), #6366f1)' : 'transparent',
     border: filled ? 'none' : '1px solid var(--border, #30363d)',
-    borderRadius: '8px',
+    borderRadius: filled ? '999px' : '10px',
     color: filled ? '#0a1628' : 'var(--text, #e6edf3)',
     fontSize: 'calc(0.85rem * var(--font-scale, 1))',
     fontWeight: 700,
     cursor: 'pointer',
     outline: 'none',
     textAlign: 'left',
+    boxShadow: filled ? '0 6px 18px rgba(0,212,255,0.28)' : 'none',
+    transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
   };
 }
 function zeroButtonFocus(e) {

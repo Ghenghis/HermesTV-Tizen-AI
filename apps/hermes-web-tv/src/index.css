@@ -397,23 +397,104 @@ textarea {
   display: inline;
 }
 
-/* ── Shared entrance animations ──
-   Other agents hook these into modals, panels, and rail items so the
-   shell feels alive rather than snapping in. Kept short (220ms-ish) so
-   even 60fps-only Mom-TV degraded path stays comfortable. Reduced-motion
-   respect is handled by the existing motion-reduced / prefers-reduced-
-   motion rules earlier in the file. */
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SOTA modal polish — shared animation keyframes + utility classes.
+ *
+ * Every modal/overlay component in src/components/* uses these so the open
+ * choreography, hover-lift behaviour, and gradient surface treatments stay
+ * consistent. Animate transform + opacity only (no box-shadow!) to honour
+ * the QN85 (Chrome 76) animation budget. Cap at 320ms; ≤220ms preferred.
+ * Reduced-motion respect at the bottom of the block.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Modal inner-panel entrance: fade in + scale up from 0.96 → 1. The
+   cubic-bezier(0.16, 1, 0.3, 1) curve overshoots gently at the end so the
+   panel feels physical without a literal bounce. */
+@keyframes hermes-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Backdrop fade — slower than the panel so the dim arrives first, panel
+   second. Pure opacity transition, no transform. */
 @keyframes hermes-fade-in {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
 
-@keyframes hermes-scale-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+/* Floating chat-bubble entrance — used by FloatingChatbot when a message
+   row mounts. translateY only so we can keep animating transform. */
+@keyframes hermes-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@keyframes hermes-slide-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ── Convenience utility classes (Tizen-safe — no :has(), no @container) ── */
+
+/* Apply to the modal backdrop (the full-screen overlay). */
+.hermes-modal-overlay {
+  animation: hermes-fade-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+/* Apply to the modal inner panel. */
+.hermes-modal-panel {
+  animation: hermes-scale-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+/* Subtle gradient that mirrors the surface-raised → surface step. Use on
+   modal headers to give each dialog a tactile top edge. */
+.hermes-gradient-header {
+  background: linear-gradient(180deg, var(--surface-raised, #1c2128), var(--surface, #161b22));
+}
+
+/* Hover-lift card (LayoutSwitcher option tiles). Only transforms — keep box-
+   shadow static for performance. */
+.hermes-card-hover {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms ease, background-color 180ms ease;
+  will-change: transform;
+}
+.hermes-card-hover:hover,
+.hermes-card-hover:focus-visible {
+  transform: translateY(-2px);
+}
+
+/* Floating chat-bubble entrance helper. */
+.hermes-bubble-in {
+  animation: hermes-bubble-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+/* Honour reduced-motion — the existing .motion-reduced rule already
+   slashes durations, but we also drop the entrance opacity so the
+   overlay doesn't flash. Belt + braces. */
+.motion-reduced .hermes-modal-overlay,
+.motion-reduced .hermes-modal-panel,
+.motion-reduced .hermes-bubble-in {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hermes-modal-overlay,
+  .hermes-modal-panel,
+  .hermes-bubble-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

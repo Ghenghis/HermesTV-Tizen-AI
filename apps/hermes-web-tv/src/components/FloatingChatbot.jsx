@@ -244,25 +244,28 @@ function FloatingChatbot(props) {
           position: 'fixed',
           bottom: '2rem',
           right: '2rem',
-          width: '56px',
-          height: '56px',
+          width: '60px',
+          height: '60px',
           borderRadius: '50%',
-          backgroundColor: 'var(--accent)',
+          background: 'linear-gradient(135deg, var(--accent), #6366f1)',
           border: 'none',
-          color: '#1a1410',
+          color: '#ffffff',
           fontSize: '1.5rem',
           fontWeight: '800',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06) inset',
           outline: 'none',
           zIndex: 200,
-          transition: 'transform 0.15s',
+          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1)',
+          willChange: 'transform',
         }}
+        onMouseEnter={function(e) { e.currentTarget.style.transform = 'scale(1.08)'; }}
+        onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
         onFocus={function(e) {
-          e.currentTarget.style.outline = '2px solid var(--accent)';
+          e.currentTarget.style.outline = '3px solid var(--accent)';
           e.currentTarget.style.outlineOffset = '3px';
           e.currentTarget.style.transform = 'scale(1.1)';
         }}
@@ -280,17 +283,18 @@ function FloatingChatbot(props) {
   if (chatState === STATES.compact) {
     return (
       <div
+        className="hermes-modal-panel"
         style={{
           position: 'fixed',
           bottom: '2rem',
           right: '2rem',
-          width: '320px',
-          backgroundColor: 'var(--surface)',
-          border: '2px solid var(--border, #30363d)',
-          borderRadius: '12px',
-          padding: '0.75rem 1rem',
+          width: '340px',
+          background: 'linear-gradient(180deg, var(--surface-raised, var(--surface)), var(--surface))',
+          border: '1px solid var(--border, #30363d)',
+          borderRadius: '16px',
+          padding: '0.85rem 1.1rem',
           zIndex: 200,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02) inset',
           color: 'var(--text)',
         }}
       >
@@ -342,17 +346,18 @@ function FloatingChatbot(props) {
   if (chatState === STATES.walkie) {
     return (
       <div
+        className="hermes-modal-panel"
         style={{
           position: 'fixed',
           bottom: '2rem',
           right: '2rem',
-          width: '220px',
-          backgroundColor: 'var(--surface)',
+          width: '240px',
+          background: 'linear-gradient(180deg, var(--surface-raised, var(--surface)), var(--surface))',
           border: '2px solid var(--accent)',
-          borderRadius: '12px',
+          borderRadius: '20px',
           padding: '1.5rem',
           zIndex: 200,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset',
           color: 'var(--text)',
           display: 'flex',
           flexDirection: 'column',
@@ -414,32 +419,33 @@ function FloatingChatbot(props) {
   // ── Expanded state (default fallback) ──
   return (
     <div
+      className="hermes-modal-panel"
       style={{
         position: 'fixed',
         bottom: '2rem',
         right: '2rem',
-        width: '380px',
-        maxHeight: '520px',
-        backgroundColor: 'var(--surface)',
-        border: '2px solid var(--border, #30363d)',
-        borderRadius: '12px',
+        width: '400px',
+        maxHeight: '560px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border, #30363d)',
+        borderRadius: '20px',
         display: 'flex',
         flexDirection: 'column',
         zIndex: 200,
-        boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02) inset',
         color: 'var(--text)',
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
+      {/* Header — gradient surface-raised → surface */}
       <div
+        className="hermes-gradient-header"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0.75rem 1rem',
+          padding: '0.85rem 1.1rem',
           borderBottom: '1px solid var(--border, #30363d)',
-          backgroundColor: 'var(--surface-raised, var(--surface))',
           flexShrink: 0,
         }}
       >
@@ -525,6 +531,7 @@ function FloatingChatbot(props) {
           return (
             <div
               key={idx}
+              className="hermes-bubble-in"
               style={{
                 display: 'flex',
                 justifyContent: isAgent ? 'flex-start' : 'flex-end',
@@ -533,12 +540,21 @@ function FloatingChatbot(props) {
               <div
                 style={{
                   maxWidth: '80%',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: isAgent ? '4px 12px 12px 12px' : '12px 4px 12px 12px',
-                  backgroundColor: isAgent ? 'var(--surface-raised, #1c2128)' : 'var(--accent)',
+                  padding: '0.7rem 0.95rem',
+                  // Agent bubbles tilt left (small bottom-left corner);
+                  // user bubbles tilt right (small bottom-right corner).
+                  // Tizen-safe: plain string of 4 radii.
+                  borderRadius: isAgent ? '16px 16px 16px 4px' : '16px 16px 4px 16px',
+                  background: isAgent
+                    ? 'var(--surface-raised, #1c2128)'
+                    : 'linear-gradient(135deg, var(--accent), var(--accent-hover, var(--accent)))',
+                  border: isAgent ? '1px solid var(--border, #30363d)' : 'none',
                   color: isAgent ? 'var(--text)' : '#ffffff',
                   fontSize: 'calc(0.875rem * var(--font-scale, 1))',
-                  lineHeight: '1.4',
+                  lineHeight: '1.45',
+                  boxShadow: isAgent
+                    ? 'inset 0 1px 0 rgba(255,255,255,0.03)'
+                    : '0 4px 12px rgba(0,0,0,0.25)',
                 }}
               >
                 {msg.text}
@@ -548,15 +564,19 @@ function FloatingChatbot(props) {
         })}
         {submitting && (
           <div
+            className="hermes-bubble-in"
             style={{ display: 'flex', justifyContent: 'flex-start' }}
             role="status"
             aria-label={agentName + ' is thinking'}
           >
             <div
               style={{
-                padding: '0.6rem 0.85rem',
-                borderRadius: '4px 12px 12px 12px',
-                backgroundColor: 'var(--surface-raised, #1c2128)',
+                padding: '0.7rem 0.95rem',
+                borderRadius: '16px 16px 16px 4px',
+                background: 'var(--surface-raised, #1c2128)',
+                border: '1px solid var(--border, #30363d)',
+                color: 'var(--muted)',
+                fontSize: 'calc(0.875rem * var(--font-scale, 1))',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
@@ -590,15 +610,15 @@ function FloatingChatbot(props) {
       {/* Command chips */}
       <CommandChips onSend={handleChipSend} />
 
-      {/* Input area */}
+      {/* Input area — gradient footer band */}
       <div
         style={{
-          padding: '0.75rem 1rem',
+          padding: '0.85rem 1.1rem',
           borderTop: '1px solid var(--border, #30363d)',
           display: 'flex',
-          gap: '0.5rem',
+          gap: '0.6rem',
           flexShrink: 0,
-          backgroundColor: 'var(--surface-raised, var(--surface))',
+          background: 'linear-gradient(0deg, var(--surface-raised, var(--surface)), var(--surface))',
         }}
       >
         <input
@@ -612,20 +632,21 @@ function FloatingChatbot(props) {
             flex: 1,
             backgroundColor: 'var(--bg)',
             border: '1px solid var(--border, #30363d)',
-            borderRadius: '6px',
+            borderRadius: '10px',
             color: 'var(--text)',
-            padding: '0.5rem 0.75rem',
+            padding: '0.6rem 0.85rem',
             fontSize: 'calc(0.875rem * var(--font-scale, 1))',
             outline: 'none',
+            transition: 'border-color 160ms ease, box-shadow 160ms ease',
           }}
           onFocus={function(e) {
             e.currentTarget.style.borderColor = 'var(--accent)';
-            e.currentTarget.style.outline = '2px solid var(--accent)';
-            e.currentTarget.style.outlineOffset = '2px';
+            e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent)';
+            e.currentTarget.style.outline = 'none';
           }}
           onBlur={function(e) {
             e.currentTarget.style.borderColor = 'var(--border, #30363d)';
-            e.currentTarget.style.outline = 'none';
+            e.currentTarget.style.boxShadow = 'none';
           }}
         />
         <button
@@ -633,23 +654,31 @@ function FloatingChatbot(props) {
           onClick={handleSend}
           disabled={submitting || !inputText.trim()}
           style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: submitting || !inputText.trim() ? 'var(--muted)' : 'var(--accent)',
+            padding: '0.55rem 1.15rem',
+            background: submitting || !inputText.trim()
+              ? 'var(--muted)'
+              : 'linear-gradient(135deg, var(--accent), #6366f1)',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '999px',
             color: '#ffffff',
-            fontWeight: '600',
+            fontWeight: '800',
             cursor: submitting || !inputText.trim() ? 'not-allowed' : 'pointer',
             fontSize: 'calc(0.875rem * var(--font-scale, 1))',
             outline: 'none',
-            transition: 'background-color 0.15s',
+            boxShadow: submitting || !inputText.trim() ? 'none' : '0 4px 14px rgba(99,102,241,0.32)',
+            transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), box-shadow 160ms ease',
+            letterSpacing: '0.02em',
           }}
+          onMouseEnter={function(e) { if (!submitting && inputText.trim()) e.currentTarget.style.transform = 'scale(1.05)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
           onFocus={function(e) {
             e.currentTarget.style.outline = '2px solid var(--accent)';
             e.currentTarget.style.outlineOffset = '2px';
+            if (!submitting && inputText.trim()) e.currentTarget.style.transform = 'scale(1.06)';
           }}
           onBlur={function(e) {
             e.currentTarget.style.outline = 'none';
+            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
           Send
