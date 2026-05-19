@@ -53,11 +53,24 @@ const xmltv = require('../integrations/xmltv');
 router.get('/api/epg', async (req, res) => {
   let hours = parseInt(req.query.hours, 10);
   if (isNaN(hours) || hours < 1) { hours = 4; }
-  if (hours > 12) { hours = 12; }
+  // Cap raised from 12 → 48 so the client can request a full "Today" or
+  // "Tomorrow" window (24h each). The XMLTV upstream is cached, so a wider
+  // window doesn't multiply upstream calls — only the in-memory filter
+  // costs grow, linearly.
+  if (hours > 48) { hours = 48; }
 
   const provider = typeof req.query.provider === 'string'
     ? req.query.provider
     : '';
+
+  // Optional `start` query param — when supplied + parseable, anchors the
+  // window at that ISO timestamp instead of `now - 30min`. Lets the client
+  // ask for "tomorrow 00:00 → tomorrow 23:59" without re-anchoring to now.
+  let windowStartMs = null;
+  if (typeof req.query.start === 'string' && req.query.start.length > 0) {
+    const parsed = Date.parse(req.query.start);
+    if (!isNaN(parsed)) { windowStartMs = parsed; }
+  }
 
   const xmltvUrl = (typeof process.env.XMLTV_URL === 'string' && process.env.XMLTV_URL.trim().length > 0)
     ? process.env.XMLTV_URL.trim()
@@ -120,17 +133,20 @@ router.get('/api/epg', async (req, res) => {
   }
 
   // Filter programs to the requested time window so the grid doesn't render
-  // 7 days of data. `now - 30min` to `now + hours` gives the user a buffer
-  // for "what's on right now" plus the forward look-ahead.
+  // 7 days of data. When `start` is supplied, the window is exactly
+  // [start, start+hours]; otherwise we anchor to `now - 30min` (so the user
+  // sees the in-progress program at the left edge of the grid).
   const nowMs = Date.now();
-  const windowStartMs = nowMs - 30 * 60 * 1000;
-  const windowEndMs   = nowMs + hours * 60 * 60 * 1000;
+  const effectiveStartMs = windowStartMs !== null
+    ? windowStartMs
+    : (nowMs - 30 * 60 * 1000);
+  const windowEndMs = effectiveStartMs + hours * 60 * 60 * 1000;
   const programs = mapped.programs.filter(function(p) {
     const ps = Date.parse(p.start);
     const pe = Date.parse(p.end);
     if (isNaN(ps) || isNaN(pe)) { return false; }
     // Include programs that overlap the window
-    return ps < windowEndMs && pe > windowStartMs;
+    return ps < windowEndMs && pe > effectiveStartMs;
   });
 
   // Provider filter — when the client passes ?provider=apollo_group we still
@@ -154,7 +170,8 @@ router.get('/api/epg', async (req, res) => {
       raw_program_count:    Array.isArray(epg.programs) ? epg.programs.length : 0,
       requested_provider:   provider,
       requested_hours:      hours,
-      window_start:         new Date(windowStartMs).toISOString(),
+      requested_start:      windowStartMs !== null ? new Date(windowStartMs).toISOString() : null,
+      window_start:         new Date(effectiveStartMs).toISOString(),
       window_end:           new Date(windowEndMs).toISOString(),
       server_time:          new Date().toISOString(),
       cache:                cacheInfo ? {

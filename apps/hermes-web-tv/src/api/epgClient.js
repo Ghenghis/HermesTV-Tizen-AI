@@ -55,22 +55,29 @@ function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 /**
- * Fetch EPG channels + programs for a provider over a window starting "now".
+ * Fetch EPG channels + programs for a provider over a configurable window.
  *
  * @param {string} providerId  Provider id (e.g. 'apollo_group', 'xtremehd').
  *   When falsy, the backend may treat that as "default / first configured
  *   provider" — we still send the parameter so the contract stays explicit.
- * @param {number} hoursAhead  Look-ahead window in hours (1..12).
+ * @param {number} hoursAhead  Look-ahead window in hours (1..48).
  *   The backend MAY clamp to its own ceiling; we don't validate client-side
  *   beyond a positive-integer cast.
+ * @param {string} [startIso]  Optional ISO-8601 anchor for the window. When
+ *   omitted, the backend anchors at "now - 30min" (so the in-progress
+ *   program sits at the left edge of the grid). EPGModal passes today/
+ *   tomorrow midnight here.
  * @returns {Promise<{channels: Array, programs: Array, _meta: {source: string, message?: string}}>}
  */
-function fetchEPG(providerId, hoursAhead) {
+function fetchEPG(providerId, hoursAhead, startIso) {
   var hours = parseInt(hoursAhead, 10);
   if (isNaN(hours) || hours < 1) { hours = 4; }
 
   var qs = '?provider=' + encodeURIComponent(providerId || '')
     + '&hours=' + encodeURIComponent(String(hours));
+  if (typeof startIso === 'string' && startIso.length > 0) {
+    qs += '&start=' + encodeURIComponent(startIso);
+  }
 
   return fetchWithTimeout(BASE_URL + '/api/epg' + qs).then(function(response) {
     if (!response.ok) {
