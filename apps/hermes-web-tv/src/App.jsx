@@ -823,7 +823,9 @@ function App() {
   // SOTA streaming UX never shows a blank canvas while the boot fetch runs.
   // We paint the layout-to-be (6×4 poster cards on enhanced, 4×3 on degraded)
   // so Mom sees where her library is about to land instead of a spinner.
-  // The CatalogGrid + CatalogCard 2:3 aspect ratio is mirrored by SkeletonCard.
+  // CatalogCard now uses per-type aspect (16:9 for live, 2:3 for VOD); the
+  // skeleton remains 2:3 portrait because we can't predict the type mix
+  // before the catalog arrives — close enough during the brief boot flash.
   if (state.loading) {
     var skeletonCols = state.tier === 'enhanced' ? 6 : 4;
     var skeletonRows = 4;

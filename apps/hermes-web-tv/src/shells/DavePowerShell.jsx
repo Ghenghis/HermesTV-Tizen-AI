@@ -91,7 +91,11 @@ function DavePowerShell(props) {
     qualityBreakdown[q] = (qualityBreakdown[q] || 0) + 1;
   });
 
-  var cols = tier === 'enhanced' ? 6 : 4;
+  // Virtualizer column estimate — auto-fill grid below resolves the actual
+  // column count from the viewport. On enhanced QN85 1920×1080 minus rails
+  // we land at ~9 cols of 160 px cards; degraded gets ~6. The estimate only
+  // drives the row-height math, not the rendered grid.
+  var cols = tier === 'enhanced' ? 9 : 6;
   var filterLabel = [
     contentFilter !== 'all' ? contentFilter : 'All',
     providerFilter !== 'all' ? providerFilter : 'All Providers',
@@ -236,7 +240,10 @@ function DavePowerShell(props) {
           {virt.topSpacer > 0 && (
             <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', 1fr)', gap: '8px' }}>
+          {/* Dense data-grid feel: auto-fill minmax(160px) yields ~9 cols
+              on QN85 1920×1080 minus the 64px icon rail and 200px stats panel,
+              so the user sees 3-4 rows of cards inside the viewport. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
             {displayItems.slice(virt.startIndex, virt.endIndex).map(function(item, sliceIdx) {
               var idx = virt.startIndex + sliceIdx;
               return (
@@ -283,7 +290,11 @@ function DavePowerShell(props) {
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  <div style={{ height: '90px', background: posterBg(item, idx), position: 'relative' }}>
+                  {/* Per-type aspect — live channels render as 16:9 landscape
+                      thumbs (the ~160×90 size the dense data-grid was built
+                      for), movies/series render as 2:3 portrait posters so
+                      the seed catalog's TMDb art doesn't get crushed. */}
+                  <div style={{ aspectRatio: (item.type === 'live') ? '16 / 9' : '2 / 3', background: posterBg(item, idx), backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
                     {item.quality && <div style={{ position: 'absolute', top: '3px', right: '3px', background: 'rgba(0,212,170,0.9)', color: '#000', fontSize: '8px', fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-pill)' }}>{item.quality}</div>}
                     {item.type === 'live' && <div style={{ position: 'absolute', top: '3px', left: '3px', background: '#e50914', color: '#fff', fontSize: '8px', fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-pill)' }}>LIVE</div>}
                   </div>

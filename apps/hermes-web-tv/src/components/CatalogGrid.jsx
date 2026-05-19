@@ -46,9 +46,15 @@ function CatalogGrid(props) {
   var gridStyle = {
     display: 'grid',
     gridTemplateColumns: 'repeat(' + cols + ', 1fr)',
+    // gridAutoRows:1fr aligns every card in a row to the same outer height
+    // even when CatalogCard's internal poster aspect differs (16:9 for live,
+    // 2:3 for VOD). Without this the row jagged-edges because mixed types
+    // produce mixed intrinsic heights — exactly the audit-03 complaint.
+    gridAutoRows: '1fr',
     gap: '1rem',
     padding: '1rem 1.5rem',
     flex: 1,
+    alignItems: 'stretch',
   };
 
   // Degraded: disable hover transitions on grid container

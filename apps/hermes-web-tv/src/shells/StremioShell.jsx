@@ -163,8 +163,13 @@ function StremioCard(props) {
       <div
         style={{
           position: 'relative',
-          aspectRatio: '16 / 9',
+          // Live channels stay 16:9 landscape; movies/series render as 2:3
+          // portrait posters. Mixing one ratio across both types stretched
+          // movie art into a landscape box (audit-03 stretched-card bug).
+          aspectRatio: isLive ? '16 / 9' : '2 / 3',
           background: bg,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
           borderRadius: '10px',
           overflow: 'hidden',
           boxShadow: hover
@@ -773,10 +778,13 @@ function StremioShell(props) {
                 <div>No items match the current filters.</div>
               </div>
             ) : (
+              // auto-fill minmax(220px) keeps 16:9 backdrop cards couch-readable
+              // while filling 1920x1080 — ~7 cols x ~3 rows visible without
+              // scrolling past the shell's main viewport.
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
                   gap: '1rem',
                 }}
               >
@@ -845,10 +853,13 @@ function StremioShell(props) {
                 </div>
               </div>
             ) : (
+              // auto-fill minmax(220px) keeps 16:9 backdrop cards couch-readable
+              // while filling 1920x1080 — ~7 cols x ~3 rows visible without
+              // scrolling past the shell's main viewport.
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
                   gap: '1rem',
                 }}
               >

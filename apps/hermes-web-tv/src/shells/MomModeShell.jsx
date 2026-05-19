@@ -93,22 +93,28 @@ function MomModeShell(props) {
     : filtered.filter(function(i) { return i.type === 'series'; });
   var displayItems = tabItems.length > 0 ? tabItems : filtered;
 
-  // Mom's TV is never system-limited — we keep the enhanced column count
-  // generous regardless of tier, so even on a UN-degraded fallback she
-  // still sees the warm/spacious 2-up that's easy from the couch.
-  var cols = tier === 'enhanced' && fontScale < 1.5 ? 3 : 2;
-
-  // Virtualize the poster grid when the catalog exceeds the threshold
-  // (~100 items). Mom Mode renders the largest cards in the whole shell set
-  // (260 px image + ~70 px title block + 20 px gap = ~360 px row), so the
-  // raw paint cost on a long catalog is the highest of any shell. Below the
-  // threshold the helper short-circuits to a full render with zero overhead.
+  // Mom's TV is never system-limited — we use an auto-fill grid keyed off
+  // a senior-friendly minimum card width (320 px). At the 1920×1080 TV
+  // viewport that yields ~5 columns of ~336 px-wide cards, well within
+  // presbyopia readable distance from the couch; at 1280 it drops to 3-4,
+  // at 720 to 2. Tier is intentionally ignored — Mom's shell never reads
+  // a degraded layout per the never-limited rule.
+  var MOM_MIN_CARD_PX = 320;
+  // Virtualization row height keyed to the new card geometry. With auto-fill
+  // we cannot read the rendered column count at hook time, so we estimate
+  // the dominant case: a 320-px-wide card with the live 5:3 aspect renders
+  // a ~192 px image; +14+16 padding +18 title row +8 sub-row = ~70 px text
+  // block; +20 px row gap → 282 px. Round up to 290 to be slightly
+  // conservative (a too-large rowHeight just mounts a few extra rows).
   var gridScrollRef = React.useRef(null);
   var virt = useGridVirtualizer({
     scrollRef: gridScrollRef,
     itemCount: displayItems.length,
-    columns: cols,
-    rowHeight: 360,
+    // Estimate of rendered columns at this viewport for the virtualizer's
+    // index math. The on-screen grid uses auto-fill and is not constrained
+    // by this number — it only affects how many rows are kept mounted.
+    columns: Math.max(2, Math.floor((typeof window !== 'undefined' ? window.innerWidth : 1920) / (MOM_MIN_CARD_PX + 20))),
+    rowHeight: 290,
     overscan: 1,
   });
 
@@ -194,7 +200,7 @@ function MomModeShell(props) {
             {virt.topSpacer > 0 && (
               <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', 1fr)', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(' + MOM_MIN_CARD_PX + 'px, 1fr))', gap: '20px' }}>
             {displayItems.slice(virt.startIndex, virt.endIndex).map(function(item, sliceIdx) {
               var idx = virt.startIndex + sliceIdx;
               return (
@@ -243,7 +249,7 @@ function MomModeShell(props) {
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  <div style={{ height: '260px', background: posterBg(item, idx), position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ aspectRatio: (item.type === 'vod' || item.type === 'movies' || item.type === 'movie' || item.type === 'series') ? '2 / 3' : '5 / 3', background: posterBg(item, idx), position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {/* Primary play indicator — warm gradient + pill radius +
                         soft lifted shadow. This is the "primary CTA" surface
                         Mom sees on every card so it gets the warm token. */}

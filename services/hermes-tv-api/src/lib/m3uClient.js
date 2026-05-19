@@ -131,17 +131,20 @@ function _normaliseCategory(group) {
 
 // Defensive: some upstream providers embed creds in logo URLs too
 // (e.g. `tvg-logo="http://host/get.php?username=X..."`). If any logo
-// matches the credential-bearing shape, swap to the hermestv.local
-// default so the catalog response cannot trigger credentialGuard and
-// kill the entire payload. We never just trust upstream metadata.
+// matches the credential-bearing shape, swap to a 1x1 transparent data
+// URI so the catalog response cannot trigger credentialGuard and kill
+// the entire payload, and so the browser never makes a DNS lookup for
+// a hermestv.local fallback host that doesn't exist in production.
+// We never just trust upstream metadata.
+var DEFAULT_LOGO_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 var CRED_BEARING_LOGO = [/\/get\.php\?username=/i, /\/player_api\.php/i, /m3u_plus/i];
 function _safeLogo(url) {
   if (typeof url !== 'string' || url.length === 0) {
-    return 'https://hermestv.local/assets/logos/default.png';
+    return DEFAULT_LOGO_DATA_URI;
   }
   for (var i = 0; i < CRED_BEARING_LOGO.length; i++) {
     if (CRED_BEARING_LOGO[i].test(url)) {
-      return 'https://hermestv.local/assets/logos/default.png';
+      return DEFAULT_LOGO_DATA_URI;
     }
   }
   return url;

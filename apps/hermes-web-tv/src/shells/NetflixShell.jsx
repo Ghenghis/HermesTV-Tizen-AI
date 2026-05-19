@@ -42,6 +42,16 @@ function CardRow(props) {
       <h3 style={{ margin: '0 0 12px', padding: '0 24px', fontSize: 'calc(16px * ' + fontScale + ')', fontWeight: 700, color: '#e5e5e5', letterSpacing: '0.3px' }}>{title}</h3>
       <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '6px 24px 10px', scrollbarWidth: 'none' }}>
         {items.slice(0, 12).map(function(item, idx) {
+          // Per-card aspect: live channels are landscape 16:9 logos/thumbs,
+          // VOD/movies/series stay 2:3 portrait posters. Cards in a single
+          // rail mix gracefully because the row-flex stretches vertically;
+          // we widen the live card so its height roughly matches a 2:3 tile
+          // (180 * 1.5 = 270 ≈ 280 * 9/16 = ~158, so 280px wide live ≈ 158
+          // tall; 180px wide VOD ≈ 270 tall — still slightly mismatched but
+          // far better than stretching a square logo into a 2:3 box).
+          var isLive = (item.type === 'live');
+          var cardWidth = isLive ? '280px' : '180px';
+          var posterAspect = isLive ? '16 / 9' : '2 / 3';
           return (
             <div
               key={item.id || idx}
@@ -53,7 +63,7 @@ function CardRow(props) {
               onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
               style={{
                 flexShrink: 0,
-                width: '140px',
+                width: cardWidth,
                 cursor: 'pointer',
                 // Use the shared sm radius — matches the rest of the suite
                 // without softening Netflix's tight, dense card look too much.
@@ -100,7 +110,7 @@ function CardRow(props) {
                 }
               }}
             >
-              <div style={{ height: '210px', background: posterBg(item, idx), borderRadius: 'var(--radius-sm)', position: 'relative' }}>
+              <div style={{ aspectRatio: posterAspect, background: posterBg(item, idx), backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 'var(--radius-sm)', position: 'relative' }}>
                 {item.quality && (
                   <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: 'var(--radius-pill)', letterSpacing: '0.05em' }}>
                     {item.quality}
