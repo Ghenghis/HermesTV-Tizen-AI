@@ -9,20 +9,36 @@ import LayoutShell from './components/LayoutShell.jsx';
 import ProfilePicker from './components/ProfilePicker.jsx';
 import ProviderFilter from './components/ProviderFilter.jsx';
 import CatalogGrid from './components/CatalogGrid.jsx';
+// FloatingChatbot is intentionally NOT lazy-loaded — the user expects voice
+// input to be available the moment the catalog paints. Pre-bundling it
+// keeps the chatbot's open-latency to a single React commit.
 import FloatingChatbot from './components/FloatingChatbot.jsx';
-import QROnboarding from './components/QROnboarding.jsx';
-import MediaDetailPanel from './components/MediaDetailPanel.jsx';
 // StreamingQualityBar is imported by MediaDetailPanel where it's actually
 // rendered; App.jsx previously imported it but never used it (per audit
 // W3-A3). Dropped to trim the App.jsx bundle entry by ~6 kB.
 import ShellRenderer from './engine/ShellRenderer.jsx';
-import LayoutSwitcher from './components/LayoutSwitcher.jsx';
-import VoicePickerModal from './components/VoicePickerModal.jsx';
-import PlayerModal from './components/PlayerModal.jsx';
-import DownloadModal from './components/DownloadModal.jsx';
-import SettingsPanelTabbed from './components/SettingsPanelTabbed.jsx';
+// SkeletonCard stays eager — it renders during initial paint before any
+// modal opens, so lazy-loading it would defeat the purpose.
 import { SkeletonCard } from './components/Skeleton.jsx';
 import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
+
+// ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
+// Every component below is rendered behind an `isOpen` flag, so their JS
+// payload is dead weight during initial paint. React.lazy hoists each into
+// its own chunk that only downloads + parses when the user opens it.
+// Suspense fallback={null} because every gate already starts in a hidden
+// state — the user never sees a "loading…" spinner for a closed modal.
+//
+// Tizen 6.5 (Chrome 76) compatibility: React 18's lazy/Suspense are stable
+// on this engine — see https://react.dev/reference/react/lazy. No `await`
+// or top-level await is used; we keep classic dynamic import().
+var PlayerModal = React.lazy(function() { return import('./components/PlayerModal.jsx'); });
+var DownloadModal = React.lazy(function() { return import('./components/DownloadModal.jsx'); });
+var VoicePickerModal = React.lazy(function() { return import('./components/VoicePickerModal.jsx'); });
+var LayoutSwitcher = React.lazy(function() { return import('./components/LayoutSwitcher.jsx'); });
+var QROnboarding = React.lazy(function() { return import('./components/QROnboarding.jsx'); });
+var SettingsPanelTabbed = React.lazy(function() { return import('./components/SettingsPanelTabbed.jsx'); });
+var MediaDetailPanel = React.lazy(function() { return import('./components/MediaDetailPanel.jsx'); });
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -1226,121 +1242,144 @@ function App() {
           );
         })()}
 
-        {/* Floating chatbot */}
+        {/* Floating chatbot — eager-loaded; the user expects voice input
+            available the moment the catalog paints. */}
         <FloatingChatbot profile={profile} online={state.online} onCommand={handleChatbotCommand} />
 
-        {/* QR onboarding modal */}
-        <QROnboarding
-          isOpen={state.showQR}
-          onClose={handleCloseQR}
-          online={state.online}
-          onCompleted={function() {
-            // Pairing handshake finished — refresh provider list so the
-            // newly-added entry shows up in ProviderFilter and chips.
-            var api = state.online ? hermesApi : mockApi;
-            api.getProviders().then(function(payload) {
-              var list = payload && payload.providers
-                ? payload.providers
-                : (Array.isArray(payload) ? payload : []);
-              patchState({ providers: list });
-            }).catch(function() { /* non-fatal; tick again on next user action */ });
-          }}
-        />
+        {/* ── Lazy-loaded modal stack ─────────────────────────────────────
+            All seven modals below are wrapped in a single <Suspense>
+            fallback={null} because every modal already starts hidden
+            (isOpen=false → null returned). The user never sees a
+            "loading…" placeholder for a modal that wasn't requested. The
+            conditional `state.show*` gates prevent the lazy chunks from
+            even being requested until the user actually invokes them —
+            cold load stays minimal, peak interaction stays smooth. */}
+        <React.Suspense fallback={null}>
+          {/* QR onboarding modal */}
+          {state.showQR && (
+            <QROnboarding
+              isOpen={state.showQR}
+              onClose={handleCloseQR}
+              online={state.online}
+              onCompleted={function() {
+                // Pairing handshake finished — refresh provider list so the
+                // newly-added entry shows up in ProviderFilter and chips.
+                var api = state.online ? hermesApi : mockApi;
+                api.getProviders().then(function(payload) {
+                  var list = payload && payload.providers
+                    ? payload.providers
+                    : (Array.isArray(payload) ? payload : []);
+                  patchState({ providers: list });
+                }).catch(function() { /* non-fatal; tick again on next user action */ });
+              }}
+            />
+          )}
 
-        {/* Media detail panel — full-screen overlay */}
-        {state.selectedItem && (
-          <MediaDetailPanel
-            item={state.selectedItem}
-            actors={state.actors}
-            onClose={handleCloseDetail}
-            onSelectProvider={handleSelectProvider}
-            selectedProviderId={state.selectedProviderId}
-            globalProviders={state.providers}
-            onPlay={handlePlay}
-            onFindSimilarActor={handleFindSimilarActor}
-            onDownload={handleStartDownload}
-          />
-        )}
+          {/* Media detail panel — full-screen overlay */}
+          {state.selectedItem && (
+            <MediaDetailPanel
+              item={state.selectedItem}
+              actors={state.actors}
+              onClose={handleCloseDetail}
+              onSelectProvider={handleSelectProvider}
+              selectedProviderId={state.selectedProviderId}
+              globalProviders={state.providers}
+              onPlay={handlePlay}
+              onFindSimilarActor={handleFindSimilarActor}
+              onDownload={handleStartDownload}
+            />
+          )}
 
-        {/* Download modal — Zero-shell exact-size disclosure */}
-        <DownloadModal
-          isOpen={state.showDownload}
-          envelope={state.downloadEnvelope}
-          pending={state.downloadPending}
-          confirmed={state.downloadConfirmed}
-          error={state.downloadError}
-          item={state.downloadItem}
-          onClose={handleCloseDownload}
-          onProceed={handleProceedDownload}
-        />
+          {/* Download modal — Zero-shell exact-size disclosure */}
+          {state.showDownload && (
+            <DownloadModal
+              isOpen={state.showDownload}
+              envelope={state.downloadEnvelope}
+              pending={state.downloadPending}
+              confirmed={state.downloadConfirmed}
+              error={state.downloadError}
+              item={state.downloadItem}
+              onClose={handleCloseDownload}
+              onProceed={handleProceedDownload}
+            />
+          )}
 
-        {/* Player overlay — opened by ▶ Watch in the detail panel. Talks to
-            /api/play and renders the resulting ticket. The actual byte
-            stream is wired in Phase 4 when Threadfin / Jellyfin URL
-            resolution lands on the backend; until then the modal shows a
-            friendly "pipeline pending" state from the 503 response. */}
-        <PlayerModal
-          isOpen={state.showPlayer}
-          ticket={state.playerTicket}
-          error={state.playerError}
-          onClose={handleClosePlayer}
-        />
+          {/* Player overlay — opened by ▶ Watch in the detail panel. Talks to
+              /api/play and renders the resulting ticket. The actual byte
+              stream is wired in Phase 4 when Threadfin / Jellyfin URL
+              resolution lands on the backend; until then the modal shows a
+              friendly "pipeline pending" state from the 503 response. */}
+          {state.showPlayer && (
+            <PlayerModal
+              isOpen={state.showPlayer}
+              ticket={state.playerTicket}
+              error={state.playerError}
+              onClose={handleClosePlayer}
+            />
+          )}
 
-        {/* Settings — tabbed modal that clones the IPTV Player Zero
-            panel (Playlists / General / Backups / Appearance / Features /
-            Hotkeys / About). Existing per-action callbacks pipe back into
-            the same handlers the old inline panel used. */}
-        <SettingsPanelTabbed
-          isOpen={state.showSettings}
-          profile={profile}
-          tier={state.tier}
-          tvModel={state.tvModel}
-          catalogSource={state.catalogSource}
-          iptvOrgCount={state.iptvOrgCount}
-          m3uProviders={state.m3uProviders}
-          activeTheme={(profile && profile.active_theme) || 'night-blue'}
-          providers={state.providers}
-          onClose={function() { patchState({ showSettings: false }); }}
-          onOpenVoicePicker={function() { patchState({ showSettings: false, showVoicePicker: true }); }}
-          onOpenLayoutSwitcher={function() { patchState({ showSettings: false, showLayoutSwitcher: true }); }}
-          onSwitchProfile={function() {
-            profileStore.clearActiveProfileId();
-            patchState(Object.assign({}, INITIAL_STATE, {
-              loading: false,
-              showProfilePicker: true,
-              showSettings: false,
-            }));
-          }}
-          onResetDefaults={handleResetDefaults}
-          onThemeChange={function(themeName) {
-            applyThemeByName(themeName);
-            patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
-          }}
-        />
+          {/* Settings — tabbed modal that clones the IPTV Player Zero
+              panel (Playlists / General / Backups / Appearance / Features /
+              Hotkeys / About). Existing per-action callbacks pipe back into
+              the same handlers the old inline panel used. */}
+          {state.showSettings && (
+            <SettingsPanelTabbed
+              isOpen={state.showSettings}
+              profile={profile}
+              tier={state.tier}
+              tvModel={state.tvModel}
+              catalogSource={state.catalogSource}
+              iptvOrgCount={state.iptvOrgCount}
+              m3uProviders={state.m3uProviders}
+              activeTheme={(profile && profile.active_theme) || 'night-blue'}
+              providers={state.providers}
+              onClose={function() { patchState({ showSettings: false }); }}
+              onOpenVoicePicker={function() { patchState({ showSettings: false, showVoicePicker: true }); }}
+              onOpenLayoutSwitcher={function() { patchState({ showSettings: false, showLayoutSwitcher: true }); }}
+              onSwitchProfile={function() {
+                profileStore.clearActiveProfileId();
+                patchState(Object.assign({}, INITIAL_STATE, {
+                  loading: false,
+                  showProfilePicker: true,
+                  showSettings: false,
+                }));
+              }}
+              onResetDefaults={handleResetDefaults}
+              onThemeChange={function(themeName) {
+                applyThemeByName(themeName);
+                patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
+              }}
+            />
+          )}
 
-        {/* Layout switcher modal */}
-        <LayoutSwitcher
-          isOpen={state.showLayoutSwitcher}
-          activeLayout={state.activeLayout}
-          tier={state.tier}
-          onSelect={handleLayoutChange}
-          onClose={function() { patchState({ showLayoutSwitcher: false }); }}
-        />
+          {/* Layout switcher modal */}
+          {state.showLayoutSwitcher && (
+            <LayoutSwitcher
+              isOpen={state.showLayoutSwitcher}
+              activeLayout={state.activeLayout}
+              tier={state.tier}
+              onSelect={handleLayoutChange}
+              onClose={function() { patchState({ showLayoutSwitcher: false }); }}
+            />
+          )}
 
-        {/* Voice picker modal — Mom can switch Azure voices seamlessly */}
-        <VoicePickerModal
-          isOpen={state.showVoicePicker}
-          profileId={profile.profile_id || 'mom_tv'}
-          currentVoiceId={state.activeVoiceId}
-          onClose={function() { patchState({ showVoicePicker: false }); }}
-          onVoiceChange={function(voiceId) {
-            // Persist per-profile so the pick survives reload, profile switch,
-            // and TV reboot. Falsy voiceId clears the stored preference.
-            var pid = (state.profile && state.profile.profile_id) || profile.profile_id || 'mom_tv';
-            voicePrefStore.setVoiceId(pid, voiceId);
-            patchState({ activeVoiceId: voiceId });
-          }}
-        />
+          {/* Voice picker modal — Mom can switch Azure voices seamlessly */}
+          {state.showVoicePicker && (
+            <VoicePickerModal
+              isOpen={state.showVoicePicker}
+              profileId={profile.profile_id || 'mom_tv'}
+              currentVoiceId={state.activeVoiceId}
+              onClose={function() { patchState({ showVoicePicker: false }); }}
+              onVoiceChange={function(voiceId) {
+                // Persist per-profile so the pick survives reload, profile switch,
+                // and TV reboot. Falsy voiceId clears the stored preference.
+                var pid = (state.profile && state.profile.profile_id) || profile.profile_id || 'mom_tv';
+                voicePrefStore.setVoiceId(pid, voiceId);
+                patchState({ activeVoiceId: voiceId });
+              }}
+            />
+          )}
+        </React.Suspense>
 
       </LayoutShell>
     </ThemeProvider>
