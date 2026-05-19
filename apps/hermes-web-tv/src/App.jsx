@@ -81,6 +81,11 @@ var MultiviewModal = React.lazy(function() { return import('./components/Multivi
 // Lazy so the search payload (incl. recent-searches store + debounce util)
 // only ships when the user actually invokes search.
 var SearchModal = React.lazy(function() { return import('./components/SearchModal.jsx'); });
+// ScheduleRecordingModal — "Record this" dialog for live channels. Opens
+// from MediaDetailPanel's Record button (live items only). Hits
+// /api/dvr/schedule via dvrClient.scheduleRecording. Lazy so the form +
+// time-picker logic only ships when the user actually schedules.
+var ScheduleRecordingModal = React.lazy(function() { return import('./components/ScheduleRecordingModal.jsx'); });
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -394,6 +399,11 @@ var INITIAL_STATE = {
   // Profile management CRUD modal — opened from Settings ▸ Profile actions
   // ▸ Manage profiles. Closes via Esc / Back / Close button.
   showProfileManagement: false,
+  // Schedule recording modal — opened from MediaDetailPanel's Record button
+  // (live items only). The pending item is held aside so the modal can
+  // pre-fill channel_id / title without poking back into selectedItem.
+  showScheduleRecording: false,
+  scheduleRecordingItem: null,
   showVoicePicker: false,
   // EPG modal — opened from the "Guide" button in the header. Fetches
   // /api/epg via epgClient.fetchEPG(providerFilter, 4) on open. Closes on
@@ -552,6 +562,10 @@ function App() {
           patchState({ showProfileManagement: false });
           return true;
         }
+        if (state.showScheduleRecording) {
+          patchState({ showScheduleRecording: false, scheduleRecordingItem: null });
+          return true;
+        }
         if (state.selectedItem) {
           patchState({ selectedItem: null, selectedProviderId: null });
           return true;
@@ -576,7 +590,7 @@ function App() {
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch, state.showProfileManagement]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch, state.showProfileManagement, state.showScheduleRecording]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
@@ -955,6 +969,22 @@ function App() {
   // Settings ▸ Manage profiles — opens the CRUD modal.
   function handleManageProfiles() {
     patchState({ showSettings: false, showProfileManagement: true });
+  }
+
+  // MediaDetailPanel ▸ Record (live items) — opens ScheduleRecordingModal
+  // with the channel pre-selected. Parental-gated through the App-level
+  // hook so a PIN cap on the rating is enforced before scheduling.
+  function handleScheduleRecording(item) {
+    if (!item) { return; }
+    if (parentalGate.isContentLocked(item)) {
+      parentalGate.requestUnlock(item).then(function(res) {
+        if (res && res.ok) {
+          patchState({ showScheduleRecording: true, scheduleRecordingItem: item });
+        }
+      });
+      return;
+    }
+    patchState({ showScheduleRecording: true, scheduleRecordingItem: item });
   }
 
   function handleChatbotCommand(commandResult) {
@@ -1620,6 +1650,7 @@ function App() {
               onPlay={handlePlay}
               onFindSimilarActor={handleFindSimilarActor}
               onDownload={handleStartDownload}
+              onScheduleRecording={handleScheduleRecording}
               profileId={profile.profile_id || 'mom_tv'}
             />
           )}
@@ -1811,6 +1842,27 @@ function App() {
               isOpen={state.showProfileManagement}
               onClose={function() { patchState({ showProfileManagement: false }); }}
               onProfilesChange={handleProfilesChange}
+            />
+          )}
+
+          {/* Schedule recording — opens from MediaDetailPanel's Record
+              button for live items. The modal owns time / duration /
+              repeat / quality picking and posts to /api/dvr/schedule.
+              On success we just close; the user can review the result
+              in Settings ▸ Playback ▸ View all recordings. */}
+          {state.showScheduleRecording && state.scheduleRecordingItem && (
+            <ScheduleRecordingModal
+              isOpen={state.showScheduleRecording}
+              item={state.scheduleRecordingItem}
+              profileId={(state.profile && state.profile.profile_id) || 'mom_tv'}
+              tier={state.tier}
+              onClose={function() { patchState({ showScheduleRecording: false, scheduleRecordingItem: null }); }}
+              onScheduled={function() {
+                // The modal already shows its own success state and auto-
+                // closes; we just clean up the pending item so the next
+                // open re-reads from a fresh selection.
+                patchState({ showScheduleRecording: false, scheduleRecordingItem: null });
+              }}
             />
           )}
 
