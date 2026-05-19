@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NuvioShell — HermesTV's cinematic, hero-driven layout (9th layout).
@@ -737,6 +738,10 @@ function NuvioShell(props) {
             background: '#0a0a0a',
           }}
         >
+          {/* Real Continue Watching rail backed by watchHistoryStore — sits
+              as the NEW first rail, before the legacy progress-derived rail
+              and the Movies/Series rails. Returns null when empty. */}
+          <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
           {continueWatching.length > 0 && (
             <NuvioRail
               title="Continue Watching"

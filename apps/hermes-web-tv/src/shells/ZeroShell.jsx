@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZeroShell — HermesTV's clone of the IPTV Player Zero look (8th layout).
@@ -461,6 +462,11 @@ function ZeroShell(props) {
             );
           })}
         </div>
+
+        {/* Continue Watching rail — sits above the main grid, after the
+            top tabs. Returns null when the profile has no history, so the
+            shell collapses gracefully for fresh installs. */}
+        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} />
 
         {/* Section header */}
         <div

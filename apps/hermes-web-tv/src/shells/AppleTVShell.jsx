@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AppleTVShell — HermesTV's clean, glass-blur, big-typography layout, inspired
@@ -242,6 +243,10 @@ function AppleTVShell(props) {
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Continue Watching — first row above the hero. Returns null when
+            the profile has no playback history yet so the hero remains the
+            visual anchor for fresh-install users. */}
+        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
 
         {/* Hero */}
         {featured && (

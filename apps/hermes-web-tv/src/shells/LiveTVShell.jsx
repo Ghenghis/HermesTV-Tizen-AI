@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LiveTVShell — HermesTV's live-first layout shell.
@@ -650,6 +651,10 @@ function LiveTVShell(props) {
           overflowX: 'hidden',
         }}
       >
+        {/* Continue Watching rail — sits just below the Now Playing strip
+            (the strip spans this column above) and before the channel grid. */}
+        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} max={8} />
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <div style={{ fontSize: 'calc(0.85rem * ' + fontScale + ')', fontWeight: 700 }}>
             {activeCategory === '__all__' ? 'All channels' : activeCategory}

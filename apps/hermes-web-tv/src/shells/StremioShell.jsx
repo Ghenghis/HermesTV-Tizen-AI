@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StremioShell — HermesTV's 10th layout, modelled on the open-source Stremio
@@ -662,6 +663,10 @@ function StremioShell(props) {
       >
         {activeTab === 'board' && (
           <div>
+            {/* Real Continue Watching rail backed by watchHistoryStore — sits
+                as the first board, above the legacy placeholder row. Returns
+                null when the profile has no playback history yet. */}
+            <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
             <StremioBoardRow
               title="Continue Watching"
               items={continueWatching}

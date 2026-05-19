@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, useGridVirtualizer } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TiviMateShell — HermesTV's IPTV / EPG-style layout.
@@ -277,7 +278,11 @@ function TiviMateShell(props) {
       </div>
 
       {/* Main EPG area */}
-      <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateRows: 'auto auto 1fr', overflow: 'hidden' }}>
+        {/* Continue Watching — compact 4-card rail above the EPG. Returns
+            null when the profile has no history, so the EPG stays flush
+            against the top edge for fresh-install users. */}
+        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} max={4} />
         {/* Time header — gradient surface band matches sidebar foot recipe */}
         <div style={{
           display: 'grid',
