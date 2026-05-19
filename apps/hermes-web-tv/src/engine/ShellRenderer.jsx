@@ -11,6 +11,9 @@ function ShellRenderer(props) {
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
+  // Optional: shells that surface a Settings tab/button dispatch through here.
+  // Currently only StremioShell wires this up; other shells ignore it.
+  var onOpenSettings = props.onOpenSettings;
 
   var ShellComponent = getShell(layout);
 
@@ -32,6 +35,7 @@ function ShellRenderer(props) {
         contentFilter={contentFilter}
         providerFilter={providerFilter}
         qualityFilter={qualityFilter}
+        onOpenSettings={onOpenSettings}
       />
     </div>
   );

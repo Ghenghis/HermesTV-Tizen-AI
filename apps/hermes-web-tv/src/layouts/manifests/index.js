@@ -8,6 +8,7 @@ import davePower from './dave-power.json';
 import zero from './zero.json';
 import nuvio from './nuvio.json';
 import extremeInfinitv from './extreme-infinitv.json';
+import stremio from './stremio.json';
 
-export const ALL_LAYOUTS = [tivimate, netflix, plex, appleTv, samsungTizen, momMode, davePower, zero, nuvio, extremeInfinitv];
+export const ALL_LAYOUTS = [tivimate, netflix, plex, appleTv, samsungTizen, momMode, davePower, zero, nuvio, extremeInfinitv, stremio];
 export default ALL_LAYOUTS;
