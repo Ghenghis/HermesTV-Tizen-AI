@@ -9,6 +9,7 @@ import { getResponseText } from '../utils/commandResponseText.js';
 import { matchGreeting } from '../utils/chatbotGreetings.js';
 import CommandChips from './CommandChips.jsx';
 import CommandHelpModal from './CommandHelpModal.jsx';
+import { SkeletonBlock } from './Skeleton.jsx';
 
 var STATES = { minimized: 'minimized', compact: 'compact', expanded: 'expanded', walkie: 'walkie-talkie' };
 
@@ -546,17 +547,26 @@ function FloatingChatbot(props) {
           );
         })}
         {submitting && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <div
+            style={{ display: 'flex', justifyContent: 'flex-start' }}
+            role="status"
+            aria-label={agentName + ' is thinking'}
+          >
             <div
               style={{
-                padding: '0.5rem 0.75rem',
+                padding: '0.6rem 0.85rem',
                 borderRadius: '4px 12px 12px 12px',
                 backgroundColor: 'var(--surface-raised, #1c2128)',
-                color: 'var(--muted)',
-                fontSize: 'calc(0.875rem * var(--font-scale, 1))',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
               }}
             >
-              {agentName} is thinking...
+              {/* Three pulsing dots — SkeletonBlock at 8px round so the bubble
+                  reads as "agent typing" rather than a static label. */}
+              <SkeletonBlock width="8px" height="8px" radius="50%" />
+              <SkeletonBlock width="8px" height="8px" radius="50%" />
+              <SkeletonBlock width="8px" height="8px" radius="50%" />
             </div>
           </div>
         )}

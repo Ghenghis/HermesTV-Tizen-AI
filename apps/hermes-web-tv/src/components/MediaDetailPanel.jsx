@@ -3,6 +3,7 @@ import ActorCard from './ActorCard.jsx';
 import StreamingQualityBar from './StreamingQualityBar.jsx';
 import SourceComparePanel from './SourceComparePanel.jsx';
 import SeriesEpisodesBlock from './SeriesEpisodesBlock.jsx';
+import { SkeletonRow } from './Skeleton.jsx';
 
 function MediaDetailPanel(props) {
   var item = props.item || {};
@@ -385,8 +386,10 @@ function MediaDetailPanel(props) {
             )}
           </div>
 
-          {/* Cast row */}
-          {castActors.length > 0 && (
+          {/* Cast row — when castIds exist but the actors array hasn't
+              resolved yet, render shimmer rows so the layout doesn't pop
+              in once the fetch completes. */}
+          {(castActors.length > 0 || castIds.length > 0) && (
             <div style={{ marginBottom: '1.25rem' }}>
               <div
                 style={{
@@ -400,24 +403,32 @@ function MediaDetailPanel(props) {
               >
                 Cast
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  overflowX: 'auto',
-                  paddingBottom: '0.25rem',
-                }}
-              >
-                {castActors.map(function(actor) {
-                  return (
-                    <ActorCard
-                      key={actor.actor_id}
-                      actor={actor}
-                      onMoreWithActor={handleMoreWithActor}
-                    />
-                  );
-                })}
-              </div>
+              {castActors.length > 0 ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.75rem',
+                    overflowX: 'auto',
+                    paddingBottom: '0.25rem',
+                  }}
+                >
+                  {castActors.map(function(actor) {
+                    return (
+                      <ActorCard
+                        key={actor.actor_id}
+                        actor={actor}
+                        onMoreWithActor={handleMoreWithActor}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div aria-label="Loading cast" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </div>
+              )}
             </div>
           )}
 
@@ -459,20 +470,34 @@ function MediaDetailPanel(props) {
             />
           )}
 
-          {/* Similar titles placeholder */}
+          {/* Similar titles — fetch pending until W3-B3 lands. Skeleton
+              rows beat the old static "coming soon" line because the user
+              sees where the recommendations will appear instead of a
+              dead-end placeholder. */}
           <div
+            aria-label="Loading similar titles"
             style={{
               padding: '0.75rem',
               backgroundColor: 'var(--surface-raised, #1c2128)',
               borderRadius: '8px',
-              fontSize: 'calc(0.8rem * var(--font-scale, 1))',
-              color: 'var(--muted)',
-              fontStyle: 'italic',
-              textAlign: 'center',
               marginTop: '1.25rem',
             }}
           >
-            More like this — coming in B3
+            <div
+              style={{
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                color: 'var(--muted)',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                marginBottom: '0.6rem',
+              }}
+            >
+              More like this
+            </div>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
           </div>
         </div>
       </div>
