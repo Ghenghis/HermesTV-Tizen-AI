@@ -21,6 +21,11 @@ import ShellRenderer from './engine/ShellRenderer.jsx';
 // modal opens, so lazy-loading it would defeat the purpose.
 import { SkeletonCard } from './components/Skeleton.jsx';
 import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
+// Side-effect import: initialises the i18n module so the persisted locale
+// is read from localStorage on first paint. Components import the hook /
+// `t` directly from `./i18n/...`; this top-level import just guarantees
+// the module evaluates eagerly rather than lazily with the first modal.
+import './i18n/index.js';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -1408,6 +1413,7 @@ function App() {
             <VoicePickerModal
               isOpen={state.showVoicePicker}
               profileId={profile.profile_id || 'mom_tv'}
+              agentName={profile.agent_name || 'Hermes'}
               currentVoiceId={state.activeVoiceId}
               onClose={function() { patchState({ showVoicePicker: false }); }}
               onVoiceChange={function(voiceId) {

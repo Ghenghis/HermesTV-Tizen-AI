@@ -10,26 +10,31 @@ import { matchGreeting } from '../utils/chatbotGreetings.js';
 import CommandChips from './CommandChips.jsx';
 import CommandHelpModal from './CommandHelpModal.jsx';
 import { SkeletonBlock } from './Skeleton.jsx';
+import { useTranslation } from '../i18n/useTranslation.js';
 
 var STATES = { minimized: 'minimized', compact: 'compact', expanded: 'expanded', walkie: 'walkie-talkie' };
-
-var MOCK_HISTORY = [
-  { role: 'agent', text: 'Hi! I\'m Hermes. Type a command or tap a Suggestion below. Try: show movies, mom mode, dark theme, show 4K.' },
-];
 
 // Friendlier no-match message shown when the backend returns
 // { valid: false, source: 'no_match' } — the 22-pattern table missed and
 // the LLM fallback is not configured. The user's input reached the server
-// fine, so do NOT call this a connectivity issue.
-function buildNoMatchReply(userText) {
+// fine, so do NOT call this a connectivity issue. Translated client-side
+// via the i18n `t` parameter so Spanish-locale users get the localized
+// fallback too.
+function buildNoMatchReply(userText, t) {
   var trimmed = (userText || '').trim();
-  var prefix = trimmed.length > 0 && trimmed.length <= 40
-    ? 'I didn\'t understand "' + trimmed + '". '
-    : 'I didn\'t understand that. ';
-  return prefix + 'Try "show movies", "show 4K", "mom mode", or "dark theme" — or tap a Suggestion below.';
+  if (trimmed.length > 0 && trimmed.length <= 40) {
+    return t('chatbot.no_match_known', { text: trimmed });
+  }
+  return t('chatbot.no_match_generic');
 }
 
 function FloatingChatbot(props) {
+  // Pull the translator. Initial greeting is built from t() rather than
+  // a module-level constant so a locale switch before the first message
+  // is sent picks up the right language.
+  var tx = useTranslation();
+  var t = tx.t;
+
   var profile = props.profile || {};
   var online = props.online !== false;
 
@@ -42,7 +47,12 @@ function FloatingChatbot(props) {
   chatState = stateResult[0];
   setChatState = stateResult[1];
 
-  var historyResult = React.useState(MOCK_HISTORY.slice());
+  // Seed history with the localized greeting. We don't re-seed on locale
+  // change because the user may already have messages above it; keeping
+  // history stable matches Zero's behaviour.
+  var historyResult = React.useState(function() {
+    return [{ role: 'agent', text: t('chatbot.greeting') }];
+  });
   var history = historyResult[0];
   var setHistory = historyResult[1];
 
@@ -105,7 +115,7 @@ function FloatingChatbot(props) {
       lowerText.indexOf('api_key') !== -1 ||
       lowerText.indexOf('secret') !== -1
     ) {
-      setErrorText('Credential input is not accepted. Please use the QR onboarding flow.');
+      setErrorText(t('chatbot.credentials_blocked'));
       return;
     }
 
@@ -166,7 +176,7 @@ function FloatingChatbot(props) {
         // This is NOT a network failure — the server is healthy, it just
         // didn't recognise the phrase. Show a friendly client-side reply
         // rather than echoing the verbose server error string.
-        var noMatchReply = buildNoMatchReply(text);
+        var noMatchReply = buildNoMatchReply(text, t);
         setHistory(function(prev) {
           return prev.concat([{ role: 'agent', text: noMatchReply }]);
         });
@@ -181,7 +191,7 @@ function FloatingChatbot(props) {
       // so lint doesn't flag it and so console retains the diagnostic.
       if (err && err.message) { try { console.warn('[chatbot] validate failed:', err.message); } catch (e) {} }
       setSubmitting(false);
-      var fallback = 'Couldn\'t reach the server. Try again in a moment.';
+      var fallback = t('chatbot.network_error');
       setHistory(function(prev) {
         return prev.concat([{ role: 'agent', text: fallback }]);
       });
@@ -219,7 +229,7 @@ function FloatingChatbot(props) {
         // NOT a connectivity issue. Chip commands are exact matches so
         // this should never fire, but keep the friendly fallback for
         // parity if the command table ever drifts.
-        var chipNoMatch = buildNoMatchReply(commandText);
+        var chipNoMatch = buildNoMatchReply(commandText, t);
         setHistory(function(prev) {
           return prev.concat([{ role: 'agent', text: chipNoMatch }]);
         });
@@ -229,7 +239,7 @@ function FloatingChatbot(props) {
       if (err && err.message) { try { console.warn('[chatbot] chip validate failed:', err.message); } catch (e) {} }
       setSubmitting(false);
       setInputText('');
-      var chipFallback = 'Couldn\'t reach the server. Try again.';
+      var chipFallback = t('chatbot.network_error_short');
       setHistory(function(prev) {
         return prev.concat([{ role: 'agent', text: chipFallback }]);
       });
@@ -254,7 +264,7 @@ function FloatingChatbot(props) {
     return (
       <button
         tabIndex={0}
-        aria-label={'Open ' + agentName + ' chatbot'}
+        aria-label={t('chatbot.open_aria', { name: agentName })}
         onClick={function() { setChatState(STATES.compact); }}
         onKeyDown={handleMinimizedKey}
         style={{
@@ -325,16 +335,16 @@ function FloatingChatbot(props) {
               className="hermes-focusable hermes-press"
               onClick={function() { setChatState(STATES.expanded); }}
               style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0.2rem 0.4rem' }}
-              aria-label="Expand chat"
+              aria-label={t('chatbot.expand_aria')}
             >
-              Expand
+              {t('chatbot.expand')}
             </button>
             <button
               tabIndex={0}
               className="hermes-focusable hermes-press"
               onClick={function() { setChatState(STATES.minimized); }}
               style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
-              aria-label="Minimize chat"
+              aria-label={t('chatbot.minimize_aria')}
             >
               &times;
             </button>
@@ -353,7 +363,7 @@ function FloatingChatbot(props) {
                 whiteSpace: 'nowrap',
               }}
             >
-              <strong>{msg.role === 'agent' ? agentName : 'You'}:</strong> {msg.text}
+              <strong>{msg.role === 'agent' ? agentName : t('common.you')}:</strong> {msg.text}
             </div>
           );
         })}
@@ -385,7 +395,7 @@ function FloatingChatbot(props) {
         }}
       >
         <div style={{ fontSize: 'calc(0.85rem * var(--font-scale, 1))', fontWeight: '700', color: 'var(--accent)' }}>
-          {agentName} — Voice
+          {t('chatbot.voice_header', { name: agentName })}
         </div>
         {/* Mic indicator */}
         <div
@@ -405,7 +415,7 @@ function FloatingChatbot(props) {
           <span aria-hidden="true">&#x1F3A4;</span>
         </div>
         <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: 'var(--muted)', textAlign: 'center' }}>
-          Listening... (mock mode — Azure TTS only)
+          {t('chatbot.voice_listening')}
         </div>
         <button
           tabIndex={0}
@@ -429,7 +439,7 @@ function FloatingChatbot(props) {
             e.currentTarget.style.outline = 'none';
           }}
         >
-          Switch to text
+          {t('chatbot.voice_switch_text')}
         </button>
       </div>
     );
@@ -490,7 +500,7 @@ function FloatingChatbot(props) {
           </span>
           {!online && (
             <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', color: '#e3b341', backgroundColor: 'rgba(227,179,65,0.15)', border: '1px solid #e3b341', borderRadius: '3px', padding: '0.1rem 0.35rem' }}>
-              OFFLINE
+              {t('common.offline')}
             </span>
           )}
         </div>
@@ -499,9 +509,9 @@ function FloatingChatbot(props) {
             tabIndex={0}
             className="hermes-focusable hermes-press"
             onClick={function() { setShowHelp(true); }}
-            title="Command help"
+            title={t('chatbot.help_title')}
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
-            aria-label="Show command help"
+            aria-label={t('chatbot.help_aria')}
           >
             ?
           </button>
@@ -509,9 +519,9 @@ function FloatingChatbot(props) {
             tabIndex={0}
             className="hermes-focusable hermes-press"
             onClick={function() { setChatState(STATES.walkie); }}
-            title="Walkie-talkie mode"
+            title={t('chatbot.voice_title')}
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
-            aria-label="Switch to voice mode"
+            aria-label={t('chatbot.voice_aria')}
           >
             &#x1F3A4;
           </button>
@@ -519,9 +529,9 @@ function FloatingChatbot(props) {
             tabIndex={0}
             className="hermes-focusable hermes-press"
             onClick={function() { setChatState(STATES.compact); }}
-            title="Compact view"
+            title={t('chatbot.compact_aria')}
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0.2rem 0.4rem' }}
-            aria-label="Compact view"
+            aria-label={t('chatbot.compact_aria')}
           >
             &#x25BC;
           </button>
@@ -529,9 +539,9 @@ function FloatingChatbot(props) {
             tabIndex={0}
             className="hermes-focusable hermes-press"
             onClick={function() { setChatState(STATES.minimized); }}
-            title="Minimize"
+            title={t('chatbot.minimize_full_aria')}
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
-            aria-label="Minimize chatbot"
+            aria-label={t('chatbot.minimize_full_aria')}
           >
             &times;
           </button>
@@ -590,7 +600,7 @@ function FloatingChatbot(props) {
             className="hermes-bubble-in"
             style={{ display: 'flex', justifyContent: 'flex-start' }}
             role="status"
-            aria-label={agentName + ' is thinking'}
+            aria-label={t('chatbot.thinking_aria', { name: agentName })}
           >
             <div
               style={{
@@ -649,7 +659,7 @@ function FloatingChatbot(props) {
           value={inputText}
           onChange={function(e) { setInputText(e.target.value); setErrorText(''); }}
           onKeyDown={handleInputKeyDown}
-          placeholder={'Message ' + agentName + '...'}
+          placeholder={t('chatbot.placeholder', { name: agentName })}
           disabled={submitting}
           style={{
             flex: 1,
@@ -710,7 +720,7 @@ function FloatingChatbot(props) {
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          Send
+          {t('chatbot.send')}
         </button>
       </div>
 
