@@ -1,0 +1,16 @@
+{
+  "id": "ynotv",
+  "name": "Lean TV",
+  "cat": "Modern Players",
+  "description": "Windows-native vibe with channel overlay + watchlist + calendar",
+  "accent": "#4d8bff",
+  "nav_style": "left-mini-rail",
+  "hero_style": "channel-overlay-card",
+  "grid_style": "poster-grid",
+  "tier_required": "any",
+  "tier_floor": "degraded",
+  "best_for": ["live", "movies", "series", "watchlist"],
+  "tizen_safe": true,
+  "mom_friendly": true,
+  "dave_power": false
+}
