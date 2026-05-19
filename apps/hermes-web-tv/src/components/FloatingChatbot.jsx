@@ -95,10 +95,18 @@ function FloatingChatbot(props) {
   function speakIfEnabled(text) {
     if (!profile || !profile.audio_feedback) return;
     if (!online) return;
+    // Azure-only voice path (project rule: docs/11 + memory feedback_voice_tts_azure_only).
+    // Never fall back to browser SpeechSynthesis or Bixby — if Azure returns
+    // status=azure_not_configured (202) the client treats it as silent and
+    // the user sees the rendered text only. This is intentional.
+    //
     // Honour the user's last-picked Azure voice from VoicePickerModal so
     // chatbot replies use Sherri's Aria / Dave's Guy preference rather than
     // whatever the server picked as the profile default. Falls back to the
     // server-side profile_id default when nothing has been persisted yet.
+    // agentName is the implicit narrator (rendered in the bubble strong tag
+    // above), so the spoken line stays first-person and reads naturally as
+    // whichever name Sherri or Dave assigned their agent.
     var prefVoice = voicePrefStore.getVoiceId(profileId);
     voiceClient.speak(text, profileId, prefVoice || undefined).catch(function() {});
   }
