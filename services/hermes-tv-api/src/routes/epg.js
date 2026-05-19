@@ -23,18 +23,34 @@
 const { Router } = require('express');
 const router = Router();
 const { LIVE_DEFS } = require('../data/seedCatalog');
+const xmltv = require('../integrations/xmltv');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/epg?provider=<provider_id>&hours=<n>
+// GET /api/epg?provider=<provider_id>&hours=<n>&force_refresh=1
 //
 // Grid endpoint consumed by apps/hermes-web-tv/src/components/EPGGrid.jsx.
 // Returns { channels, programs, _meta: { source } } so the TV-side React
 // component can render the time-grid without further normalisation.
 //
-// Current implementation is an honest STUB — operators wire a real XMLTV
-// source via XMLTV_URL env + a future xmltvClient.js parser.
+// Three operating modes:
+//   1. XMLTV_URL env set            → fetch + parse + cache via xmltv.js,
+//                                      apply data/channelMap.json mapping,
+//                                      filter to the next `hours` window.
+//   2. XMLTV_URL unset              → stub response with a helpful message
+//                                      pointing at the setup doc.
+//   3. ?force_refresh=1             → bypass cache, but only when env var
+//                                      EPG_ALLOW_FORCE_REFRESH=1 is set
+//                                      (otherwise any LAN client could
+//                                      hammer the upstream source).
+//
+// Response headers:
+//   X-Hermes-XMLTV-Channels         — first 20 raw XMLTV channel IDs from
+//                                      the feed (comma-joined). Lets
+//                                      operators wire channelMap.json
+//                                      without grepping logs. Only emitted
+//                                      when XMLTV_URL is configured.
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/api/epg', (req, res) => {
+router.get('/api/epg', async (req, res) => {
   let hours = parseInt(req.query.hours, 10);
   if (isNaN(hours) || hours < 1) { hours = 4; }
   if (hours > 12) { hours = 12; }
@@ -43,15 +59,113 @@ router.get('/api/epg', (req, res) => {
     ? req.query.provider
     : '';
 
+  const xmltvUrl = (typeof process.env.XMLTV_URL === 'string' && process.env.XMLTV_URL.trim().length > 0)
+    ? process.env.XMLTV_URL.trim()
+    : '';
+
+  // ─── Mode 2: no upstream configured — return the stub ────────────────────
+  if (xmltvUrl.length === 0) {
+    return res.json({
+      channels: [],
+      programs: [],
+      _meta: {
+        source: 'stub',
+        message: 'Set XMLTV_URL env var to enable EPG data — see docs/44_EPG_XMLTV_SETUP.md',
+        requested_provider: provider,
+        requested_hours: hours,
+        server_time: new Date().toISOString(),
+      },
+    });
+  }
+
+  // ─── Mode 1/3: real upstream ─────────────────────────────────────────────
+  // `force_refresh` is a debugging hatch. Off by default to prevent any LAN
+  // client from triggering an upstream fetch on every request — that would
+  // make the operator's XMLTV provider rate-limit them.
+  const wantForce = req.query.force_refresh === '1' || req.query.force_refresh === 'true';
+  const forceAllowed = process.env.EPG_ALLOW_FORCE_REFRESH === '1';
+  const useForce = wantForce && forceAllowed;
+
+  let epg;
+  try {
+    epg = await xmltv.fetchEpg(xmltvUrl, { forceRefresh: useForce });
+  } catch (e) {
+    // fetchEpg never throws by contract, but defense-in-depth: if it does,
+    // surface an honest stub rather than a 500.
+    return res.json({
+      channels: [],
+      programs: [],
+      _meta: {
+        source:        'xmltv',
+        source_label:  xmltv._safeSourceLabel(xmltvUrl),
+        message:       'XMLTV fetch threw unexpectedly — see server logs',
+        requested_provider: provider,
+        requested_hours: hours,
+        server_time:   new Date().toISOString(),
+        error:         'unexpected',
+      },
+    });
+  }
+
+  // Apply the operator-curated XMLTV → HermesTV channel ID map. Channels
+  // not in the map are dropped — the TV grid only renders channels we can
+  // also play back.
+  const mapped = xmltv.applyChannelMap(epg);
+
+  // Expose the raw XMLTV channel IDs as a response header so the operator
+  // can extend channelMap.json without re-running curl. Cap at 20 to keep
+  // the header well under the 8KB envelope.
+  if (mapped.xmltv_channel_ids && mapped.xmltv_channel_ids.length > 0) {
+    res.set('X-Hermes-XMLTV-Channels', mapped.xmltv_channel_ids.join(','));
+  }
+
+  // Filter programs to the requested time window so the grid doesn't render
+  // 7 days of data. `now - 30min` to `now + hours` gives the user a buffer
+  // for "what's on right now" plus the forward look-ahead.
+  const nowMs = Date.now();
+  const windowStartMs = nowMs - 30 * 60 * 1000;
+  const windowEndMs   = nowMs + hours * 60 * 60 * 1000;
+  const programs = mapped.programs.filter(function(p) {
+    const ps = Date.parse(p.start);
+    const pe = Date.parse(p.end);
+    if (isNaN(ps) || isNaN(pe)) { return false; }
+    // Include programs that overlap the window
+    return ps < windowEndMs && pe > windowStartMs;
+  });
+
+  // Provider filter — when the client passes ?provider=apollo_group we still
+  // serve EPG (it's source-agnostic) but echo the filter in _meta so the
+  // EPGGrid component can display a "showing for Apollo Group" caption.
+  // The XMLTV feed itself is provider-agnostic by design.
+
+  // Get cached entry diagnostics — useful for operators tuning the TTL.
+  const cacheInfo = xmltv.getCachedEpg(xmltvUrl);
+
   res.json({
-    channels: [],
-    programs: [],
+    channels: mapped.channels,
+    programs: programs,
     _meta: {
-      source: 'stub',
-      message: 'EPG source not configured — wire an XMLTV URL in settings',
-      requested_provider: provider,
-      requested_hours: hours,
-      server_time: new Date().toISOString(),
+      source:               'xmltv',
+      source_label:         xmltv._safeSourceLabel(xmltvUrl), // host + path only — no creds
+      fetched_at:           epg.fetched_at,
+      channel_count:        mapped.channels.length,
+      program_count:        programs.length,
+      raw_channel_count:    Array.isArray(epg.channels) ? epg.channels.length : 0,
+      raw_program_count:    Array.isArray(epg.programs) ? epg.programs.length : 0,
+      requested_provider:   provider,
+      requested_hours:      hours,
+      window_start:         new Date(windowStartMs).toISOString(),
+      window_end:           new Date(windowEndMs).toISOString(),
+      server_time:          new Date().toISOString(),
+      cache:                cacheInfo ? {
+        age_ms:     cacheInfo.age_ms,
+        fresh:      cacheInfo.fresh,
+        expires_at: cacheInfo.expires_at,
+      } : null,
+      force_refresh: useForce
+        ? 'applied'
+        : (wantForce && !forceAllowed ? 'denied (set EPG_ALLOW_FORCE_REFRESH=1)' : 'not_requested'),
+      error: epg.error || null,
     },
   });
 });

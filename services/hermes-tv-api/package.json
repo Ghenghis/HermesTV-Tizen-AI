@@ -7,12 +7,15 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node ../../tools/schema-validate.js && node ./test/playlists.smoke.js"
+    "test": "node ../../tools/schema-validate.js && node ./test/playlists.smoke.js && node ./test/xmltv.smoke.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
     "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "fast-xml-parser": "^5.8.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.38.0"
   },
-  "engines": { "node": ">=20.0.0" }
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }

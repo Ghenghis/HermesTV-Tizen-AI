@@ -397,6 +397,102 @@ checkRouteModule('routes/backup.js', 'services/hermes-tv-api/src/routes/backup.j
   { method: 'POST', path: '/api/backup/import' },
 ]);
 
+// --- XMLTV integration wiring (PR: feat/xmltv-parser) -----------------------
+// Cheap static check: confirms the XMLTV adapter, channel map, and the new
+// /api/epg upstream wiring all exist. The behavioural test lives in
+// services/hermes-tv-api/test/xmltv.smoke.js — this gate keeps the wiring
+// from quietly disappearing during a refactor.
+console.log('\n--- XMLTV integration (services/hermes-tv-api/src/integrations/xmltv.js) ---');
+var xmltvPath        = path.join(REPO, 'services/hermes-tv-api/src/integrations/xmltv.js');
+var channelMapPath   = path.join(REPO, 'services/hermes-tv-api/src/data/channelMap.json');
+var xmltvSetupDoc    = path.join(REPO, 'docs/44_EPG_XMLTV_SETUP.md');
+
+if (fs.existsSync(xmltvPath)) {
+  var xmltvSrc = fs.readFileSync(xmltvPath, 'utf8');
+  ['fetchEpg', 'parseXmltv', 'getCachedEpg', 'applyChannelMap'].forEach(function(name) {
+    if (xmltvSrc.indexOf(name + ':') !== -1 || xmltvSrc.indexOf('function ' + name) !== -1) {
+      pass('xmltv.js exports ' + name);
+    } else {
+      fail('xmltv.js missing export: ' + name);
+    }
+  });
+  if (xmltvSrc.indexOf('CACHE_TTL_MS') !== -1 && xmltvSrc.indexOf('5 * 60 * 1000') !== -1) {
+    pass('xmltv.js cache TTL = 5 min');
+  } else {
+    fail('xmltv.js cache TTL constant missing or not 5 min');
+  }
+  if (xmltvSrc.indexOf('FETCH_TIMEOUT_MS') !== -1 && xmltvSrc.indexOf('10 * 1000') !== -1) {
+    pass('xmltv.js fetch timeout = 10s');
+  } else {
+    fail('xmltv.js fetch timeout missing or not 10s');
+  }
+  // Credentials must never be logged or echoed — confirm the sanitizer is
+  // wired and that the URL never appears in the source-label helper.
+  if (xmltvSrc.indexOf("require('../lib/sanitizeLog')") !== -1) {
+    pass('xmltv.js routes errors through sanitizeLog');
+  } else {
+    fail('xmltv.js missing sanitizeLog wiring');
+  }
+} else {
+  fail('xmltv.js missing — expected services/hermes-tv-api/src/integrations/xmltv.js');
+}
+
+if (fs.existsSync(channelMapPath)) {
+  var mapData = readJSON('services/hermes-tv-api/src/data/channelMap.json');
+  if (mapData) {
+    // Accept either {map: {...}} envelope or bare {xmltvId: hermesId}.
+    var entries = (mapData.map && typeof mapData.map === 'object') ? mapData.map : mapData;
+    // Strip metadata keys (anything starting with _) so the count is only
+    // real mapping entries.
+    var realEntries = Object.keys(entries).filter(function(k) { return k.charAt(0) !== '_'; });
+    if (realEntries.length >= 3) {
+      pass('channelMap.json has ' + realEntries.length + ' XMLTV → HermesTV mappings');
+    } else {
+      fail('channelMap.json must have >= 3 sample mappings, got ' + realEntries.length);
+    }
+    // Spot-check: every value should start with "live." to match the
+    // routes/channels.js + catchup.js ID space.
+    var bad = realEntries.filter(function(k) {
+      var v = entries[k];
+      return typeof v !== 'string' || v.indexOf('live.') !== 0;
+    });
+    if (bad.length === 0) {
+      pass('channelMap.json — every value is a live.<slug> form');
+    } else {
+      fail('channelMap.json — values must start with live.: ' + bad.join(', '));
+    }
+  }
+} else {
+  fail('channelMap.json missing — expected services/hermes-tv-api/src/data/channelMap.json');
+}
+
+// /api/epg must actually call the XMLTV adapter when XMLTV_URL is set.
+var epgSrcText = fs.existsSync(epgRoutePath) ? fs.readFileSync(epgRoutePath, 'utf8') : '';
+if (epgSrcText.indexOf("require('../integrations/xmltv')") !== -1
+    && epgSrcText.indexOf('XMLTV_URL') !== -1
+    && epgSrcText.indexOf('fetchEpg(') !== -1
+    && epgSrcText.indexOf('applyChannelMap(') !== -1) {
+  pass('routes/epg.js wires XMLTV_URL → fetchEpg → applyChannelMap');
+} else {
+  fail('routes/epg.js missing XMLTV wiring (XMLTV_URL / fetchEpg / applyChannelMap)');
+}
+if (epgSrcText.indexOf('X-Hermes-XMLTV-Channels') !== -1) {
+  pass('routes/epg.js emits X-Hermes-XMLTV-Channels header');
+} else {
+  fail('routes/epg.js missing X-Hermes-XMLTV-Channels header');
+}
+if (epgSrcText.indexOf('EPG_ALLOW_FORCE_REFRESH') !== -1) {
+  pass('routes/epg.js gates force_refresh on EPG_ALLOW_FORCE_REFRESH env');
+} else {
+  fail('routes/epg.js missing EPG_ALLOW_FORCE_REFRESH gate');
+}
+
+if (fs.existsSync(xmltvSetupDoc)) {
+  pass('docs/44_EPG_XMLTV_SETUP.md exists');
+} else {
+  fail('docs/44_EPG_XMLTV_SETUP.md missing');
+}
+
 // Index router registration check — make sure every new module is mounted.
 console.log('\n--- index.js router registration ---');
 var indexPath = path.join(REPO, 'services/hermes-tv-api/src/index.js');
