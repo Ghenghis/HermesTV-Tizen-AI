@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 import * as watchHistoryStore from '../store/watchHistoryStore.js';
+import CategorySidebar from '../components/CategorySidebar.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IptvnatorShell — HermesTV's 13th layout shell, a "Classic 3-pane" surface.
@@ -144,6 +145,14 @@ function IptvnatorShell(props) {
   var tooltipState = React.useState(null);
   var tooltipPlayer = tooltipState[0];
   var setTooltipPlayer = tooltipState[1];
+
+  // Category quick-filter — chips render as a horizontal strip above the
+  // channel list (existing left rail keeps its Playlists/Favorites/Recent
+  // sections). 'all' = no filter; otherwise the slug must match the
+  // catalog item's `item.category` (or `metadata.genre` fallback).
+  var categoryFilterState = React.useState('all');
+  var categoryFilter = categoryFilterState[0];
+  var setCategoryFilter = categoryFilterState[1];
 
   // ─── Recently Viewed — pulled from watchHistoryStore ──────────────────────
   // Mirrors the contract used by SeriesNextUp / useWatchProgress. We always

@@ -1,6 +1,9 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import FavoritesRail from '../components/FavoritesRail.jsx';
+import RecentlyWatchedRail from '../components/RecentlyWatchedRail.jsx';
+import useFavorites from '../hooks/useFavorites.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NetflixShell — HermesTV's cinematic horizontal-rail layout, inspired by the
@@ -26,6 +29,11 @@ function CardRow(props) {
   var title = props.title;
   var items = props.items;
   var onItemSelect = props.onItemSelect;
+  // onItemFocus drives the hero preview without opening the detail panel.
+  // focusedItemId lets each card know whether *it* is the currently-previewed
+  // card so a second click commits to onItemSelect (open modal).
+  var onItemFocus = props.onItemFocus;
+  var focusedItemId = props.focusedItemId;
   var tier = props.tier;
   var fontScale = props.fontScale;
   var profile = props.profile;
@@ -34,6 +42,10 @@ function CardRow(props) {
   // degraded) we skip every transform/box-shadow animation so the .motion-
   // reduced rule in index.css doesn't have to fight us.
   var allowMotion = tier === 'enhanced' && !(profile && profile.reduced_motion);
+
+  // Per-card heart toggle — shares one favorites store with the entire shell.
+  var profileId = (profile && (profile.profile_id || profile.id)) || 'mom_tv';
+  var fav = useFavorites(profileId);
 
   if (!items || items.length === 0) return null;
 
@@ -115,6 +127,42 @@ function CardRow(props) {
                   <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: 'var(--radius-pill)', letterSpacing: '0.05em' }}>
                     {item.quality}
                   </div>
+                )}
+                {item.id && (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label={fav.isFavorite(item.id) ? 'Remove from favorites' : 'Add to favorites'}
+                    aria-pressed={fav.isFavorite(item.id)}
+                    onClick={function(e) { e.stopPropagation(); fav.toggleFavorite(item); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); fav.toggleFavorite(item); } }}
+                    style={{
+                      position: 'absolute',
+                      top: '6px',
+                      left: '6px',
+                      width: '26px', height: '26px',
+                      borderRadius: '50%',
+                      border: '1px solid ' + (fav.isFavorite(item.id) ? '#ef4444' : 'rgba(255,255,255,0.35)'),
+                      background: fav.isFavorite(item.id) ? 'rgba(239,68,68,0.22)' : 'rgba(0,0,0,0.55)',
+                      color: fav.isFavorite(item.id) ? '#ef4444' : '#fff',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      outline: 'none',
+                      transition: 'background-color 140ms ease, color 140ms ease',
+                      zIndex: 2,
+                    }}
+                  >
+                    {fav.isFavorite(item.id) ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+                      </svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+                      </svg>
+                    )}
+                  </button>
                 )}
               </div>
               <div style={{ padding: '6px 4px', fontSize: 'calc(11px * ' + fontScale + ')', color: '#e5e5e5', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -332,9 +380,24 @@ function NetflixShell(props) {
 
         {/* Content rows */}
         <div style={{ paddingTop: '24px' }}>
-          {/* Continue Watching — first card row above all others. Returns
-              null when the profile has no playback history yet. */}
+          {/* Layout order per audit: Favorites → Continue Watching → Recently
+              Watched → catalog. Each rail is purely additive — returns null
+              when empty so degraded states never flash an empty header. */}
+          <FavoritesRail
+            profileId={profile && (profile.profile_id || profile.id)}
+            onItemSelect={onItemSelect}
+            profile={profile}
+            fontScale={fontScale}
+            catalog={filtered}
+          />
           <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
+          <RecentlyWatchedRail
+            profileId={profile && (profile.profile_id || profile.id)}
+            onItemSelect={onItemSelect}
+            profile={profile}
+            fontScale={fontScale}
+            catalog={filtered}
+          />
           <CardRow title="Top Picks For You" items={filtered} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 8)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(4)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />

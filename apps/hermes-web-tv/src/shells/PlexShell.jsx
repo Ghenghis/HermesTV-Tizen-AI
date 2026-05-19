@@ -1,6 +1,9 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import FavoritesRail from '../components/FavoritesRail.jsx';
+import RecentlyWatchedRail from '../components/RecentlyWatchedRail.jsx';
+import useFavorites from '../hooks/useFavorites.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PlexShell — HermesTV's media-server-style layout.
@@ -40,6 +43,10 @@ function GridSection(props) {
   // .motion-reduced body class globally, but reading the profile flag here
   // lets us skip the translateY hover-lift before the CSS even applies.
   var allowMotion = !(profile && profile.reduced_motion);
+
+  // Per-card heart toggle wiring — shares one favorites read per row.
+  var profileId = (profile && (profile.profile_id || profile.id)) || 'mom_tv';
+  var fav = useFavorites(profileId);
 
   if (!items || items.length === 0) return null;
 
@@ -138,6 +145,42 @@ function GridSection(props) {
                   }}>
                     LIVE
                   </div>
+                )}
+                {item.id && (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label={fav.isFavorite(item.id) ? 'Remove from favorites' : 'Add to favorites'}
+                    aria-pressed={fav.isFavorite(item.id)}
+                    onClick={function(e) { e.stopPropagation(); fav.toggleFavorite(item); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); fav.toggleFavorite(item); } }}
+                    style={{
+                      position: 'absolute',
+                      bottom: '6px',
+                      right: '6px',
+                      width: '28px', height: '28px',
+                      borderRadius: '50%',
+                      border: '1px solid ' + (fav.isFavorite(item.id) ? '#ef4444' : 'rgba(255,255,255,0.4)'),
+                      background: fav.isFavorite(item.id) ? 'rgba(239,68,68,0.22)' : 'rgba(0,0,0,0.6)',
+                      color: fav.isFavorite(item.id) ? '#ef4444' : '#fff',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      outline: 'none',
+                      transition: 'background-color 140ms ease, color 140ms ease',
+                      zIndex: 2,
+                    }}
+                  >
+                    {fav.isFavorite(item.id) ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+                      </svg>
+                    )}
+                  </button>
                 )}
               </div>
               <div style={{ padding: '10px 10px 12px', background: '#191b1d' }}>
@@ -358,10 +401,24 @@ function PlexShell(props) {
           </div>
         )}
 
-        {/* Continue Watching — first content row, sits above the On Now /
-            Movies / Series grids. Returns null when the profile has no
-            playback history yet. */}
+        {/* Layout order: Favorites → Continue Watching → Recently Watched →
+            On Now / Movies / Series grids. Each rail is purely additive and
+            returns null when empty. */}
+        <FavoritesRail
+          profileId={profile && (profile.profile_id || profile.id)}
+          onItemSelect={onItemSelect}
+          profile={profile}
+          fontScale={fontScale}
+          catalog={filtered}
+        />
         <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
+        <RecentlyWatchedRail
+          profileId={profile && (profile.profile_id || profile.id)}
+          onItemSelect={onItemSelect}
+          profile={profile}
+          fontScale={fontScale}
+          catalog={filtered}
+        />
         <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
         <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, 10)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
         <GridSection title="Series" items={series.length > 0 ? series : filtered.slice(4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />

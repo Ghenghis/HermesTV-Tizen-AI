@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, useGridVirtualizer } from './shellHelpers.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import CategorySidebar from '../components/CategorySidebar.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TiviMateShell — HermesTV's IPTV / EPG-style layout.
@@ -42,7 +43,23 @@ function TiviMateShell(props) {
 
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
   var liveItems = filtered.filter(function(i) { return i.type === 'live'; });
-  var channelList = liveItems.length > 0 ? liveItems : filtered;
+
+  // Category filter — chosen via the new CategorySidebar rail on the far
+  // left of the shell. 'all' = no filter; otherwise the slug must match the
+  // catalog item's `item.category` (or `metadata.genre` fallback) before the
+  // channel reaches the rail / EPG grid.
+  var categoryFilterResult = React.useState('all');
+  var categoryFilter = categoryFilterResult[0];
+  var setCategoryFilter = categoryFilterResult[1];
+
+  var categoryItems = liveItems;
+  if (categoryFilter !== 'all') {
+    categoryItems = liveItems.filter(function(it) {
+      var slug = (it && it.category) || (it && it.metadata && it.metadata.genre) || 'other';
+      return String(slug).toLowerCase() === categoryFilter;
+    });
+  }
+  var channelList = categoryItems.length > 0 ? categoryItems : filtered;
 
   var activeIdxResult = React.useState(0);
   var activeIdx = activeIdxResult[0];
@@ -88,7 +105,22 @@ function TiviMateShell(props) {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', height: '100%', background: '#0e1217', color: '#e6e9ef', fontFamily: "'Roboto', sans-serif", overflow: 'hidden' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '200px 220px 1fr', height: '100%', background: '#0e1217', color: '#e6e9ef', fontFamily: "'Roboto', sans-serif", overflow: 'hidden' }}>
+
+      {/* Category rail — new in PR for left-sidebar category quick filter.
+          Renders chips derived from item.category on the live items so the
+          counts always reflect what TiviMate will actually paint when the
+          user selects a chip. Orange accent matches the shell identity. */}
+      <div style={{ background: '#0a0d12', borderRight: '1px solid #1b1f27', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <CategorySidebar
+          items={liveItems}
+          activeId={categoryFilter}
+          onSelect={setCategoryFilter}
+          accent={TM_ACCENT}
+          fontScale={fontScale}
+          title="Groups"
+        />
+      </div>
 
       {/* Sidebar */}
       <div style={{ background: '#0a0d12', borderRight: '1px solid #1b1f27', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

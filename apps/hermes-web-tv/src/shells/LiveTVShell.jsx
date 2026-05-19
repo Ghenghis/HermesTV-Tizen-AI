@@ -2,6 +2,7 @@ import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import CategorySidebar from '../components/CategorySidebar.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LiveTVShell — HermesTV's live-first layout shell.
@@ -72,30 +73,10 @@ function _channelNumberOf(item, idx) {
   return String(idx + 1);
 }
 
-// ─── Category derivation ────────────────────────────────────────────────────
-// Drive the left rail from the actual catalog — never hard-code "Sports /
-// News". Order: most-populated first, with "All" pinned at the top. Ties
-// break alphabetically for stable rendering.
-function _deriveCategoryGroups(liveItems) {
-  var counts = {};
-  for (var i = 0; i < liveItems.length; i++) {
-    var it = liveItems[i];
-    var cat = (it && it.category)
-      || (it && it.metadata && it.metadata.genre)
-      || 'Other';
-    counts[cat] = (counts[cat] || 0) + 1;
-  }
-  var names = Object.keys(counts);
-  names.sort(function(a, b) {
-    if (counts[b] !== counts[a]) { return counts[b] - counts[a]; }
-    return a.localeCompare(b);
-  });
-  var groups = [{ id: '__all__', label: 'All channels', count: liveItems.length }];
-  for (var j = 0; j < names.length; j++) {
-    groups.push({ id: names[j], label: names[j], count: counts[names[j]] });
-  }
-  return groups;
-}
+// ─── Category derivation moved to components/CategorySidebar.jsx ────────────
+// The shared CategorySidebar component now derives the rail's chip list from
+// the live items the shell passes in, so this file no longer needs its own
+// helper. The accent / variant / mom-mode whitelisting all live in one place.
 
 // ─── Mini EPG fallback ──────────────────────────────────────────────────────
 // When /api/epg/grid is unreachable or returns nothing for this channel we
@@ -175,7 +156,8 @@ function LiveTVShell(props) {
   var liveItems = filtered.filter(function(i) { return i.type === 'live'; });
 
   // ─── State ────────────────────────────────────────────────────────────────
-  var categoryState = React.useState('__all__');
+  // Category id matches the slug CategorySidebar emits ('all', 'sports', …).
+  var categoryState = React.useState('all');
   var activeCategory = categoryState[0];
   var setActiveCategory = categoryState[1];
 
@@ -199,15 +181,14 @@ function LiveTVShell(props) {
   var setMiniEPG = epgState[1];
 
   // ─── Derived ──────────────────────────────────────────────────────────────
-  var categoryGroups = React.useMemo(function() {
-    return _deriveCategoryGroups(liveItems);
-  }, [liveItems]);
-
+  // CategorySidebar derives its own count list from liveItems — the helper
+  // below (`_deriveCategoryGroups`) is kept only for the header-row count
+  // and is no longer rendered as a chip strip.
   var displayChannels = liveItems;
-  if (activeCategory !== '__all__') {
+  if (activeCategory !== 'all') {
     displayChannels = liveItems.filter(function(it) {
-      var cat = (it && it.category) || (it && it.metadata && it.metadata.genre) || 'Other';
-      return cat === activeCategory;
+      var slug = (it && it.category) || (it && it.metadata && it.metadata.genre) || 'other';
+      return String(slug).toLowerCase() === activeCategory;
     });
   }
 
@@ -575,6 +556,9 @@ function LiveTVShell(props) {
       </section>
 
       {/* ─── ZONE 2: LEFT CATEGORY RAIL ────────────────────────────────── */}
+      {/* Now powered by the shared CategorySidebar so every live-focused
+          shell (TiviMate / LiveTV / Iptvnator / DavePower / Mom / Extreme)
+          renders the same chip set with consistent keyboard navigation. */}
       <aside
         aria-label="Channel categories"
         style={{
@@ -583,58 +567,17 @@ function LiveTVShell(props) {
           background: 'var(--surface, #161b22)',
           border: '1px solid var(--border, #1a2030)',
           borderRadius: '12px',
-          padding: '8px',
-          overflowY: 'auto',
-          overflowX: 'hidden',
+          padding: '4px',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ fontSize: 'calc(0.62rem * ' + fontScale + ')', color: 'var(--muted, #8b949e)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 10px 8px' }}>
-          Categories
-        </div>
-        {categoryGroups.map(function(g) {
-          var isActive = activeCategory === g.id;
-          return (
-            <button
-              key={g.id}
-              tabIndex={0}
-              aria-pressed={isActive}
-              onClick={function() { setActiveCategory(g.id); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setActiveCategory(g.id);
-                }
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                width: '100%',
-                padding: '8px 10px',
-                marginBottom: '2px',
-                background: isActive ? 'var(--surface-raised, #1c2128)' : 'transparent',
-                borderLeft: isActive ? '3px solid var(--accent, #00d4ff)' : '3px solid transparent',
-                borderTop: 'none', borderRight: 'none', borderBottom: 'none',
-                color: isActive ? 'var(--accent, #00d4ff)' : 'var(--text, #e6edf3)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontSize: 'calc(0.78rem * ' + fontScale + ')',
-                fontWeight: isActive ? 700 : 500,
-                outline: 'none',
-                borderRadius: '6px',
-              }}
-              onFocus={function(e) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px var(--accent, #00d4ff)'; }}
-              onBlur={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
-              onMouseEnter={function(e) { if (!isActive) { e.currentTarget.style.background = 'var(--surface-raised, #1c2128)'; } }}
-              onMouseLeave={function(e) { if (!isActive) { e.currentTarget.style.background = 'transparent'; } }}
-            >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {g.label}
-              </span>
-              <span style={{ fontSize: 'calc(0.65rem * ' + fontScale + ')', color: 'var(--muted, #8b949e)', marginLeft: '6px' }}>
-                {g.count}
-              </span>
-            </button>
-          );
-        })}
+        <CategorySidebar
+          items={liveItems}
+          activeId={activeCategory}
+          onSelect={setActiveCategory}
+          fontScale={fontScale}
+          title="Categories"
+        />
       </aside>
 
       {/* ─── ZONE 3: CENTER CHANNEL GRID ───────────────────────────────── */}
@@ -657,7 +600,7 @@ function LiveTVShell(props) {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <div style={{ fontSize: 'calc(0.85rem * ' + fontScale + ')', fontWeight: 700 }}>
-            {activeCategory === '__all__' ? 'All channels' : activeCategory}
+            {activeCategory === 'all' ? 'All channels' : activeCategory}
             <span style={{ marginLeft: '8px', color: 'var(--muted, #8b949e)', fontWeight: 400, fontSize: 'calc(0.7rem * ' + fontScale + ')' }}>
               {displayChannels.length} {displayChannels.length === 1 ? 'channel' : 'channels'}
             </span>
