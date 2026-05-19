@@ -1,4 +1,5 @@
 import mockData from '../../mock/catalog.mock.json';
+import * as profileStore from '../store/profileStore.js';
 
 var VALID_PROFILE_IDS = ['dave_tv', 'mom_tv'];
 
@@ -23,19 +24,68 @@ var FALLBACK_PROFILES = {
   },
 };
 
-function getProfile(profileId) {
-  if (VALID_PROFILE_IDS.indexOf(profileId) === -1) {
-    return Promise.reject(new Error('Invalid profile ID: ' + profileId));
+// Map a profileStore record (v1 schema: id/display_name/active_theme/...) into
+// the shape mockApi historically returned (profile_id/tier/active_layout/...).
+// Keeps App.jsx happy without it needing to know that the source is local.
+function _localToApiShape(local) {
+  if (!local) { return null; }
+  var tier;
+  if (local.tier_override === 'enhanced') { tier = 'enhanced'; }
+  else if (local.tier_override === 'degraded') { tier = 'degraded'; }
+  else {
+    // Auto — infer from TV model prefix the same way App.resolveTier does.
+    var model = String(local.tv_model || '').toUpperCase();
+    tier = (model.indexOf('QN') === 0 || model === 'CUSTOM') ? 'enhanced' : 'degraded';
   }
-  var profiles = mockData.profiles || [];
-  for (var i = 0; i < profiles.length; i++) {
-    if (profiles[i].profile_id === profileId) {
-      return Promise.resolve(Object.assign({}, profiles[i]));
+  return {
+    profile_id: local.id,
+    display_name: local.display_name || local.id,
+    nickname: local.nickname || '',
+    tv_model: local.tv_model || 'QN85Q7FAAFXZA',
+    tier: tier,
+    is_primary_target: tier === 'enhanced',
+    mom_mode: !!local.mom_mode,
+    active_layout: local.mom_mode ? 'jumbo-rail' : 'grid-standard',
+    active_theme: local.active_theme || 'night-blue',
+    font_scale: typeof local.font_scale === 'number' ? local.font_scale : 1.0,
+    reduced_motion: !!local.reduced_motion,
+    audio_feedback: !!local.audio_feedback,
+    agent_name: local.agent_name || 'Hermes',
+    agent_voice: 'azure-en-us-aria-neural',
+    avatar_emoji: local.avatar_emoji || '',
+    quality_preference: {
+      resolution_floor: tier === 'enhanced' ? '1080p' : '720p',
+      prefer_4k: tier === 'enhanced',
+      hdr_preferred: tier === 'enhanced',
+      bitrate_floor_kbps: tier === 'enhanced' ? 4000 : 2000
+    }
+  };
+}
+
+function getProfile(profileId) {
+  // Fast path — built-in mock data still wins for dave_tv / mom_tv when the
+  // user hasn't customised them. This preserves the historic boot greeting,
+  // 4K preference, etc., that the catalog.mock.json carries.
+  if (VALID_PROFILE_IDS.indexOf(profileId) !== -1) {
+    var profiles = mockData.profiles || [];
+    for (var i = 0; i < profiles.length; i++) {
+      if (profiles[i].profile_id === profileId) {
+        return Promise.resolve(Object.assign({}, profiles[i]));
+      }
+    }
+    if (FALLBACK_PROFILES[profileId]) {
+      return Promise.resolve(Object.assign({}, FALLBACK_PROFILES[profileId]));
     }
   }
-  if (FALLBACK_PROFILES[profileId]) {
-    return Promise.resolve(Object.assign({}, FALLBACK_PROFILES[profileId]));
-  }
+  // Custom profile path — created via ProfileManagementModal and persisted to
+  // localStorage. The dev-mock backend has no record of them, but the
+  // profileStore does — translate into the API shape so boot succeeds.
+  try {
+    var local = profileStore.getProfile(profileId);
+    if (local) {
+      return Promise.resolve(_localToApiShape(local));
+    }
+  } catch (_) { /* fall through to the reject below */ }
   return Promise.reject(new Error('Profile not found: ' + profileId));
 }
 
