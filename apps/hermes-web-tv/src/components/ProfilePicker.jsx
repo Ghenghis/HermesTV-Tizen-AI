@@ -203,6 +203,11 @@ function AddProfileTile(props) {
 
 function ProfilePicker(props) {
   var onSelect = props.onSelect;
+  // When `embedded` is true the picker drops its full-screen chrome
+  // (radial-gradient background + min-height:100vh) so it can sit inside
+  // a parent container — e.g. the OnboardingWizard's step body. The tile
+  // visuals stay identical.
+  var embedded = props.embedded === true;
 
   // Snapshot of the stored profiles. Re-read whenever the management modal
   // closes (it may have added / removed / renamed records).
@@ -245,19 +250,29 @@ function ProfilePicker(props) {
     setProfiles(next);
   }
 
+  var rootStyle = embedded ? {
+    background: 'transparent',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '2rem',
+    padding: '0',
+    width: '100%',
+  } : {
+    minHeight: '100vh',
+    background: 'radial-gradient(ellipse at top, #1a2030 0%, #0d1117 60%, #08090d 100%)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '3rem',
+  };
+
   return (
     <div
-      className="hermes-modal-overlay"
-      style={{
-        minHeight: '100vh',
-        background: 'radial-gradient(ellipse at top, #1a2030 0%, #0d1117 60%, #08090d 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '2.5rem',
-        padding: '2rem 1rem'
-      }}
+      className={embedded ? '' : 'hermes-modal-overlay'}
+      style={rootStyle}
     >
       <h1
         className="hermes-modal-panel"
