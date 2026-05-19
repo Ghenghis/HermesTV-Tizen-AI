@@ -4,6 +4,8 @@ import StreamingQualityBar from './StreamingQualityBar.jsx';
 import SourceComparePanel from './SourceComparePanel.jsx';
 import SeriesEpisodesBlock from './SeriesEpisodesBlock.jsx';
 import { SkeletonRow } from './Skeleton.jsx';
+import ParentalLockOverlay from './ParentalLockOverlay.jsx';
+import useParentalGate from '../hooks/useParentalGate.js';
 import { getSkipIntro, setSkipIntro } from '../store/skipIntroPrefStore.js';
 
 function MediaDetailPanel(props) {
@@ -20,6 +22,12 @@ function MediaDetailPanel(props) {
   // shared 'shared' bucket so the toggle still works for unauthenticated
   // sessions. App.jsx can pass props.profileId in a follow-up.
   var profileId = props.profileId || 'shared';
+
+  // Parental gate — wraps Play and Download. The hook returns
+  // {isContentLocked, requestUnlock, overlayProps} and we render the
+  // overlay inside the same modal so the gate appears in-context. When
+  // the user types the right PIN, the original handler fires.
+  var parentalGate = useParentalGate();
 
   // Compute whether playback is currently possible — disable the Watch button
   // when no provider is configured (source_health.status === 'not_configured').
@@ -432,9 +440,14 @@ function MediaDetailPanel(props) {
               disabled={!canPlay}
               title={canPlay ? 'Start playback' : noPlayReason}
               onClick={function() {
-                if (canPlay && typeof onPlay === 'function') {
-                  onPlay(item, selectedProviderId || null);
+                if (!canPlay || typeof onPlay !== 'function') { return; }
+                if (parentalGate.isContentLocked(item)) {
+                  parentalGate.requestUnlock(item).then(function(res) {
+                    if (res && res.ok) { onPlay(item, selectedProviderId || null); }
+                  });
+                  return;
                 }
+                onPlay(item, selectedProviderId || null);
               }}
               style={{
                 padding: '0.8rem 1.8rem',
@@ -478,7 +491,14 @@ function MediaDetailPanel(props) {
                 disabled={!canPlay}
                 title={canPlay ? 'Download for offline viewing' : noPlayReason}
                 onClick={function() {
-                  if (canPlay && typeof onDownload === 'function') { onDownload(item); }
+                  if (!canPlay || typeof onDownload !== 'function') { return; }
+                  if (parentalGate.isContentLocked(item)) {
+                    parentalGate.requestUnlock(item).then(function(res) {
+                      if (res && res.ok) { onDownload(item); }
+                    });
+                    return;
+                  }
+                  onDownload(item);
                 }}
                 aria-label={'Download ' + (item.title || 'item')}
                 style={{
@@ -746,6 +766,12 @@ function MediaDetailPanel(props) {
           </div>
         </div>
       </div>
+
+      {/* Parental gate overlay — rendered as a sibling of the modal-panel
+          (NOT a descendant) so its position:fixed isn't trapped inside the
+          panel's will-change/transform containing block. Layered above the
+          detail panel via its own zIndex (90 > our 50). */}
+      <ParentalLockOverlay {...parentalGate.overlayProps} />
     </div>
   );
 }
