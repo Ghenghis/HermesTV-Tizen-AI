@@ -6,7 +6,7 @@
 // `type === 'movie'` or `type === 'movies'`. The mismatch produced empty
 // "Featured Movies" / "Movies" tabs even when the catalog had hundreds of
 // VOD items. Series items that arrive as `type === 'vod'` carry the
-// `is_series === true` flag (Stremio/Xtream convention) so we route them to
+// `is_series === true` flag (Stremio / XC convention) so we route them to
 // the series bucket; otherwise a VOD row is treated as a movie.
 //
 // All predicates are null-safe and ES5-compatible (no arrow functions, no
