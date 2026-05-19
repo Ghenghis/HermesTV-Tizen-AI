@@ -139,17 +139,17 @@ async function probeLayouts() {
   if (!r.body || typeof r.body.count !== 'number') {
     return fail('GET /api/layouts', 'body.count missing');
   }
-  if (r.body.count !== 9) {
-    return fail('GET /api/layouts', 'count=' + r.body.count + ' (expected 9)');
+  if (r.body.count < 9) {
+    return fail('GET /api/layouts', 'count=' + r.body.count + ' (expected >= 9, growing as new shells land)');
   }
   const ids = (r.body.layouts || []).map((l) => l.id);
-  if (ids.indexOf('zero') === -1) {
-    return fail('GET /api/layouts', 'missing layout id "zero" (got: ' + ids.join(',') + ')');
+  const required = ['zero', 'nuvio'];
+  for (let i = 0; i < required.length; i++) {
+    if (ids.indexOf(required[i]) === -1) {
+      return fail('GET /api/layouts', 'missing layout id "' + required[i] + '" (got: ' + ids.join(',') + ')');
+    }
   }
-  if (ids.indexOf('nuvio') === -1) {
-    return fail('GET /api/layouts', 'missing layout id "nuvio" (got: ' + ids.join(',') + ')');
-  }
-  pass('GET /api/layouts', 'count=9 incl. zero + nuvio');
+  pass('GET /api/layouts', 'count=' + r.body.count + ' incl. zero + nuvio');
 }
 
 async function probeCatalog() {
