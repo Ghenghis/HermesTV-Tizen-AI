@@ -218,8 +218,34 @@ function ScheduleRecordingModal(props) {
   React.useEffect(function() {
     if (!isOpen) { return; }
     setTitle((item && item.title) ? item.title : 'Untitled recording');
-    setStartHHMM(_toHHMM(defaultStart));
-    setDuration(60);
+
+    // When the caller supplies item.start_utc (EPG → schedule flow),
+    // pre-fill the time inputs from the program's actual start instead of
+    // "now + 30s". Same trick for duration when item.end_utc is also set —
+    // we snap to the nearest pre-defined option (30 / 60 / 90 / 120 / 180)
+    // so the picker still shows a clean value the user can adjust.
+    var prefStartMs = (item && typeof item.start_utc === 'string') ? Date.parse(item.start_utc) : NaN;
+    if (isFinite(prefStartMs) && prefStartMs > Date.now() - 60 * 1000) {
+      setStartHHMM(_toHHMM(new Date(prefStartMs)));
+    } else {
+      setStartHHMM(_toHHMM(defaultStart));
+    }
+
+    var prefEndMs = (item && typeof item.end_utc === 'string') ? Date.parse(item.end_utc) : NaN;
+    var presetDuration = 60;
+    if (isFinite(prefStartMs) && isFinite(prefEndMs) && prefEndMs > prefStartMs) {
+      var minutes = Math.round((prefEndMs - prefStartMs) / 60000);
+      var snapTo = [30, 60, 90, 120, 180];
+      var best = snapTo[0];
+      var bestDist = Math.abs(minutes - best);
+      for (var i = 1; i < snapTo.length; i++) {
+        var d = Math.abs(minutes - snapTo[i]);
+        if (d < bestDist) { best = snapTo[i]; bestDist = d; }
+      }
+      presetDuration = best;
+    }
+    setDuration(presetDuration);
+
     setQuality(qualityOptions[0].value);
     setRepeats('once');
     setPaddingOn(true);
