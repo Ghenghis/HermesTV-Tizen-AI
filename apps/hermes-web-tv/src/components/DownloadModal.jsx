@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '../i18n/useTranslation.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DownloadModal — IPTV-Player-Zero-style exact-size disclosure dialog.
@@ -22,6 +23,9 @@ import React from 'react';
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DownloadModal(props) {
+  var tx = useTranslation();
+  var t = tx.t;
+
   var isOpen = !!props.isOpen;
   var envelope = props.envelope || null;     // download envelope from /api/download (success path)
   var pending = !!props.pending;             // request in flight
@@ -48,7 +52,7 @@ function DownloadModal(props) {
   // to the bare item title for movies and live items.
   var title = (envelope && envelope.label)
     || (item && item.title)
-    || 'Untitled';
+    || t('common.untitled');
   var sizeHuman = envelope && envelope.exact_size_human ? envelope.exact_size_human : null;
   // "queued" view fires after the user clicks Proceed (parent flips `confirmed`).
   // The envelope.status is always 'queued' on success — that's the API contract —
@@ -62,7 +66,7 @@ function DownloadModal(props) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={'Download ' + title}
+      aria-label={t('download.aria_open', { title: title })}
       onClick={function(e) {
         if (e.target === e.currentTarget && typeof onClose === 'function') { onClose(); }
       }}
@@ -128,7 +132,7 @@ function DownloadModal(props) {
                   textTransform: 'uppercase',
                 }}
               >
-                {isQueued ? 'Download queued' : isError ? 'Download blocked' : 'Exact download size'}
+                {isQueued ? t('download.title_queued') : isError ? t('download.title_blocked') : t('download.title_size')}
               </div>
               <div
                 style={{
@@ -151,16 +155,16 @@ function DownloadModal(props) {
                 }}
               >
                 {isQueued
-                  ? 'Job ID: ' + envelope.job_id
+                  ? t('download.job_id', { id: envelope.job_id })
                   : isError
-                    ? (error.message || 'The server rejected this download.')
-                    : 'Review the size before starting this download.'}
+                    ? (error.message || t('download.server_rejected'))
+                    : t('download.review_hint')}
               </div>
             </div>
           </div>
           <button
             tabIndex={0}
-            aria-label="Close"
+            aria-label={t('common.close')}
             onClick={function() { if (typeof onClose === 'function') { onClose(); } }}
             style={{
               flexShrink: 0,
@@ -201,14 +205,14 @@ function DownloadModal(props) {
           {isError && (
             <div>
               <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', color: 'var(--muted, #7dd3fc)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Server response
+                {t('download.server_response')}
               </div>
               <div style={{ marginTop: '0.3rem', fontSize: 'calc(0.9rem * var(--font-scale, 1))', fontWeight: 600 }}>
                 {error.error}
               </div>
               {threadfinNeeded && (
                 <div style={{ marginTop: '0.5rem', fontSize: 'calc(0.78rem * var(--font-scale, 1))', color: 'var(--muted, #7dd3fc)' }}>
-                  Operator: set <code style={{ background: 'rgba(0,212,255,0.1)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>THREADFIN_URL</code> in the API <code style={{ background: 'rgba(0,212,255,0.1)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>.env</code> and redeploy.
+                  {t('download.threadfin_hint')}
                 </div>
               )}
             </div>
@@ -225,7 +229,7 @@ function DownloadModal(props) {
                     letterSpacing: '0.06em',
                   }}
                 >
-                  Exact download size
+                  {t('download.title_size')}
                 </div>
                 <div
                   style={{
@@ -238,7 +242,7 @@ function DownloadModal(props) {
                 </div>
               </div>
               <span
-                aria-label="Exact size, not an estimate"
+                aria-label={t('download.exact_badge_aria')}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -252,20 +256,20 @@ function DownloadModal(props) {
                   flexShrink: 0,
                 }}
               >
-                Exact
+                {t('download.exact_badge')}
               </span>
             </div>
           )}
 
           {!isError && pending && (
             <div style={{ fontSize: 'calc(0.85rem * var(--font-scale, 1))', color: 'var(--muted, #7dd3fc)' }}>
-              Calculating exact size…
+              {t('download.calculating')}
             </div>
           )}
 
           {isQueued && (
             <div style={{ marginTop: '0.4rem', fontSize: 'calc(0.78rem * var(--font-scale, 1))', color: 'var(--muted, #7dd3fc)' }}>
-              {envelope && envelope._note ? envelope._note : 'The download is queued. The actual byte stream lands in Phase 4 once the operator wires the muxer pipeline.'}
+              {envelope && envelope._note ? envelope._note : t('download.queued_note')}
             </div>
           )}
         </div>
@@ -299,7 +303,7 @@ function DownloadModal(props) {
                 onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #00d4ff)'; e.currentTarget.style.outlineOffset = '2px'; }}
                 onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 tabIndex={0}
@@ -325,7 +329,7 @@ function DownloadModal(props) {
                 onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 212, 255, 0.45), 0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1.05)'; }}
                 onBlur={function(e) { e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1)'; }}
               >
-                Proceed
+                {t('common.proceed')}
               </button>
             </React.Fragment>
           )}
@@ -353,7 +357,7 @@ function DownloadModal(props) {
               onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 212, 255, 0.45), 0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1.05)'; }}
               onBlur={function(e) { e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1)'; }}
             >
-              Close
+              {t('common.close')}
             </button>
           )}
         </div>

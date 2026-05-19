@@ -1,12 +1,19 @@
 import React from 'react';
 import * as voiceClient from '../api/azureVoiceClient.js';
+import { useTranslation } from '../i18n/useTranslation.js';
 
 function VoicePickerModal(props) {
+  var tx = useTranslation();
+  var t = tx.t;
+
   var isOpen = props.isOpen;
   var profileId = props.profileId;
   var currentVoiceId = props.currentVoiceId;
   var onClose = props.onClose;
   var onVoiceChange = props.onVoiceChange;
+  // Agent name flows through props from App.jsx; falls back to 'Hermes'
+  // so existing call sites without the prop continue to work.
+  var agentName = props.agentName || 'Hermes';
 
   var voicesResult = React.useState([]);
   var voices = voicesResult[0];
@@ -40,7 +47,7 @@ function VoicePickerModal(props) {
       setAzureReady(!!data.azure_configured);
       setLoading(false);
     }).catch(function(err) {
-      setStatusMsg('Could not load voices: ' + err.message);
+      setStatusMsg(t('voice.load_failed', { message: err.message }));
       setLoading(false);
     });
 
@@ -62,11 +69,11 @@ function VoicePickerModal(props) {
         // Server's r.message wins (e.g. friendly "TTS unconfigured" stub).
         // Local fallback when r.message is empty avoids naming the env var
         // literally so the credentialGuard middleware never strips it.
-        setStatusMsg(r.message || 'Voice preview unavailable — Azure Speech is not configured on the server.');
+        setStatusMsg(r.message || t('voice.preview_unavailable'));
       }
       setTimeout(function() { setPreviewing(null); }, 800);
     }).catch(function(err) {
-      setStatusMsg('Preview failed: ' + err.message);
+      setStatusMsg(t('voice.preview_failed', { message: err.message }));
       setPreviewing(null);
     });
   }
@@ -77,11 +84,11 @@ function VoicePickerModal(props) {
     voiceClient.setProfileVoice(profileId, voice.id).then(function(r) {
       setSaving(null);
       if (typeof onVoiceChange === 'function') onVoiceChange(voice.id);
-      setStatusMsg('Saved! ' + voice.name + ' is your new voice.');
+      setStatusMsg(t('voice.saved', { name: voice.name }));
       setTimeout(function() { onClose(); }, 800);
     }).catch(function(err) {
       setSaving(null);
-      setStatusMsg('Could not save: ' + err.message);
+      setStatusMsg(t('voice.save_failed', { message: err.message }));
     });
   }
 
@@ -112,8 +119,8 @@ function VoicePickerModal(props) {
           background: 'linear-gradient(180deg, #1c1c28, #15151d)',
         }}>
           <div>
-            <div id="voice-modal-title" style={{ fontSize: 'calc(1.2rem * var(--font-scale, 1))', fontWeight: 800, color: '#e8edf5', letterSpacing: '0.01em' }}>Choose Hermes&apos;s Voice</div>
-            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#8a8f9b', marginTop: '4px' }}>Tap 🔊 to hear a voice, then tap Use to keep it</div>
+            <div id="voice-modal-title" style={{ fontSize: 'calc(1.2rem * var(--font-scale, 1))', fontWeight: 800, color: '#e8edf5', letterSpacing: '0.01em' }}>{t('voice.title', { name: agentName })}</div>
+            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#8a8f9b', marginTop: '4px' }}>{t('voice.subtitle')}</div>
           </div>
           <button
             onClick={onClose}
@@ -140,16 +147,16 @@ function VoicePickerModal(props) {
             border: '1px solid rgba(227,179,65,0.4)', borderRadius: '8px',
             fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#e3b341', lineHeight: 1.4,
           }}>
-            ⚠ Azure Speech is not configured on the server yet. Previews and save will return stubs until the operator wires up the subscription credentials.
+            {t('voice.azure_warning')}
           </div>
         )}
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
           {loading && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#8a8f9b', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>Loading voices…</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#8a8f9b', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>{t('voice.loading')}</div>
           )}
           {!loading && voices.length === 0 && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#8a8f9b', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>No voices available.</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#8a8f9b', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>{t('voice.empty')}</div>
           )}
           {voices.map(function(voice) {
             var isCurrent = voice.id === currentVoiceId;
@@ -170,7 +177,7 @@ function VoicePickerModal(props) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <span style={{ fontWeight: 700, fontSize: 'calc(0.95rem * var(--font-scale, 1))', color: '#e8edf5' }}>{voice.name}</span>
                     <span style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{voice.locale} · {voice.gender} · {voice.tone}</span>
-                    {isCurrent && <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 800, color: '#ff7eb3', border: '1px solid #ff7eb3', borderRadius: '999px', padding: '2px 8px', letterSpacing: '0.06em', background: 'rgba(255,126,179,0.08)' }}>CURRENT</span>}
+                    {isCurrent && <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 800, color: '#ff7eb3', border: '1px solid #ff7eb3', borderRadius: '999px', padding: '2px 8px', letterSpacing: '0.06em', background: 'rgba(255,126,179,0.08)' }}>{t('voice.current_badge')}</span>}
                   </div>
                   <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#9aa3b2', fontStyle: 'italic' }}>"{voice.sample}"</div>
                 </div>
@@ -209,7 +216,7 @@ function VoicePickerModal(props) {
                   onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
                   onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; if (!isCurrent) e.currentTarget.style.transform = 'scale(1.06)'; }}
                   onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
-                >{isCurrent ? 'Active' : (saving === voice.id ? 'Saving…' : 'Use')}</button>
+                >{isCurrent ? t('voice.active') : (saving === voice.id ? t('voice.saving') : t('voice.use'))}</button>
               </div>
             );
           })}
