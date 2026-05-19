@@ -62,6 +62,11 @@ var EPGModal = React.lazy(function() { return import('./components/EPGModal.jsx'
 // in a follow-up). Lazy so the four-stream HLS surface doesn't bloat the
 // initial paint.
 var MultiviewModal = React.lazy(function() { return import('./components/MultiviewModal.jsx'); });
+// SearchModal — global "/" or Ctrl+K search overlay. Hits /api/search with
+// a 200ms debounce and caches the last 10 queries via recentSearchesStore.
+// Lazy so the search payload (incl. recent-searches store + debounce util)
+// only ships when the user actually invokes search.
+var SearchModal = React.lazy(function() { return import('./components/SearchModal.jsx'); });
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -369,6 +374,9 @@ var INITIAL_STATE = {
   actorFilter: null,
   activeLayout: '',
   showLayoutSwitcher: false,
+  // Global search overlay. Toggled by the header Search button, by "/" or
+  // Ctrl+K, and by the chatbot `open_search` command (follow-up).
+  showSearch: false,
   showVoicePicker: false,
   // EPG modal — opened from the "Guide" button in the header. Fetches
   // /api/epg via epgClient.fetchEPG(providerFilter, 4) on open. Closes on
@@ -425,14 +433,43 @@ function App() {
   }
 
   React.useEffect(function() {
-    function onCtrlL(e) {
+    function onGlobalKey(e) {
+      // Bail when focus is in an editable field so "/" or Ctrl+K don't hijack
+      // typing inside the chatbot input, search box, etc. Tizen 6.5 has
+      // isContentEditable + tagName, so this check is safe.
+      var t = e.target;
+      var inEditable = !!t && (
+        t.tagName === 'INPUT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.tagName === 'SELECT' ||
+        (t.isContentEditable === true)
+      );
+
+      // Ctrl+L → layout switcher (existing)
       if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
         patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
+        return;
+      }
+
+      // Ctrl+K → global search (works from anywhere, including inputs)
+      if (e.ctrlKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        patchState(function(prev) { return Object.assign({}, prev, { showSearch: true }); });
+        return;
+      }
+
+      // "/" → global search (skipped when typing in a field — matches Vim,
+      // Stremio, GitHub conventions where slash is a search-from-anywhere
+      // shortcut that yields to the active editor).
+      if (e.key === '/' && !inEditable && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        patchState(function(prev) { return Object.assign({}, prev, { showSearch: true }); });
+        return;
       }
     }
-    document.addEventListener('keydown', onCtrlL);
-    return function() { document.removeEventListener('keydown', onCtrlL); };
+    document.addEventListener('keydown', onGlobalKey);
+    return function() { document.removeEventListener('keydown', onGlobalKey); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Samsung Tizen remote — color buttons + Smart Hub route to chatbot commands.
@@ -485,6 +522,10 @@ function App() {
           patchState({ showLayoutSwitcher: false });
           return true;
         }
+        if (state.showSearch) {
+          patchState({ showSearch: false });
+          return true;
+        }
         if (state.selectedItem) {
           patchState({ selectedItem: null, selectedProviderId: null });
           return true;
@@ -509,7 +550,7 @@ function App() {
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
@@ -1257,6 +1298,37 @@ function App() {
               &#x2699;
             </button>
 
+            {/* Global search button — opens SearchModal. Also wired to the
+                "/" and Ctrl+K keyboard shortcuts at the App level. Hits
+                /api/search through searchClient with a 200ms debounce. */}
+            <button
+              tabIndex={0}
+              onClick={function() { patchState({ showSearch: true }); }}
+              title="Search (/ or Ctrl+K)"
+              aria-label="Open search"
+              style={{
+                padding: '0.4rem 0.9rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text)',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+                letterSpacing: '0.03em',
+                flexShrink: 0,
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid var(--accent)';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              &#x1F50D; Search
+            </button>
+
             {/* TV Guide (EPG) button — opens the EPG modal. Reaches the
                 shipped EPGGrid via EPGModal which fetches /api/epg through
                 epgClient.fetchEPG(providerFilter, 4). Visible on every
@@ -1617,6 +1689,22 @@ function App() {
                     return;
                   }
                 }
+              }}
+            />
+          )}
+
+          {/* Global search modal — opened from header Search button, "/"
+              keypress (outside editable fields), or Ctrl+K. Enter on a
+              result hands the item off to the regular detail panel flow
+              via handleItemClick so playback / favorites work end-to-end. */}
+          {state.showSearch && (
+            <SearchModal
+              isOpen={state.showSearch}
+              profileId={(state.profile && state.profile.profile_id) || 'mom_tv'}
+              onClose={function() { patchState({ showSearch: false }); }}
+              onItemSelect={function(item) {
+                patchState({ showSearch: false });
+                handleItemClick(item);
               }}
             />
           )}
