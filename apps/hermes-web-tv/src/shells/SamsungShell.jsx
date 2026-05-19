@@ -1,7 +1,26 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SamsungShell — brand-native Tizen-feeling layout.
+//
+// Keeps the cobalt (#1428a0) accent as the Samsung-firmware visual cue but
+// upgrades every surface to the shared design tokens introduced in PR #69 /
+// #75:
+//   - radii: var(--radius-xs|sm|md|lg|xl)
+//   - shadows: var(--shadow-md|lg|focus)
+//   - gradients: var(--gradient-accent) for the primary CTA
+//   - hover-lift: translateY(-2px) on cards with the 180ms shared easing
+//
+// Tizen 6.5 (Chrome 76) safe — no :has(), no @container, no logical props.
+// The cobalt accent is preserved as a literal (#1428a0) because that's the
+// brand-firmware cue, not a tokenised value.
+// ─────────────────────────────────────────────────────────────────────────────
+
 var SAMSUNG_TABS = ['Live', 'Movies', 'Series', 'Sports', 'Kids'];
+var SAMSUNG_ACCENT = '#1428a0';
+var SAMSUNG_ACCENT_SOFT = 'rgba(20,40,160,0.25)';
+var SAMSUNG_EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 function SamsungShell(props) {
   var catalog = props.catalog;
@@ -18,6 +37,7 @@ function SamsungShell(props) {
   var movies = filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
   var series = filtered.filter(function(i) { return i.type === 'series'; });
   var fontScale = (profile && profile.font_scale) || 1;
+  var reducedMotion = !!(profile && profile.reduced_motion);
   var activeTabResult = React.useState(0);
   var activeTab = activeTabResult[0];
   var setActiveTab = activeTabResult[1];
@@ -54,19 +74,50 @@ function SamsungShell(props) {
                     if (onItemSelect) onItemSelect(item);
                   }
                 }}
-                style={{ flexShrink: 0, width: cardW + 'px', cursor: 'pointer', borderRadius: '6px', overflow: 'hidden', border: '2px solid transparent', transition: 'border-color 120ms, box-shadow 120ms' }}
-                onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#1428a0'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,40,160,0.25)'; }}
-                onMouseLeave={function(e) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
-                onFocus={function(e) { e.currentTarget.style.borderColor = '#1428a0'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,40,160,0.25)'; }}
-                onBlur={function(e) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
+                style={{
+                  flexShrink: 0,
+                  width: cardW + 'px',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                  border: '2px solid transparent',
+                  // Hover-lift + box-shadow upgrade per PR #75 vocabulary. We
+                  // animate transform + border-color + box-shadow only (no
+                  // layout properties), capped at 180ms on the shared ease-out.
+                  transition: 'transform 180ms ' + SAMSUNG_EASE_OUT + ', border-color 180ms ease, box-shadow 180ms ease',
+                  willChange: 'transform',
+                  transform: 'translateY(0)',
+                  boxShadow: 'var(--shadow-md)',
+                  outline: 'none',
+                }}
+                onMouseEnter={function(e) {
+                  e.currentTarget.style.borderColor = SAMSUNG_ACCENT;
+                  e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                  if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={function(e) {
+                  e.currentTarget.style.borderColor = 'transparent';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.borderColor = SAMSUNG_ACCENT;
+                  e.currentTarget.style.boxShadow = '0 0 0 3px ' + SAMSUNG_ACCENT_SOFT + ', 0 12px 36px rgba(20,40,160,0.35)';
+                  if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.borderColor = 'transparent';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
                 tabIndex={0}
               >
                 <div style={{ width: cardW + 'px', height: cardH + 'px', background: posterBg(item, idx), position: 'relative' }}>
                   {showLive && (
-                    <div style={{ position: 'absolute', top: '6px', left: '6px', background: '#e50914', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '2px', letterSpacing: '0.05em' }}>LIVE</div>
+                    <div style={{ position: 'absolute', top: '6px', left: '6px', background: '#e50914', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: 'var(--radius-xs)', letterSpacing: '0.05em' }}>LIVE</div>
                   )}
                   {item.quality && (
-                    <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 5px', borderRadius: '2px' }}>{item.quality}</div>
+                    <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 5px', borderRadius: 'var(--radius-xs)' }}>{item.quality}</div>
                   )}
                 </div>
                 <div style={{ background: '#111', padding: '6px 8px', fontSize: 'calc(11px * ' + fontScale + ')', color: '#e8e8e8', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
@@ -81,10 +132,10 @@ function SamsungShell(props) {
   return (
     <div style={{ background: '#0d0d0d', color: '#fff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Samsung One', 'Noto Sans', sans-serif" }}>
 
-      {/* Top bar */}
-      <header style={{ background: '#111', height: '56px', display: 'flex', alignItems: 'center', padding: '0 24px', gap: '24px', flexShrink: 0, borderBottom: '1px solid #222' }}>
+      {/* Top bar — gentle gradient lift (surface-raised → surface) */}
+      <header style={{ background: 'linear-gradient(180deg, #1a1a1a, #111)', height: '56px', display: 'flex', alignItems: 'center', padding: '0 24px', gap: '24px', flexShrink: 0, borderBottom: '1px solid #222' }}>
         <div style={{ fontWeight: 700, fontSize: 'calc(18px * ' + fontScale + ')', color: '#fff' }}>
-          Hermes<span style={{ color: '#1428a0' }}>TV</span>
+          Hermes<span style={{ color: SAMSUNG_ACCENT }}>TV</span>
         </div>
         <nav style={{ display: 'flex', gap: '4px' }}>
           {SAMSUNG_TABS.map(function(tab, i) {
@@ -103,18 +154,26 @@ function SamsungShell(props) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  borderBottom: activeTab === i ? '3px solid #1428a0' : '3px solid transparent',
+                  borderBottom: activeTab === i ? '3px solid ' + SAMSUNG_ACCENT : '3px solid transparent',
                   color: activeTab === i ? '#fff' : '#888',
                   fontSize: 'calc(13px * ' + fontScale + ')',
                   fontWeight: activeTab === i ? 600 : 400,
                   cursor: 'pointer',
                   padding: '0 14px',
                   height: '56px',
-                  transition: 'color 120ms',
+                  borderRadius: 'var(--radius-sm)',
+                  transition: 'color 180ms ease, background-color 180ms ease',
                   outline: 'none',
                 }}
-                onFocus={function(e) { e.currentTarget.style.outline = '2px solid #1428a0'; e.currentTarget.style.outlineOffset = '-2px'; }}
-                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid ' + SAMSUNG_ACCENT;
+                  e.currentTarget.style.outlineOffset = '-2px';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px ' + SAMSUNG_ACCENT_SOFT;
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.outline = 'none';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               >
                 {tab}
               </button>
@@ -131,12 +190,13 @@ function SamsungShell(props) {
           <div style={{ position: 'relative', height: '300px', background: posterBg(featured, 0), flexShrink: 0 }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, #0d0d0d 0%, rgba(13,13,13,0.3) 60%, transparent 100%)' }} />
             <div style={{ position: 'absolute', bottom: '24px', left: '24px', maxWidth: '460px' }}>
-              {featured.genre && <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', color: '#1428a0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>{featured.genre}</div>}
+              {featured.genre && <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', color: SAMSUNG_ACCENT, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>{featured.genre}</div>}
               <div style={{ fontSize: 'calc(28px * ' + fontScale + ')', fontWeight: 700, marginBottom: '8px' }}>{featured.title}</div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                {featured.year && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#888', background: '#1a1a1a', padding: '2px 8px', borderRadius: '3px' }}>{featured.year}</span>}
-                {featured.quality && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#fff', background: '#1428a0', padding: '2px 8px', borderRadius: '3px', fontWeight: 700 }}>{featured.quality}</span>}
+                {featured.year && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#888', background: '#1a1a1a', padding: '2px 10px', borderRadius: 'var(--radius-pill)' }}>{featured.year}</span>}
+                {featured.quality && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#fff', background: SAMSUNG_ACCENT, padding: '2px 10px', borderRadius: 'var(--radius-pill)', fontWeight: 700 }}>{featured.quality}</span>}
               </div>
+              {/* Primary CTA — gradient accent + pill radius + shadow lift */}
               <button
                 data-focusable="true"
                 tabIndex={0}
@@ -147,9 +207,36 @@ function SamsungShell(props) {
                     if (onItemSelect) onItemSelect(featured);
                   }
                 }}
-                style={{ padding: '10px 24px', background: '#1428a0', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 600, fontSize: 'calc(13px * ' + fontScale + ')', cursor: 'pointer', outline: 'none' }}
-                onFocus={function(e) { e.currentTarget.style.outline = '3px solid #fff'; e.currentTarget.style.outlineOffset = '2px'; }}
-                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+                style={{
+                  padding: '10px 24px',
+                  background: 'var(--gradient-accent)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 'var(--radius-pill)',
+                  fontWeight: 700,
+                  fontSize: 'calc(13px * ' + fontScale + ')',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxShadow: 'var(--shadow-md)',
+                  transition: 'transform 180ms ' + SAMSUNG_EASE_OUT + ', box-shadow 180ms ease',
+                  willChange: 'transform',
+                }}
+                onMouseEnter={function(e) {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                  if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={function(e) {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-focus)';
+                  if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
               >
                 ▶ Watch
               </button>
