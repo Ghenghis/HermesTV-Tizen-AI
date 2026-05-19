@@ -971,6 +971,56 @@ function App() {
     patchState({ showSettings: false, showProfileManagement: true });
   }
 
+  // EPGModal ▸ click a program cell. Future programs route to the
+  // ScheduleRecordingModal with start_utc / end_utc pre-filled from the
+  // EPG entry; currently-airing programs route to handlePlay via the
+  // channel resolver so a single Enter key works for both cases.
+  function handleEPGProgramSelect(program) {
+    if (!program) { return; }
+    var startVal = program.start;
+    var startMs = (typeof startVal === 'number') ? startVal : Date.parse(startVal || '');
+    var endVal = program.end;
+    var endMs = (typeof endVal === 'number') ? endVal : Date.parse(endVal || '');
+    var now = Date.now();
+
+    if (isFinite(startMs) && startMs > now) {
+      // Future program → schedule. Synthesize an item that
+      // ScheduleRecordingModal can read directly (channel_id, title,
+      // start_utc, end_utc all flow through unchanged).
+      patchState({ showEPG: false });
+      handleScheduleRecording({
+        id: program.channel_id,
+        channel_id: program.channel_id,
+        title: program.title || '',
+        type: 'live',
+        start_utc: isFinite(startMs) ? new Date(startMs).toISOString() : undefined,
+        end_utc: isFinite(endMs) ? new Date(endMs).toISOString() : undefined,
+      });
+      return;
+    }
+
+    // Currently airing (or past — backend will reject if it's no longer
+    // streamable). Fall through to the channel resolver.
+    handleEPGChannelSelect({ id: program.channel_id, name: program.title || '' });
+  }
+
+  // EPGModal ▸ click a channel name in the sticky left column. Resolves
+  // the channel id to a catalog item and hands off to handlePlay. When
+  // the catalog doesn't carry the channel yet (iptv-org cron hasn't
+  // landed it), we still call handlePlay with a synthesized live item —
+  // /api/play decides whether it can serve a stream.
+  function handleEPGChannelSelect(channel) {
+    if (!channel || !channel.id) { return; }
+    patchState({ showEPG: false });
+    for (var i = 0; i < state.catalog.length; i++) {
+      if (String(state.catalog[i].id) === String(channel.id)) {
+        handlePlay(state.catalog[i], null);
+        return;
+      }
+    }
+    handlePlay({ id: channel.id, title: channel.name || '', type: 'live' }, null);
+  }
+
   // MediaDetailPanel ▸ Record (live items) — opens ScheduleRecordingModal
   // with the channel pre-selected. Parental-gated through the App-level
   // hook so a PIN cap on the rating is enforced before scheduling.
@@ -1778,12 +1828,8 @@ function App() {
               isOpen={state.showEPG}
               providerFilter={state.providerFilter}
               onClose={function() { patchState({ showEPG: false }); }}
-              onProgramSelect={function(/* program */) {
-                // Future: resolve program.channel_id → catalog item, call handlePlay.
-              }}
-              onChannelSelect={function(/* channel */) {
-                // Future: resolve channel.id → catalog item, call handlePlay.
-              }}
+              onProgramSelect={handleEPGProgramSelect}
+              onChannelSelect={handleEPGChannelSelect}
             />
           )}
 
