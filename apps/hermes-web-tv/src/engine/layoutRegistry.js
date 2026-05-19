@@ -7,6 +7,7 @@ import MomModeShell from '../shells/MomModeShell.jsx';
 import DavePowerShell from '../shells/DavePowerShell.jsx';
 import ZeroShell from '../shells/ZeroShell.jsx';
 import NuvioShell from '../shells/NuvioShell.jsx';
+import ExtremeInfiniTVShell from '../shells/ExtremeInfiniTVShell.jsx';
 
 var SHELL_REGISTRY = {
   'tivimate': TiviMateShell,
@@ -18,6 +19,7 @@ var SHELL_REGISTRY = {
   'dave-power': DavePowerShell,
   'zero': ZeroShell,
   'nuvio': NuvioShell,
+  'extreme-infinitv': ExtremeInfiniTVShell,
 };
 
 var LAYOUT_IDS = Object.keys(SHELL_REGISTRY);
