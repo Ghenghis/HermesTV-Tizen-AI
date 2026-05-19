@@ -10,6 +10,7 @@ import NuvioShell from '../shells/NuvioShell.jsx';
 import ExtremeInfiniTVShell from '../shells/ExtremeInfiniTVShell.jsx';
 import StremioShell from '../shells/StremioShell.jsx';
 import LiveTVShell from '../shells/LiveTVShell.jsx';
+import IptvnatorShell from '../shells/IptvnatorShell.jsx';
 
 // NOTE: Three parallel agents are landing NuvioShell / StremioShell /
 // ExtremeInfiniTVShell at the same time as LiveTVShell. When merging
@@ -28,6 +29,7 @@ var SHELL_REGISTRY = {
   'extreme-infinitv': ExtremeInfiniTVShell,
   'stremio': StremioShell,
   'live-tv': LiveTVShell,
+  'iptvnator': IptvnatorShell,
 };
 
 var LAYOUT_IDS = Object.keys(SHELL_REGISTRY);
