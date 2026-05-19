@@ -243,6 +243,9 @@ function SettingsPanelTabbed(props) {
   var onOpenLayoutSwitcher = props.onOpenLayoutSwitcher;
   var onSwitchProfile = props.onSwitchProfile;
   var onResetDefaults = props.onResetDefaults;
+  // Fired when the user clicks "Replay onboarding". App.jsx clears the
+  // onboardingState flag + per-step answers and re-mounts the wizard.
+  var onReplayOnboarding = props.onReplayOnboarding;
   var onThemeChange = props.onThemeChange;
   // onOpenPlaylistImport — fires when the user clicks the new "Import
   // playlist" button on the Playlists tab. App.jsx hosts the modal so the
@@ -377,6 +380,15 @@ function SettingsPanelTabbed(props) {
               onFocus={zeroButtonFocus}
               onBlur={zeroButtonBlur}
             >↺ Reset to defaults</button>
+            {onReplayOnboarding ? (
+              <button
+                tabIndex={0}
+                onClick={onReplayOnboarding}
+                style={zeroButtonStyle('outline')}
+                onFocus={zeroButtonFocus}
+                onBlur={zeroButtonBlur}
+              >▶ Replay onboarding</button>
+            ) : null}
           </div>
         </_Card>
       </div>
