@@ -14,11 +14,15 @@
  *   1. Copy apps/hermes-web-tv/dist/  →  apps/hermes-tv-tizen/dist/
  *   2. Copy config.xml.example       →  dist/config.xml
  *      (substituting hermestv.example.com → tv.daveai.tech in case
- *       any legacy placeholder slipped through)
+ *       any legacy placeholder slipped through). Also validates the CSP
+ *       in the template does NOT contain 'unsafe-eval' — Tizen rejects it.
  *   3. Copy apps/hermes-tv-tizen/icon.png → dist/icon.png
  *      If missing: generate a 117×117 placeholder PNG via Node Buffer.
  *   4. Verify dist/index.html exists and contains <script type="module">
  *   5. Copy src/api/apiBase.js → dist/api/apiBase.js (if not already bundled)
+ *   6. Copy src/platform/*.js → dist/platform/*.js (lifecycle + codec
+ *      capability helpers — kept as raw .js so they can be loaded by
+ *      either bundled or hand-authored Tizen pages.)
  *
  * Hard rules:
  *   - No network calls.
@@ -39,6 +43,8 @@ const ICON_SOURCE = path.join(TIZEN_DIR, 'icon.png');
 const ICON_OUTPUT = path.join(TIZEN_DIST, 'icon.png');
 const API_BASE_SOURCE = path.join(TIZEN_DIR, 'src', 'api', 'apiBase.js');
 const API_BASE_OUTPUT = path.join(TIZEN_DIST, 'api', 'apiBase.js');
+const PLATFORM_SOURCE_DIR = path.join(TIZEN_DIR, 'src', 'platform');
+const PLATFORM_OUTPUT_DIR = path.join(TIZEN_DIST, 'platform');
 
 const PROD_API_HOST = 'tv.daveai.tech';
 const LEGACY_PLACEHOLDER = 'hermestv.example.com';
@@ -84,7 +90,7 @@ function emptyDir(dir) {
 
 // Step 1 — copy web dist
 function stepCopyWebDist() {
-  log(`step 1/5: copy web build  ${WEB_DIST}  →  ${TIZEN_DIST}`);
+  log(`step 1/6: copy web build  ${WEB_DIST}  →  ${TIZEN_DIST}`);
   if (!fs.existsSync(WEB_DIST)) {
     die(
       `web dist does not exist at ${WEB_DIST}. ` +
@@ -103,7 +109,7 @@ function stepCopyWebDist() {
 
 // Step 2 — copy and substitute config.xml
 function stepCopyConfigXml() {
-  log(`step 2/5: stage config.xml  ${CONFIG_TEMPLATE}  →  ${CONFIG_OUTPUT}`);
+  log(`step 2/6: stage config.xml  ${CONFIG_TEMPLATE}  →  ${CONFIG_OUTPUT}`);
   if (!fs.existsSync(CONFIG_TEMPLATE)) {
     die(`config template missing: ${CONFIG_TEMPLATE}`);
   }
@@ -111,12 +117,29 @@ function stepCopyConfigXml() {
   // Replace any legacy placeholder host. The template is already updated to
   // daveai.tech, but this substitution stays as a safety net for forks.
   xml = xml.split(LEGACY_PLACEHOLDER).join(PROD_API_HOST);
+
+  // Tizen 6.5's strict CSP rejects 'unsafe-eval'. Failing fast at prep
+  // time means Sherri's TV never gets a build whose policy will cause the
+  // app to refuse to start with a cryptic "Refused to evaluate string"
+  // error in dlog. Per docs/IPTV_Player_Zero/SAMSUNG_TIZEN_PORT.md §CSP.
+  // Extract only the <tizen:content-security-policy> block so the check
+  // doesn't trip on XML comments that document the rule.
+  const cspMatch = xml.match(
+    /<tizen:content-security-policy>([\s\S]*?)<\/tizen:content-security-policy>/i
+  );
+  if (cspMatch && /['"]unsafe-eval['"]/.test(cspMatch[1])) {
+    die(
+      `config.xml.example CSP contains 'unsafe-eval'. ` +
+        `Tizen 6.5 rejects it at app start. Remove it from the ` +
+        `<tizen:content-security-policy> block before rebuilding.`
+    );
+  }
   fs.writeFileSync(CONFIG_OUTPUT, xml, 'utf8');
 }
 
 // Step 3 — icon
 function stepCopyIcon() {
-  log(`step 3/5: stage icon.png`);
+  log(`step 3/6: stage icon.png`);
   if (fs.existsSync(ICON_SOURCE)) {
     fs.copyFileSync(ICON_SOURCE, ICON_OUTPUT);
     return;
@@ -127,7 +150,7 @@ function stepCopyIcon() {
 
 // Step 4 — verify index.html
 function stepVerifyIndexHtml() {
-  log(`step 4/5: verify dist/index.html`);
+  log(`step 4/6: verify dist/index.html`);
   const indexHtml = path.join(TIZEN_DIST, 'index.html');
   if (!fs.existsSync(indexHtml)) {
     die(`dist/index.html does not exist after copy: ${indexHtml}`);
@@ -144,7 +167,7 @@ function stepVerifyIndexHtml() {
 
 // Step 5 — copy apiBase.js into dist/api/ for any non-bundled callers
 function stepCopyApiBase() {
-  log(`step 5/5: stage src/api/apiBase.js → dist/api/apiBase.js`);
+  log(`step 5/6: stage src/api/apiBase.js → dist/api/apiBase.js`);
   if (!fs.existsSync(API_BASE_SOURCE)) {
     die(`apiBase source missing: ${API_BASE_SOURCE}`);
   }
@@ -154,6 +177,29 @@ function stepCopyApiBase() {
   }
   ensureDir(path.dirname(API_BASE_OUTPUT));
   fs.copyFileSync(API_BASE_SOURCE, API_BASE_OUTPUT);
+}
+
+// Step 6 — copy platform helpers (tizenLifecycle, codecCapabilities) into
+// dist/platform/ so any non-bundled inline script in index.html can require
+// them at boot. These are the Tizen-specific shims described in
+// docs/IPTV_Player_Zero/SAMSUNG_TIZEN_PORT.md (visibilitychange decoder
+// release + MediaSource.isTypeSupported probe).
+function stepCopyPlatformHelpers() {
+  log(`step 6/6: stage src/platform/*.js → dist/platform/`);
+  if (!fs.existsSync(PLATFORM_SOURCE_DIR)) {
+    log(`  no src/platform/ directory at ${PLATFORM_SOURCE_DIR} — skipping`);
+    return;
+  }
+  ensureDir(PLATFORM_OUTPUT_DIR);
+  const entries = fs.readdirSync(PLATFORM_SOURCE_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) { continue; }
+    if (!/\.js$/.test(entry.name)) { continue; }
+    const src = path.join(PLATFORM_SOURCE_DIR, entry.name);
+    const dst = path.join(PLATFORM_OUTPUT_DIR, entry.name);
+    fs.copyFileSync(src, dst);
+    log(`  copied ${entry.name}`);
+  }
 }
 
 /**
@@ -266,6 +312,7 @@ function main() {
   stepCopyIcon();
   stepVerifyIndexHtml();
   stepCopyApiBase();
+  stepCopyPlatformHelpers();
   log('done — dist/ is ready for tizen-package.js');
 }
 
