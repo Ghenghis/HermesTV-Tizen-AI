@@ -1,4 +1,5 @@
 import React from 'react';
+import { applyShellFilters, posterBg } from './shellHelpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZeroShell — HermesTV's clone of the IPTV Player Zero look (8th layout).
@@ -18,20 +19,6 @@ import React from 'react';
 // user-visible strings. The visual language is inspired by the public
 // screenshots; no proprietary assets are bundled.
 // ─────────────────────────────────────────────────────────────────────────────
-
-function applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter) {
-  return (catalog || []).filter(function(item) {
-    if (contentFilter !== 'all' && item.type !== contentFilter) { return false; }
-    if (providerFilter !== 'all' && item.provider_id !== providerFilter) { return false; }
-    if (qualityFilter !== 'all') {
-      var q = (item.quality || '').toUpperCase();
-      if (qualityFilter === '4K' && q.indexOf('4K') === -1 && q.indexOf('2160') === -1) { return false; }
-      if (qualityFilter === '1080p+' && q.indexOf('1080') === -1 && q.indexOf('4K') === -1 && q.indexOf('2160') === -1) { return false; }
-      if (qualityFilter === '720p+' && q.indexOf('720') === -1 && q.indexOf('1080') === -1 && q.indexOf('4K') === -1) { return false; }
-    }
-    return true;
-  });
-}
 
 // Star rating used to render the yellow chip on the top-right of each card.
 // Items don't carry a real `user_rating` yet — surface either the resolution
@@ -519,8 +506,11 @@ function ZeroShell(props) {
             >
               {displayItems.map(function(item, idx) {
                 var star = _deriveStarRating(item);
-                var posterUrl = item.poster_url || item.poster || (item.metadata && item.metadata.poster_url) || '';
-                var bg = posterUrl ? 'url(' + posterUrl + ') center/cover no-repeat' : 'linear-gradient(135deg, var(--surface-raised, #1c2128), var(--bg, #0a0e1a))';
+                // posterBg lives in ./shellHelpers.js — single source of truth
+                // across all 8 shells. It checks poster_url → poster →
+                // logo_url → thumb → metadata.poster_url before falling back
+                // to a deterministic gradient hashed by item.id.
+                var bg = posterBg(item, idx);
                 var year = (item.metadata && item.metadata.year) || item.year || '';
                 return (
                   <button
