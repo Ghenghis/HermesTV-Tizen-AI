@@ -301,6 +301,30 @@ function seriesItem(seq, opts) {
   // ...), picsum 2:3 portrait otherwise.
   var poster = posterFor(opts.slug);
   var thumb = picsumThumb(opts.slug);
+
+  // Optional series-only metadata — kept additive so callers that don't
+  // set the new fields render exactly the same shape they did before
+  // these were introduced. The detail panel checks each field and
+  // gracefully hides any block whose backing data is missing.
+  var metadata = {
+    resolution: opts.resolution || '1080p',
+    year: opts.year || 2024,
+    seasons: opts.seasons || 1,
+    genre: opts.genre || 'drama',
+  };
+  if (typeof opts.intro_end_seconds === 'number') {
+    metadata.intro_end_seconds = opts.intro_end_seconds;
+  }
+  if (typeof opts.credits_start_seconds === 'number') {
+    metadata.credits_start_seconds = opts.credits_start_seconds;
+  }
+  if (opts.rating_breakdown && typeof opts.rating_breakdown === 'object') {
+    metadata.rating_breakdown = opts.rating_breakdown;
+  }
+  if (typeof opts.trailer_url === 'string' && opts.trailer_url.length > 0) {
+    metadata.trailer_url = opts.trailer_url;
+  }
+
   return {
     id: id,
     type: 'series',
@@ -314,12 +338,7 @@ function seriesItem(seq, opts) {
     thumbnail_url: thumb,
     profile_access: opts.profile_access || ['dave_tv', 'mom_tv'],
     providers: providers,
-    metadata: {
-      resolution: opts.resolution || '1080p',
-      year: opts.year || 2024,
-      seasons: opts.seasons || 1,
-      genre: opts.genre || 'drama',
-    },
+    metadata: metadata,
     quality: opts.resolution || '1080p',
     year: opts.year || 2024,
     genre: opts.genre || 'drama',
@@ -492,13 +511,38 @@ var VOD_DEFS = [
 // SERIES (~20)
 // ---------------------------------------------------------------------------
 
+// Optional metadata richness — Stranger Things, Severance, The Bear carry
+// intro/credits markers + external ratings + a trailer URL so the series
+// detail panel has at least three items to demonstrate the new blocks.
+// All other series remain on the minimal shape so the additive-field
+// contract is exercised by both the present and absent path.
 var SERIES_DEFS = [
-  { slug: 'stranger-things', title: 'Stranger Things', year: 2016, seasons: 4, genre: 'series', providers: XTREME, resolution: '4K' },
+  {
+    slug: 'stranger-things', title: 'Stranger Things', year: 2016, seasons: 4,
+    genre: 'series', providers: XTREME, resolution: '4K',
+    intro_end_seconds: 78,
+    credits_start_seconds: 2820,
+    rating_breakdown: { imdb: 8.7, rotten_tomatoes: 92, metacritic: 76 },
+    trailer_url: 'https://www.youtube.com/watch?v=b9EkMc79ZSU',
+  },
   { slug: 'house-of-dragon', title: 'House of the Dragon', year: 2022, seasons: 2, genre: 'series', providers: XTREME, resolution: '4K' },
   { slug: 'rings-of-power', title: 'The Rings of Power', year: 2022, seasons: 2, genre: 'series', providers: XTREME, resolution: '4K' },
-  { slug: 'severance', title: 'Severance', year: 2022, seasons: 2, genre: 'series', providers: XTREME, resolution: '4K' },
+  {
+    slug: 'severance', title: 'Severance', year: 2022, seasons: 2,
+    genre: 'series', providers: XTREME, resolution: '4K',
+    intro_end_seconds: 92,
+    credits_start_seconds: 2940,
+    rating_breakdown: { imdb: 8.7, rotten_tomatoes: 97, metacritic: 84 },
+    trailer_url: 'https://www.youtube.com/watch?v=xEQP4VVuyrY',
+  },
   { slug: 'ted-lasso', title: 'Ted Lasso', year: 2020, seasons: 3, genre: 'series', providers: APOLLO, resolution: '1080p' },
-  { slug: 'the-bear', title: 'The Bear', year: 2022, seasons: 3, genre: 'series', providers: XTREME, resolution: '4K' },
+  {
+    slug: 'the-bear', title: 'The Bear', year: 2022, seasons: 3,
+    genre: 'series', providers: XTREME, resolution: '4K',
+    intro_end_seconds: 45,
+    credits_start_seconds: 1740,
+    rating_breakdown: { imdb: 8.6, rotten_tomatoes: 99, metacritic: 87 },
+  },
   { slug: 'wednesday', title: 'Wednesday', year: 2022, seasons: 1, genre: 'series', providers: BOTH, resolution: '4K' },
   { slug: 'yellowstone', title: 'Yellowstone', year: 2018, seasons: 5, genre: 'series', providers: BOTH, resolution: '4K' },
   { slug: '1923', title: '1923', year: 2022, seasons: 1, genre: 'series', providers: APOLLO, resolution: '1080p' },

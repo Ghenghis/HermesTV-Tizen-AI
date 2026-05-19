@@ -4,6 +4,7 @@ import StreamingQualityBar from './StreamingQualityBar.jsx';
 import SourceComparePanel from './SourceComparePanel.jsx';
 import SeriesEpisodesBlock from './SeriesEpisodesBlock.jsx';
 import { SkeletonRow } from './Skeleton.jsx';
+import { getSkipIntro, setSkipIntro } from '../store/skipIntroPrefStore.js';
 
 function MediaDetailPanel(props) {
   var item = props.item || {};
@@ -15,6 +16,10 @@ function MediaDetailPanel(props) {
   var onPlay = props.onPlay;  // (item, providerId?) → parent calls /api/play
   var onFindSimilarActor = props.onFindSimilarActor;  // (actor) → parent filters catalog by actor_id
   var onDownload = props.onDownload;  // (item) → parent opens DownloadModal w/ /api/download envelope
+  // Profile id is read from props.profileId when wired, otherwise we use a
+  // shared 'shared' bucket so the toggle still works for unauthenticated
+  // sessions. App.jsx can pass props.profileId in a follow-up.
+  var profileId = props.profileId || 'shared';
 
   // Compute whether playback is currently possible — disable the Watch button
   // when no provider is configured (source_health.status === 'not_configured').
@@ -54,6 +59,32 @@ function MediaDetailPanel(props) {
   var backdropUrl = item.backdrop_url || metadata.backdrop_url || '';
   var plot = item.plot || metadata.plot || '';
   var castIds = Array.isArray(metadata.cast_ids) ? metadata.cast_ids : [];
+
+  // Optional series-only metadata — every block below is rendered only
+  // when the corresponding field is present, so this stays additive and
+  // non-breaking for items that don't carry the new shape yet.
+  var ratingBreakdown = metadata.rating_breakdown || null;  // { imdb, rotten_tomatoes, metacritic }
+  var introEndSeconds = (typeof metadata.intro_end_seconds === 'number') ? metadata.intro_end_seconds : null;
+  var creditsStartSeconds = (typeof metadata.credits_start_seconds === 'number') ? metadata.credits_start_seconds : null;
+  var hasIntroMarkers = (introEndSeconds !== null || creditsStartSeconds !== null);
+  var isSeries = (item.type === 'series');
+
+  // Skip-intro preference — persisted per profile. We mirror the stored
+  // value in state so the toggle reflects optimistically and the save
+  // happens in the background. Persistence is silent if localStorage is
+  // unavailable (Tizen privacy mode); the in-session toggle still works.
+  var skipIntroResult = React.useState(false);
+  var skipIntroOn = skipIntroResult[0];
+  var setSkipIntroOn = skipIntroResult[1];
+  React.useEffect(function() {
+    setSkipIntroOn(getSkipIntro(profileId));
+  }, [profileId]);
+
+  function toggleSkipIntro() {
+    var next = !skipIntroOn;
+    setSkipIntroOn(next);
+    setSkipIntro(profileId, next);
+  }
 
   // Quality fields
   var quality = item.quality || {};
@@ -321,6 +352,76 @@ function MediaDetailPanel(props) {
             </p>
           )}
 
+          {/* Rating breakdown — IMDb / RT / Metacritic. Renders only when
+              metadata.rating_breakdown is present, so the existing items
+              with no breakdown still render unchanged. Each badge uses the
+              same pill geometry as the year / MPAA tags for visual
+              consistency, but adds a tiny coloured swatch so the source is
+              recognisable at a glance. */}
+          {ratingBreakdown && (
+            <div
+              aria-label="External ratings"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.45rem',
+                margin: '0 0 1rem',
+              }}
+            >
+              {typeof ratingBreakdown.imdb === 'number' && (
+                <span
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    padding: '0.2rem 0.6rem',
+                    border: '1px solid var(--border, #30363d)',
+                    borderRadius: 'var(--radius-pill, 999px)',
+                    background: 'rgba(245,197,24,0.08)',
+                    fontSize: 'calc(0.72rem * var(--font-scale, 1))',
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                  }}
+                >
+                  <span aria-hidden="true" style={{ color: '#f5c518', fontSize: '0.95em' }}>IMDb</span>
+                  <span>{ratingBreakdown.imdb.toFixed(1)}/10</span>
+                </span>
+              )}
+              {typeof ratingBreakdown.rotten_tomatoes === 'number' && (
+                <span
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    padding: '0.2rem 0.6rem',
+                    border: '1px solid var(--border, #30363d)',
+                    borderRadius: 'var(--radius-pill, 999px)',
+                    background: 'rgba(250,50,50,0.08)',
+                    fontSize: 'calc(0.72rem * var(--font-scale, 1))',
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                  }}
+                >
+                  <span aria-hidden="true" style={{ color: '#fa3232' }}>RT</span>
+                  <span>{ratingBreakdown.rotten_tomatoes}%</span>
+                </span>
+              )}
+              {typeof ratingBreakdown.metacritic === 'number' && (
+                <span
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    padding: '0.2rem 0.6rem',
+                    border: '1px solid var(--border, #30363d)',
+                    borderRadius: 'var(--radius-pill, 999px)',
+                    background: 'rgba(102,204,0,0.08)',
+                    fontSize: 'calc(0.72rem * var(--font-scale, 1))',
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                  }}
+                >
+                  <span aria-hidden="true" style={{ color: '#66cc00' }}>MC</span>
+                  <span>{ratingBreakdown.metacritic}</span>
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Watch button — primary CTA. Disabled when no provider is configured;
               the disabled-reason tooltip points the operator at the runbook so
               they know exactly what to do. */}
@@ -495,6 +596,91 @@ function MediaDetailPanel(props) {
             />
           </div>
 
+          {/* Skip-intro preference — only shown for series carrying
+              intro / credits markers in metadata. The toggle persists per
+              profile via skipIntroPrefStore. The actual skip happens
+              inside PlayerModal in a follow-up; this surface owns the
+              preference so series fans can flip it on once and forget
+              about it. */}
+          {isSeries && hasIntroMarkers && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                marginTop: '1.25rem',
+                padding: '0.7rem 0.9rem',
+                background: 'var(--surface-raised, #1c2128)',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-md, 12px)',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 'calc(0.8rem * var(--font-scale, 1))',
+                    fontWeight: 700,
+                    color: 'var(--text, #e6edf3)',
+                  }}
+                >
+                  Skip intro automatically
+                </div>
+                <div
+                  style={{
+                    fontSize: 'calc(0.72rem * var(--font-scale, 1))',
+                    color: 'var(--muted, #8b949e)',
+                    marginTop: '0.15rem',
+                  }}
+                >
+                  {introEndSeconds !== null && (
+                    <span>Intro ends at {Math.round(introEndSeconds)}s. </span>
+                  )}
+                  {creditsStartSeconds !== null && (
+                    <span>Credits start at {Math.round(creditsStartSeconds)}s.</span>
+                  )}
+                </div>
+              </div>
+              <button
+                tabIndex={0}
+                role="switch"
+                aria-checked={skipIntroOn}
+                aria-label={'Skip intro ' + (skipIntroOn ? 'on' : 'off')}
+                onClick={toggleSkipIntro}
+                onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSkipIntro(); } }}
+                style={{
+                  position: 'relative',
+                  width: '46px',
+                  height: '26px',
+                  borderRadius: 'var(--radius-pill, 999px)',
+                  background: skipIntroOn ? 'var(--gradient-accent)' : 'rgba(255,255,255,0.12)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  flexShrink: 0,
+                  transition: 'background 200ms var(--ease-out, ease)',
+                }}
+                onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent)'; e.currentTarget.style.outlineOffset = '3px'; }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: '3px',
+                    left: skipIntroOn ? '23px' : '3px',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    background: '#ffffff',
+                    boxShadow: 'var(--shadow-md, 0 2px 6px rgba(0,0,0,0.4))',
+                    transition: 'left 200ms var(--ease-out, ease)',
+                  }}
+                />
+              </button>
+            </div>
+          )}
+
           {/* Episodes block (series only) — Zero / Smallville-style episode
               list with per-season + per-episode download buttons. Movies
               and live channels never see this block. */}
@@ -506,17 +692,18 @@ function MediaDetailPanel(props) {
             />
           )}
 
-          {/* Similar titles — fetch pending until W3-B3 lands. Skeleton
-              rows beat the old static "coming soon" line because the user
-              sees where the recommendations will appear instead of a
-              dead-end placeholder. Polished with 12px radius + inner shadow
-              for depth. */}
+          {/* Similar titles — fetch pending until W3-B3 lands. The
+              skeleton rows beat the old static "coming soon" line because
+              the user sees where the recommendations will appear instead
+              of a dead-end placeholder. We also surface a short copy line
+              that explains WHEN the rail will populate, so the operator
+              isn't left guessing whether the empty space is a bug. */}
           <div
-            aria-label="Loading similar titles"
+            aria-label="Recommended titles — loading"
             style={{
               padding: '0.9rem',
               backgroundColor: 'var(--surface-raised, #1c2128)',
-              borderRadius: '12px',
+              borderRadius: 'var(--radius-md, 12px)',
               border: '1px solid var(--border, #30363d)',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 24px rgba(0,0,0,0.25)',
               marginTop: '1.25rem',
@@ -524,15 +711,34 @@ function MediaDetailPanel(props) {
           >
             <div
               style={{
-                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
-                fontWeight: '700',
-                color: 'var(--muted)',
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.5rem',
                 marginBottom: '0.6rem',
+                flexWrap: 'wrap',
               }}
             >
-              More like this
+              <div
+                style={{
+                  fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                  fontWeight: '700',
+                  color: 'var(--muted)',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {isSeries ? 'More series like this' : 'More like this'}
+              </div>
+              <div
+                style={{
+                  fontSize: 'calc(0.7rem * var(--font-scale, 1))',
+                  color: 'var(--muted)',
+                  fontStyle: 'italic',
+                }}
+              >
+                Recommendations coming soon — we'll surface titles based on cast, genre, and watch history.
+              </div>
             </div>
             <SkeletonRow />
             <SkeletonRow />
