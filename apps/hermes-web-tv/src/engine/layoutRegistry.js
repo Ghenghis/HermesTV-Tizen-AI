@@ -8,6 +8,7 @@ import DavePowerShell from '../shells/DavePowerShell.jsx';
 import ZeroShell from '../shells/ZeroShell.jsx';
 import NuvioShell from '../shells/NuvioShell.jsx';
 import ExtremeInfiniTVShell from '../shells/ExtremeInfiniTVShell.jsx';
+import StremioShell from '../shells/StremioShell.jsx';
 
 var SHELL_REGISTRY = {
   'tivimate': TiviMateShell,
@@ -20,6 +21,7 @@ var SHELL_REGISTRY = {
   'zero': ZeroShell,
   'nuvio': NuvioShell,
   'extreme-infinitv': ExtremeInfiniTVShell,
+  'stremio': StremioShell,
 };
 
 var LAYOUT_IDS = Object.keys(SHELL_REGISTRY);
