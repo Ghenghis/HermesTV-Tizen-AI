@@ -6,6 +6,7 @@ import SamsungShell from '../shells/SamsungShell.jsx';
 import MomModeShell from '../shells/MomModeShell.jsx';
 import DavePowerShell from '../shells/DavePowerShell.jsx';
 import ZeroShell from '../shells/ZeroShell.jsx';
+import NuvioShell from '../shells/NuvioShell.jsx';
 
 var SHELL_REGISTRY = {
   'tivimate': TiviMateShell,
@@ -16,6 +17,7 @@ var SHELL_REGISTRY = {
   'mom-mode': MomModeShell,
   'dave-power': DavePowerShell,
   'zero': ZeroShell,
+  'nuvio': NuvioShell,
 };
 
 var LAYOUT_IDS = Object.keys(SHELL_REGISTRY);

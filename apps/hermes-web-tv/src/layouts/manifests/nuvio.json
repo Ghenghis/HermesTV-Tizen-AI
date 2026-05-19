@@ -1,0 +1,16 @@
+{
+  "id": "nuvio",
+  "name": "Nuvio-style",
+  "cat": "Modern Players",
+  "description": "Cinematic, hero-driven layout with horizontal content rails",
+  "accent": "#1f6feb",
+  "nav_style": "top-minimal",
+  "hero_style": "cinematic-fade",
+  "grid_style": "horizontal-rails",
+  "tier_required": "enhanced",
+  "tier_floor": "enhanced",
+  "best_for": ["movies", "series"],
+  "tizen_safe": true,
+  "mom_friendly": false,
+  "dave_power": false
+}

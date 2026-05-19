@@ -139,14 +139,17 @@ async function probeLayouts() {
   if (!r.body || typeof r.body.count !== 'number') {
     return fail('GET /api/layouts', 'body.count missing');
   }
-  if (r.body.count !== 8) {
-    return fail('GET /api/layouts', 'count=' + r.body.count + ' (expected 8)');
+  if (r.body.count !== 9) {
+    return fail('GET /api/layouts', 'count=' + r.body.count + ' (expected 9)');
   }
   const ids = (r.body.layouts || []).map((l) => l.id);
   if (ids.indexOf('zero') === -1) {
     return fail('GET /api/layouts', 'missing layout id "zero" (got: ' + ids.join(',') + ')');
   }
-  pass('GET /api/layouts', 'count=8 incl. zero');
+  if (ids.indexOf('nuvio') === -1) {
+    return fail('GET /api/layouts', 'missing layout id "nuvio" (got: ' + ids.join(',') + ')');
+  }
+  pass('GET /api/layouts', 'count=9 incl. zero + nuvio');
 }
 
 async function probeCatalog() {
