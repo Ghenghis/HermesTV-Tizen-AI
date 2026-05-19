@@ -1,5 +1,8 @@
 # HermesTV Tizen AI — Claude Agent Contract Kit
 
+[![HermesTV CI](https://github.com/Ghenghis/HermesTV-Tizen-AI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Ghenghis/HermesTV-Tizen-AI/actions/workflows/ci.yml)
+[![Deploy VPS](https://github.com/Ghenghis/HermesTV-Tizen-AI/actions/workflows/deploy-vps.yml/badge.svg?branch=main)](https://github.com/Ghenghis/HermesTV-Tizen-AI/actions/workflows/deploy-vps.yml)
+
 Repository target:
 
 - Local: `G:\Github\HermesTV-Tizen-AI`
