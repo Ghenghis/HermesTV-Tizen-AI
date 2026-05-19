@@ -141,6 +141,27 @@ const server = app.listen(PORT, () => {
   if (process.env.NODE_ENV !== 'test') {
     try { require('./lib/iptvOrgRefresh').start(); }
     catch (e) { console.warn('[HermesAPI] iptv-org refresh start failed: ' + e.message); }
+
+    // Pre-warm operator-pasted M3U caches (Apollo / xTremeHD) at startup.
+    // Without this, the first /api/catalog request triggers a fresh M3U
+    // fetch which can take 15-30 seconds on a multi-MB master playlist,
+    // and the web client's 20-second timeout fires before the response
+    // arrives → Mom sees "Profile load failed: Request timed out: /api/catalog"
+    // on cold boot. Fire-and-forget — never blocks app.listen, never throws.
+    // 5-min cache TTL means subsequent requests are ~200ms.
+    try {
+      var m3uClient = require('./lib/m3uClient');
+      if (m3uClient.isEnabled()) {
+        console.log('[HermesAPI] pre-warming m3uClient catalog cache (fire-and-forget)...');
+        m3uClient.fetchCatalog({ limit: 600 }).then(function(items) {
+          console.log('[HermesAPI] m3uClient pre-warm complete: ' + (Array.isArray(items) ? items.length : 0) + ' items cached');
+        }).catch(function(err) {
+          console.warn('[HermesAPI] m3uClient pre-warm failed: ' + (err && err.message ? err.message : 'unknown') + ' (catalog still serves seed)');
+        });
+      }
+    } catch (e) {
+      console.warn('[HermesAPI] m3uClient pre-warm hook failed to start: ' + e.message);
+    }
   }
 });
 
