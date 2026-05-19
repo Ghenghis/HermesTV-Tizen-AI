@@ -2,7 +2,6 @@ import React from 'react';
 import * as profileStore from './store/profileStore.js';
 import * as voicePrefStore from './store/voicePrefStore.js';
 import * as hermesApi from './api/hermesApi.js';
-import * as mockApi from './api/mockApi.js';
 import * as voiceClient from './api/azureVoiceClient.js';
 import ThemeProvider from './components/ThemeProvider.jsx';
 import LayoutShell from './components/LayoutShell.jsx';
@@ -17,6 +16,7 @@ import FloatingChatbot from './components/FloatingChatbot.jsx';
 // rendered; App.jsx previously imported it but never used it (per audit
 // W3-A3). Dropped to trim the App.jsx bundle entry by ~6 kB.
 import ShellRenderer from './engine/ShellRenderer.jsx';
+import { isValidLayout } from './engine/layoutRegistry.js';
 // SkeletonCard stays eager — it renders during initial paint before any
 // modal opens, so lazy-loading it would defeat the purpose.
 import { SkeletonCard } from './components/Skeleton.jsx';
@@ -510,7 +510,7 @@ function App() {
   React.useEffect(function() {
     var cleanup = installTizenKeyHandler(
       function(commandText) {
-        var api = state.online ? hermesApi : mockApi;
+        var api = hermesApi;
         api.validateCommand({ command_text: commandText, profile_id: (state.profile && state.profile.profile_id) || 'mom_tv' })
           .then(function(result) {
             if (result && result.valid) {
@@ -634,7 +634,7 @@ function App() {
         return;
       }
 
-      var api = reachable ? hermesApi : mockApi;
+      var api = hermesApi;
       var isOnline = reachable;
 
       return api.getProfile(profileId).then(function(profile) {
@@ -697,10 +697,17 @@ function App() {
             iptvOrgCount: iptvOrgCount,
           });
 
-          // ── Boot greeting via Azure TTS ────────────────────────────────────
+          // ── Boot greeting via Azure TTS (Azure-only path) ──────────────────
+          // Project rule (docs/11 + memory feedback_voice_tts_azure_only):
+          // Azure is the ONLY voice output. No browser SpeechSynthesis, no
+          // Bixby fallback — if Azure is unavailable the user sees the text
+          // and hears silence. This is intentional, not a bug.
+          //
           // Speak a short "Welcome back, Sherri" line through the user's
           // last-picked Azure voice (or the server-side profile default
-          // when nothing has been persisted yet). Skipped when:
+          // when nothing has been persisted yet). The agent's chosen name
+          // (profile.agent_name, e.g. "Nova" or "Hermes") is the implicit
+          // narrator — display_name is the user we're greeting. Skipped when:
           //   - profile.audio_feedback is false (Dave's default — silent)
           //   - the API is unreachable (mock fallback paths)
           //   - AZURE_TTS_KEY is missing on the server (handled silently —
@@ -1621,8 +1628,7 @@ function App() {
         {/* Shell renderer — active shell layout OR default grid */}
         {(function() {
           var resolvedLayout = state.activeLayout || (profile.mom_mode ? 'mom-mode' : '');
-          var validShells = ['tivimate', 'netflix', 'plex', 'apple-tv', 'samsung-tizen', 'mom-mode', 'dave-power', 'zero'];
-          if (resolvedLayout && validShells.indexOf(resolvedLayout) !== -1) {
+          if (resolvedLayout && isValidLayout(resolvedLayout)) {
             return (
               <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <ShellRenderer
@@ -1700,7 +1706,7 @@ function App() {
               onCompleted={function() {
                 // Pairing handshake finished — refresh provider list so the
                 // newly-added entry shows up in ProviderFilter and chips.
-                var api = state.online ? hermesApi : mockApi;
+                var api = hermesApi;
                 api.getProviders().then(function(payload) {
                   var list = payload && payload.providers
                     ? payload.providers
@@ -1829,7 +1835,7 @@ function App() {
                 // Refresh provider list so the new playlist tag appears in
                 // ProviderFilter / FilterBar selects. We re-open Settings so
                 // the user sees the new entry in the Playlists tab list.
-                var api = state.online ? hermesApi : mockApi;
+                var api = hermesApi;
                 api.getProviders().then(function(payload) {
                   var list = payload && payload.providers
                     ? payload.providers
