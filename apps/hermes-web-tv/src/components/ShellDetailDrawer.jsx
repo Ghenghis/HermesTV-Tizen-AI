@@ -161,9 +161,13 @@ function ShellDetailDrawer(props) {
             </p>
           )}
 
-          {/* Actions */}
+          {/* Actions — Watch + Add to List previously had no keyboard
+              focus styling at all. .hermes-focusable wires the shared
+              accent halo + press squish so the remote can land on either
+              CTA and the user sees it. */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
+              className="hermes-focusable hermes-press"
               style={{
                 padding: '10px 20px',
                 borderRadius: '6px',
@@ -180,6 +184,7 @@ function ShellDetailDrawer(props) {
               &#9654; Watch
             </button>
             <button
+              className="hermes-focusable hermes-press"
               style={{
                 padding: '10px 20px',
                 borderRadius: '6px',

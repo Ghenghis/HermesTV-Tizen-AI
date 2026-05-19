@@ -32,9 +32,13 @@ function MiniPlayer(props) {
           overflow: 'hidden',
         }}
       >
-        {/* Close button */}
+        {/* Close button — .hermes-focusable picks up the shared focus halo
+            + active-state squish so it matches every other dismiss button
+            in the app without bespoke inline focus/blur handlers. */}
         <button
           onClick={onClose}
+          className="hermes-focusable hermes-press"
+          aria-label="Close mini player"
           style={{
             position: 'absolute',
             top: '6px',
@@ -50,7 +54,6 @@ function MiniPlayer(props) {
             display: 'grid',
             placeItems: 'center',
             zIndex: 2,
-            outline: 'none',
           }}
         >
           &times;

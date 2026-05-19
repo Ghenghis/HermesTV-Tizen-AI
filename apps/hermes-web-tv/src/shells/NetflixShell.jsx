@@ -160,7 +160,7 @@ function NetflixShell(props) {
             return (
               <button
                 key={tab}
-                data-focusable="true"
+                className="hermes-focusable hermes-press"
                 tabIndex={0}
                 aria-pressed={isActive}
                 onClick={function() { setActiveTab(i); }}
@@ -178,25 +178,14 @@ function NetflixShell(props) {
                   fontWeight: isActive ? 600 : 400,
                   cursor: 'pointer',
                   padding: '12px 0',
-                  // Active tab gets the shared accent gradient underline —
-                  // tints the Netflix red into the cross-shell indigo so the
-                  // active state feels unified without losing brand color.
                   borderBottom: isActive ? '2px solid transparent' : '2px solid transparent',
                   borderImage: isActive ? 'var(--gradient-accent) 1' : 'none',
                   outline: 'none',
                   transition: 'color 120ms ease',
+                  borderRadius: 'var(--radius-sm)',
                 }}
-                onFocus={function(e) {
-                  e.currentTarget.style.color = '#fff';
-                  // Soft focus halo on top nav — uses --shadow-focus so the
-                  // glow color tracks the active theme accent automatically.
-                  e.currentTarget.style.boxShadow = 'var(--shadow-focus)';
-                  e.currentTarget.style.borderRadius = 'var(--radius-sm)';
-                }}
-                onBlur={function(e) {
-                  e.currentTarget.style.color = isActive ? '#fff' : '#b3b3b3';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
+                onMouseEnter={function(e) { e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.color = isActive ? '#fff' : '#b3b3b3'; }}
               >
                 {tab}
               </button>
@@ -236,7 +225,7 @@ function NetflixShell(props) {
                     pill. Keeps the brand red on the left edge while joining
                     the cross-shell accent family on the right. */}
                 <button
-                  data-focusable="true"
+                  className="hermes-focusable hermes-press"
                   tabIndex={0}
                   onClick={function() { if (onItemSelect) onItemSelect(featured); }}
                   onKeyDown={function(e) {
@@ -285,7 +274,7 @@ function NetflixShell(props) {
                 {/* Secondary CTA — translucent surface, pill radius to match
                     the primary so they read as a paired set. */}
                 <button
-                  data-focusable="true"
+                  className="hermes-focusable hermes-press"
                   tabIndex={0}
                   onClick={function() { if (onItemSelect) onItemSelect(featured); }}
                   onKeyDown={function(e) {
