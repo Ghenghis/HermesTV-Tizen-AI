@@ -225,6 +225,11 @@ function SettingsPanelTabbed(props) {
   var onSwitchProfile = props.onSwitchProfile;
   var onResetDefaults = props.onResetDefaults;
   var onThemeChange = props.onThemeChange;
+  // onOpenPlaylistImport — fires when the user clicks the new "Import
+  // playlist" button on the Playlists tab. App.jsx hosts the modal so the
+  // settings panel can close cleanly before the wizard opens (otherwise
+  // both overlays would stack on top of each other).
+  var onOpenPlaylistImport = props.onOpenPlaylistImport;
 
   var activeTabResult = React.useState('general');
   var activeTab = activeTabResult[0];
@@ -261,8 +266,18 @@ function SettingsPanelTabbed(props) {
     return (
       <div>
         <_Card icon="☰" header="Operator playlists" tagline="Add and manage Xtream Codes / M3U / Stalker sources.">
-          <div style={{ fontSize: 'calc(0.85rem * var(--font-scale, 1))', color: 'var(--muted)', marginBottom: '0.5rem' }}>
-            Backend playlist editing happens on the VPS via <code style={{ background: 'rgba(0,212,255,0.1)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>APOLLO_M3U_URL</code> and <code style={{ background: 'rgba(0,212,255,0.1)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>XTREMEHD_M3U_URL</code> environment variables. The frontend add-playlist flow lands once the API exposes write endpoints.
+          <div style={{ fontSize: 'calc(0.85rem * var(--font-scale, 1))', color: 'var(--muted)', marginBottom: '0.6rem' }}>
+            Operator-imported playlists land on the API via the new <code style={{ background: 'rgba(0,212,255,0.1)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>POST /api/playlists/save</code> endpoint. Environment-configured sources (<code style={{ background: 'rgba(0,212,255,0.1)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>APOLLO_M3U_URL</code> / <code style={{ background: 'rgba(0,212,255,0.1)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>XTREMEHD_M3U_URL</code>) keep working in parallel.
+          </div>
+          <div style={{ marginBottom: '0.6rem' }}>
+            <button
+              tabIndex={0}
+              onClick={function() { if (typeof onOpenPlaylistImport === 'function') { onOpenPlaylistImport(); } }}
+              onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (typeof onOpenPlaylistImport === 'function') { onOpenPlaylistImport(); } } }}
+              style={zeroButtonStyle('filled')}
+              onFocus={zeroButtonFocus}
+              onBlur={zeroButtonBlur}
+            >+ Import playlist</button>
           </div>
           {providers && providers.length > 0 ? providers.map(function(p) {
             var label = p.provider_id || p.id || 'provider';
