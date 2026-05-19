@@ -637,7 +637,7 @@ function App() {
         patchState({
           loading: false,
           online: false,
-          error: 'Cannot reach the HermesTV server. Check your network or wait a moment and click Retry.',
+          error: 'Cannot reach the DaveTV server. Check your network or wait a moment and click Retry.',
         });
         return;
       }
@@ -1191,7 +1191,7 @@ function App() {
           }}
         >
           <div style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '0.03em' }}>
-            Hermes<span style={{ color: '#1f6feb' }}>TV</span>
+            Dave<span style={{ color: '#1f6feb' }}>TV</span>
           </div>
           <div style={{ fontSize: '0.8rem', color: '#8b949e' }}>Loading your library...</div>
         </div>
@@ -1409,7 +1409,7 @@ function App() {
                 color: 'var(--text)',
               }}
             >
-              Hermes<span style={{ color: 'var(--accent)' }}>TV</span>
+              Dave<span style={{ color: 'var(--accent)' }}>TV</span>
             </span>
             {state.tier === 'enhanced' && (
               <span
