@@ -21,6 +21,12 @@ function ShellRenderer(props) {
   // Optional: shells that surface a Settings tab/button dispatch through here.
   // Currently only StremioShell wires this up; other shells ignore it.
   var onOpenSettings = props.onOpenSettings;
+  // Hero-focus channel — shells with a hero/preview panel (Netflix, Plex,
+  // AppleTV, Nuvio, ExtremeInfiniTV, Ynotv) read focusedItem to drive the
+  // hero background + title + CTAs, and call onItemFocus on card hover /
+  // remote-focus / single-click. Shells without a hero ignore both.
+  var onItemFocus = props.onItemFocus;
+  var focusedItem = props.focusedItem;
 
   var ShellComponent = getShell(layout);
 
@@ -39,6 +45,8 @@ function ShellRenderer(props) {
         tier={tier}
         providers={providers}
         onItemSelect={onItemSelect}
+        onItemFocus={onItemFocus}
+        focusedItem={focusedItem}
         contentFilter={contentFilter}
         providerFilter={providerFilter}
         qualityFilter={qualityFilter}

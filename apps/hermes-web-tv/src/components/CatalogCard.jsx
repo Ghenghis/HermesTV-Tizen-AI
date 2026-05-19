@@ -2,6 +2,7 @@ import React from 'react';
 import QualityBadge from './QualityBadge.jsx';
 import ProviderBadge from './ProviderBadge.jsx';
 import * as watchHistoryStore from '../store/watchHistoryStore.js';
+import useFavorites from '../hooks/useFavorites.js';
 
 var CONTENT_TYPE_LABELS = {
   live: 'LIVE',
@@ -28,6 +29,14 @@ function CatalogCard(props) {
   // grid memoises CatalogCard via its key prop so cards don't refetch
   // on every render of the grid.
   var profileId = (profile && profile.profile_id) || 'mom_tv';
+
+  // Favorites — heart toggle in the poster slot. useFavorites owns the
+  // optimistic state so the heart flips instantly without an IDB round-trip.
+  // We stop propagation in the click handler so toggling the heart does NOT
+  // also open the detail panel via the card's outer onClick.
+  var fav = useFavorites(profileId);
+  var isFavorited = fav.isFavorite(item && item.id);
+
   var progressState = React.useState(0);
   var progressPct = progressState[0];
   var setProgressPct = progressState[1];
@@ -173,6 +182,63 @@ function CatalogCard(props) {
               backgroundColor: isLive ? 'rgba(0,0,0,0.35)' : 'transparent',
             }}
           />
+        )}
+
+        {/* Heart toggle — sits in the top-right of the poster, doubles as a
+            "favorite this" affordance everywhere the grid renders. Filled red
+            when favorited, outline white otherwise. We stop propagation so a
+            heart-click doesn't also fire the card's outer onClick. */}
+        {item && item.id && (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            aria-pressed={isFavorited}
+            title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            onClick={function(e) {
+              e.stopPropagation();
+              fav.toggleFavorite(item);
+            }}
+            onKeyDown={function(e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                fav.toggleFavorite(item);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              width: '30px',
+              height: '30px',
+              borderRadius: '50%',
+              backgroundColor: isFavorited ? 'rgba(239,68,68,0.22)' : 'rgba(0,0,0,0.55)',
+              border: '1px solid ' + (isFavorited ? '#ef4444' : 'rgba(255,255,255,0.35)'),
+              color: isFavorited ? '#ef4444' : '#ffffff',
+              cursor: 'pointer',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              outline: 'none',
+              transition: 'background-color 140ms ease, color 140ms ease, transform 140ms ease',
+              zIndex: 3,
+              lineHeight: 1,
+            }}
+            onMouseEnter={function(e) { e.currentTarget.style.transform = 'scale(1.1)'; }}
+            onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            {isFavorited ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+              </svg>
+            )}
+          </button>
         )}
       </div>
 

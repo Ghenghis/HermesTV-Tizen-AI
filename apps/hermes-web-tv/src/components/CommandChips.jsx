@@ -1,15 +1,21 @@
 import React from 'react';
 
-// Suggestions chip bar rendered above the chatbot input. Four curated
-// example commands cover the most common UX paths (content filter, quality
-// filter, profile switch, theme switch). Clicking a chip inserts the text
-// and submits via the parent's onSend handler. Full command list still
-// reachable through the ? Help modal.
+// Suggestions chip bar rendered above the chatbot input. Six curated
+// example commands cover the mainstream IPTV-app paths a Mom-mode or
+// Dave user is most likely to want from a single tap: pick a content
+// type, open search, play whatever is focused, pull up tonight's EPG,
+// or change the visual shell. Two chips ("Search for…" / "Change look")
+// resolve to client-side UI shortcuts that map to the existing server
+// command vocabulary (open_search, update_layout chooser respectively).
+// Clicking a chip inserts the text and submits via the parent's onSend
+// handler. Full command list still reachable through the ? Help modal.
 var SUGGESTIONS = [
-  { label: 'Show Movies', command: 'show movies' },
-  { label: 'Show 4K', command: 'show 4K' },
-  { label: 'Mom Mode', command: 'mom mode' },
-  { label: 'Dark Theme', command: 'dark theme' },
+  { label: '🎬 Show movies', command: 'show movies' },
+  { label: '📺 Live channels', command: 'show live' },
+  { label: '🔍 Search for...', command: 'search' },
+  { label: '▶ Play this', command: 'play this' },
+  { label: '📅 Tonight\'s lineup', command: 'tonight' },
+  { label: '🎨 Change look', command: 'change look' },
 ];
 
 function CommandChips(props) {

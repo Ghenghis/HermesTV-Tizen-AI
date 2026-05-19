@@ -11,6 +11,7 @@
 //   GET    /api/dvr/recordings      query ?profile_id=...
 //   GET    /api/dvr/recording/:id
 //   DELETE /api/dvr/recording/:id   body { profile_id }
+//   POST   /api/dvr/recording/:id/play (forward-looking — backend may 503 until Phase 4)
 //   GET    /api/dvr/settings
 //   PATCH  /api/dvr/settings        body { profile_id, ...patch }
 //
@@ -141,6 +142,35 @@ function cancelRecording(id, profileId) {
 }
 
 /**
+ * Request a stream ticket for a completed recording. The backend route
+ * (`POST /api/dvr/recording/:id/play`) is forward-looking — until the
+ * Phase 4 muxer lands, the server will return 503 with a friendly
+ * `message`. Callers should treat the 503 as a "pipeline pending"
+ * state and surface the message verbatim instead of an error toast.
+ *
+ * Response shape (when implemented):
+ *   { success: true, ticket: { stream_endpoint, expires_at, item: {...}, provider: {...} } }
+ *
+ * @param {string} id  recording_id
+ * @param {string=} profileId  Optional — sent in the body so the backend
+ *   can scope auth the same way it does for cancel/schedule.
+ */
+function playRecording(id, profileId) {
+  if (typeof id !== 'string' || id.length === 0) {
+    return Promise.reject(new Error('playRecording requires a recording id'));
+  }
+  var body = {};
+  if (typeof profileId === 'string' && profileId.length > 0) {
+    body.profile_id = profileId;
+  }
+  return _fetchWithTimeout(BASE_URL + '/api/dvr/recording/' + encodeURIComponent(id) + '/play', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(_handleJson);
+}
+
+/**
  * Fetch the global DVR settings envelope.
  * @returns {Promise<Object>}
  */
@@ -167,6 +197,7 @@ export {
   listRecordings,
   getRecording,
   cancelRecording,
+  playRecording,
   getSettings,
   patchSettings,
 };

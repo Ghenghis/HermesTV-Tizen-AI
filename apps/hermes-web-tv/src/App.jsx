@@ -418,6 +418,14 @@ var INITIAL_STATE = {
   // Selected item for detail panel
   selectedItem: null,
   selectedProviderId: null,
+  // Focused item — the card currently "previewed" by the shell's hero panel.
+  // Distinct from selectedItem: focus drives the hero background / hero CTA
+  // targets, selection opens MediaDetailPanel. Single click on a card moves
+  // focus; double-click or Enter on the focused card opens the detail panel.
+  // Shells with a hero (Netflix, Plex, AppleTV, Nuvio, ExtremeInfiniTV, Ynotv)
+  // read this; shells without one (Mom, TiviMate, Samsung, LiveTV, Iptvnator,
+  // Dave Power, Stremio's board) ignore it.
+  focusedItem: null,
   // Player overlay state — populated by /api/play response
   showPlayer: false,
   playerTicket: null,
@@ -774,7 +782,18 @@ function App() {
     } else if (Array.isArray(item.provider_tags) && item.provider_tags.length > 0) {
       defaultProvider = item.provider_tags[0];
     }
-    patchState({ selectedItem: item, selectedProviderId: defaultProvider });
+    // Selecting also focuses so the hero stays in sync if the modal is dismissed.
+    patchState({ selectedItem: item, selectedProviderId: defaultProvider, focusedItem: item });
+  }
+
+  // Focus a card without opening the detail panel. Single-click / hover /
+  // remote-focus on a card flows through here so the active shell's hero
+  // panel can preview the item before the user commits to opening the modal.
+  function handleItemFocus(item) {
+    if (!item) { return; }
+    // Cheap guard — don't churn state when focus lands on the same id.
+    if (state.focusedItem && state.focusedItem.id === item.id) { return; }
+    patchState({ focusedItem: item });
   }
 
   function handleCloseDetail() {
@@ -1099,6 +1118,14 @@ function App() {
       if (state.selectedItem) {
         handlePlay(state.selectedItem, state.selectedProviderId || null);
       }
+    } else if (action === 'open_epg') {
+      // Client-only action dispatched by the FloatingChatbot "Tonight's lineup"
+      // chip. Opens the EPGGrid modal; no server command exists for this.
+      patchState({ showEPG: true });
+    } else if (action === 'open_layout_switcher') {
+      // Client-only action dispatched by the FloatingChatbot "Change look" chip.
+      // Opens the LayoutSwitcher; no server command exists for this.
+      patchState({ showLayoutSwitcher: true });
     }
     // show_detail and find_similar_actor: no state mutation needed (chatbot response text handles UX)
   }
@@ -1640,6 +1667,8 @@ function App() {
                   tier={state.tier}
                   providers={state.providers}
                   onItemSelect={handleItemClick}
+                  onItemFocus={handleItemFocus}
+                  focusedItem={state.focusedItem}
                   contentFilter={state.contentFilter}
                   providerFilter={state.providerFilter}
                   qualityFilter={state.qualityFilter}
@@ -1762,6 +1791,18 @@ function App() {
               error={state.playerError}
               onClose={handleClosePlayer}
               profileId={profile.profile_id || 'mom_tv'}
+              profile={profile}
+              online={state.online}
+              catalog={state.catalog}
+              onSwitchItem={function(nextItem) {
+                // Swap the currently-playing channel by routing through
+                // handlePlay — same /api/play ticket flow, just a new item.
+                // App-level parental gate still runs inside handlePlay.
+                if (nextItem && nextItem.id) {
+                  handlePlay(nextItem, null);
+                }
+              }}
+              onOpenSettings={function() { patchState({ showSettings: true }); }}
               onOpenMultiview={function(/* item */) {
                 // Close the single-stream player so Multiview can take the
                 // foreground. Tile click inside Multiview can promote a

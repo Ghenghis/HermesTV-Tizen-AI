@@ -76,6 +76,10 @@ function getResponseText(action, params) {
   if (action === 'find_similar_actor') return 'Finding more content with this actor.';
   if (action === 'reset_filters') return 'All filters cleared.';
   if (action === 'show_notification') return 'Got it.';
+  if (action === 'open_search') return 'Opening search.';
+  if (action === 'play_this') return 'Playing now.';
+  if (action === 'open_epg') return 'Opening tonight’s lineup.';
+  if (action === 'open_layout_switcher') return 'Opening the layout picker.';
 
   return 'Done.';
 }
