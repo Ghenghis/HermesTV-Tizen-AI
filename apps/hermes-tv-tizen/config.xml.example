@@ -3,21 +3,76 @@
         id="http://ghenghis/hermestv-tizen" version="0.1.0" viewmodes="maximized">
   <tizen:application id="HermesTV.HermesTV" package="HermesTV01" required_version="6.5"/>
   <content src="index.html"/>
+
+  <!-- ─── Features ──────────────────────────────────────────────────────────
+       Only declare features we actually need at runtime. Each feature widens
+       the Samsung Seller-Office reviewer scope, so keep this list tight.
+       Per docs/IPTV_Player_Zero/SAMSUNG_TIZEN_PORT.md §config.xml: internet
+       + screen-size are mandatory for a 1080p TV web app. -->
   <feature name="http://tizen.org/feature/screen.size.normal.1920.1080"/>
+  <feature name="http://tizen.org/feature/network.internet"/>
+
   <icon src="icon.png"/>
   <name>HermesTV</name>
   <tizen:profile name="tv"/>
+
+  <!-- ─── Settings ──────────────────────────────────────────────────────────
+       background-support="disable": app yields the foreground when the user
+       navigates away (paired with tizenLifecycle.js, which detaches the
+       <video> on visibilitychange so Tizen reclaims decoder slots cleanly).
+       hwkey-event="enable": route the OS Back key to the page so our
+       installTizenKeyHandler can cascade through the modal stack instead of
+       the OS hard-exiting the app. -->
   <tizen:setting screen-orientation="landscape" context-menu="disable"
                  background-support="disable" encryption="disable"
                  install-location="auto" hwkey-event="enable"/>
-  <!-- Production access: VPS-hosted API and assets. tv.daveai.tech is the
-       canonical short URL; hermestv.daveai.tech remains a valid alias so
-       existing .wgt installs and any cached references continue to work. -->
+
+  <!-- ─── Access origins ───────────────────────────────────────────────────
+       Tizen rejects HTTP/WS requests to hosts not listed here. The list is
+       intentionally narrow — only the canonical VPS, its alias, and an
+       explicit LAN-dev escape hatch. tv.daveai.tech is now the canonical
+       short URL; hermestv.daveai.tech remains a valid alias so existing
+       .wgt installs and any cached references continue to work. -->
   <access origin="https://tv.daveai.tech" subdomains="true"/>
   <access origin="https://hermestv.daveai.tech" subdomains="true"/>
-  <!-- Local dev access: only used when localStorage override 'hermestv.api_base' points to LAN -->
+  <!-- Local dev access: only used when localStorage override
+       'hermestv.api_base' (or ?api=<url> query string) points to LAN. -->
   <access origin="http://localhost" subdomains="true"/>
+
+  <!-- ─── Privileges ────────────────────────────────────────────────────────
+       Each privilege is reviewed at install time. We add only what the app
+       actually exercises so Samsung Seller-Office doesn't reject the build.
+         internet           : fetch() to the VPS
+         network.get        : read connectivity state (Settings panel badge)
+         tv.audio           : tizen.tvaudiocontrol for volume / mute UI sync
+         tv.inputdevice     : tizen.tvinputdevice.registerKey for transport
+                              / channel / color / numpad keys (see
+                              apps/hermes-web-tv/src/utils/tizenKeyMap.js).
+         mediaplaylist      : reserved for future AVPlay queue work; safe to
+                              leave declared because AVPlay calls fall back
+                              to silent failure if the privilege is missing. -->
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
-  <tizen:privilege name="http://tizen.org/privilege/tv.audio"/>
   <tizen:privilege name="http://tizen.org/privilege/network.get"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.audio"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:privilege name="http://tizen.org/privilege/mediaplaylist"/>
+
+  <!-- ─── Content Security Policy ──────────────────────────────────────────
+       Tizen's strict mode rejects 'unsafe-eval' and we have none in the
+       Vite output — keep it that way. 'unsafe-inline' for style-src is
+       still required because React inlines style attributes via JSX.
+       script-src includes 'self' only — no third-party CDN scripts are
+       loaded by the app. media-src / img-src allow http+https for poster
+       images and stream blobs returned by the VPS. -->
+  <tizen:content-security-policy>
+    default-src 'self' https://hermestv.daveai.tech;
+    connect-src 'self' https://hermestv.daveai.tech wss://hermestv.daveai.tech;
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob: http: https:;
+    media-src 'self' blob: http: https:;
+    font-src 'self' data:;
+    object-src 'none';
+    frame-ancestors 'none';
+  </tizen:content-security-policy>
 </widget>
