@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DavePowerShell — Dave's preferred dense-info power-user layout.
@@ -312,6 +313,10 @@ function DavePowerShell(props) {
       {/* Stats panel — enhanced tier only */}
       {tier === 'enhanced' && (
         <div style={{ background: 'linear-gradient(180deg, #11162a, #0d1120)', borderLeft: '1px solid #1a2030', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+          {/* Continue Watching — vertical-stack 'compact' variant in the
+              right sidebar. Returns null when the profile has no playback
+              history so the stats panel stays flush with the top edge. */}
+          <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} variant="compact" max={3} />
           <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, color: DAVE_ACCENT, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Catalog Stats</div>
 
           <div>

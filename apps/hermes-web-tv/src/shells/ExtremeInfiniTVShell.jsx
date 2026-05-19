@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExtremeInfiniTVShell — HermesTV's "Power user" 3-pane shell (11th layout).
@@ -545,6 +546,11 @@ function ExtremeInfiniTVShell(props) {
           background: 'var(--bg, #0d1117)',
         }}
       >
+        {/* Continue Watching rail — sits above the channel-list table header.
+            Returns null when the profile has no history, so the dense
+            data-grid layout doesn't gain wasted vertical space when empty. */}
+        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} max={8} />
+
         {/* Column header — gives the table a scannable structure */}
         <div
           style={{

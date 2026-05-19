@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MomModeShell — Sherri's primary layout.
@@ -178,6 +179,10 @@ function MomModeShell(props) {
 
       {/* Content grid */}
       <div ref={gridScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+        {/* Continue Watching — first row of the scrolling content, with WARM
+            gradient on the progress bar so it harmonises with the calm
+            mom-mode palette. Returns null on profiles with no history. */}
+        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} warmGradient={true} />
         {displayItems.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', fontSize: 'calc(18px * ' + fontScale + ')', color: '#c8b8e8', lineHeight: 1.6 }}>
             Nothing here yet.<br />Try another category or ask Hermes!

@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NetflixShell — HermesTV's cinematic horizontal-rail layout, inspired by the
@@ -321,6 +322,9 @@ function NetflixShell(props) {
 
         {/* Content rows */}
         <div style={{ paddingTop: '24px' }}>
+          {/* Continue Watching — first card row above all others. Returns
+              null when the profile has no playback history yet. */}
+          <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
           <CardRow title="Top Picks For You" items={filtered} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 8)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(4)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />

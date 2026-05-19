@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PlexShell — HermesTV's media-server-style layout.
@@ -354,6 +355,10 @@ function PlexShell(props) {
           </div>
         )}
 
+        {/* Continue Watching — first content row, sits above the On Now /
+            Movies / Series grids. Returns null when the profile has no
+            playback history yet. */}
+        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
         <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
         <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, 10)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
         <GridSection title="Series" items={series.length > 0 ? series : filtered.slice(4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
