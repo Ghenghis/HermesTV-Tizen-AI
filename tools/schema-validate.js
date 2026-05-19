@@ -213,5 +213,29 @@ if (fs.existsSync(uiCommandPath)) {
   fail('uiCommand.js not found');
 }
 
+// --- EPG route registration check ---
+// Verifies that the new /api/epg grid endpoint exists in epg.js AND that the
+// router is mounted in index.js. The grid endpoint is what
+// apps/hermes-web-tv/src/components/EPGGrid.jsx reads via api/epgClient.js.
+console.log('\n--- EPG route registration (/api/epg grid) ---');
+var epgRoutePath = path.join(REPO, 'services/hermes-tv-api/src/routes/epg.js');
+var apiIndexPath = path.join(REPO, 'services/hermes-tv-api/src/index.js');
+if (fs.existsSync(epgRoutePath) && fs.existsSync(apiIndexPath)) {
+  var epgText = fs.readFileSync(epgRoutePath, 'utf8');
+  var indexText = fs.readFileSync(apiIndexPath, 'utf8');
+  // The grid endpoint registers GET /api/epg (no path param). We accept
+  // either single or double quotes around the path.
+  var gridRouteRegex = /router\.get\(\s*['"]\/api\/epg['"]/;
+  if (gridRouteRegex.test(epgText)
+      && indexText.indexOf('epgRouter') !== -1
+      && indexText.indexOf("require('./routes/epg')") !== -1) {
+    pass('epg.js exposes GET /api/epg (grid) and is mounted in index.js');
+  } else {
+    fail('epg.js missing GET /api/epg (grid) or not mounted in index.js');
+  }
+} else {
+  fail('epg.js or index.js not found');
+}
+
 console.log('\n=== Results: ' + totalPass + ' PASS, ' + totalFail + ' FAIL ===');
 process.exit(totalFail > 0 ? 1 : 0);
