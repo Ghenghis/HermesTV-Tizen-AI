@@ -54,6 +54,8 @@ var VALID_COMMANDS = [
   { text: 'open search', expectedAction: 'open_search' },
   { text: 'record this', expectedAction: 'schedule_recording' },
   { text: 'schedule recording', expectedAction: 'schedule_recording' },
+  { text: 'play this', expectedAction: 'play_this' },
+  { text: 'watch this', expectedAction: 'play_this' },
 ];
 
 // Commands that should return { valid: false }
