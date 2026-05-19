@@ -12,7 +12,12 @@ var BASE_URL = (function() {
   if (h === 'hermestv.local') return 'http://hermestv.local';
   return '';
 })();
-var DEFAULT_TIMEOUT = 8000;
+// Cold-cache /api/catalog returns ~540 KB over Cloudflare; on a cold worker
+// the full transfer occasionally crosses 8 s. Bumped to 20 s so Mom doesn't
+// see "Profile load failed: Request timed out" on cold boot. The /health
+// probe stays tight at 3 s — it's a single byte response and a 3 s timeout
+// is still the right "reachable?" signal.
+var DEFAULT_TIMEOUT = 20000;
 var HEALTH_TIMEOUT = 3000;
 
 function makeNetworkError(message) {
