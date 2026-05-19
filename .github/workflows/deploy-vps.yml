@@ -72,34 +72,33 @@ jobs:
           echo "Workflow SHA: ${{ github.sha }}"
 
       # ---------------------------------------------------------------------
-      # 2) Configure SSH agent from the VPS_SSH_KEY secret. webfactory/ssh-agent
-      # loads the private key into an ephemeral agent that lives only for the
-      # job — the key is never written to disk.
+      # 2) Install sshpass + pre-seed known_hosts.
+      #
+      # The Hostinger operator workflow today uses password auth (VPS_PASS),
+      # not key auth, so we install sshpass and pipe the secret over stdin
+      # via `-e SSHPASS=…` to keep the value off process args (`ps -ef` would
+      # otherwise show `-p <password>`). The key-auth path can be re-added
+      # later by storing VPS_SSH_KEY and replacing the sshpass wrapper.
+      #
+      # known_hosts: on a fresh GHA runner the file is empty, so even with
+      # password auth `StrictHostKeyChecking=yes` would refuse the first
+      # connection. ssh-keyscan resolves and pins the host's public key for
+      # this job; -H hashes the entry so the literal hostname stays out of
+      # the run log.
       # ---------------------------------------------------------------------
-      - name: Start SSH agent and load deploy key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-
-      # ---------------------------------------------------------------------
-      # 3) Pre-seed known_hosts. The laptop script relies on the operator
-      # having already accepted the host key in ~/.ssh/known_hosts; on a
-      # fresh GHA runner that file is empty, so `BatchMode=yes` would refuse
-      # the first connection. ssh-keyscan resolves the host's public key
-      # over the same TCP port we'll use, then pins it for this job.
-      # ---------------------------------------------------------------------
-      - name: Pre-seed known_hosts via ssh-keyscan
+      - name: Install sshpass and pre-seed known_hosts
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
+          set -euo pipefail
           if [ -z "$VPS_HOST" ]; then
             echo "::error::Secret VPS_HOST is empty. See docs/42_VPS_DEPLOY_VIA_GH_ACTIONS.md."
             exit 1
           fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          # -T 20: bound the scan so a missing host doesn't hang the job.
-          # -H: hash the entry so the literal hostname doesn't end up in the log.
           ssh-keyscan -T 20 -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           chmod 600 ~/.ssh/known_hosts
           echo "known_hosts pre-seeded ($(wc -l < ~/.ssh/known_hosts) entries)."
@@ -113,21 +112,28 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          SSHPASS: ${{ secrets.VPS_PASS }}
           DEPLOY_REF: ${{ inputs.ref }}
         run: |
           set -euo pipefail
-          if [ -z "$VPS_USER" ] || [ -z "$VPS_HOST" ]; then
-            echo "::error::Secrets VPS_USER and VPS_HOST must both be set."
+          if [ -z "$VPS_USER" ] || [ -z "$VPS_HOST" ] || [ -z "${SSHPASS:-}" ]; then
+            echo "::error::Secrets VPS_USER, VPS_HOST, VPS_PASS must all be set."
             exit 1
           fi
-          echo "Connecting to ${VPS_USER}@${VPS_HOST} ..."
-          # BatchMode=yes: no interactive prompts (fail fast if auth is broken).
-          # ConnectTimeout=30: same budget as the laptop script.
+          echo "Connecting to ${VPS_USER}@${VPS_HOST} (password auth via sshpass) ..."
+          # sshpass -e reads the password from the SSHPASS env var, never the
+          # command line — `ps -ef` cannot leak it. ConnectTimeout=30 mirrors
+          # the laptop script. BatchMode=yes is omitted because sshpass needs
+          # password-auth challenges to pass through; we get equivalent fail-
+          # fast via PasswordAuthentication=yes + 1 attempt + the timeout.
           # The heredoc uses 'REMOTE' (quoted) on the END marker so $vars on
           # the local side are expanded by us, while \$vars on the remote
-          # side are expanded by the remote shell — exactly mirroring the
-          # script's escaping.
-          ssh -o BatchMode=yes -o ConnectTimeout=30 \
+          # side are expanded by the remote shell.
+          sshpass -e ssh \
+            -o ConnectTimeout=30 \
+            -o PasswordAuthentication=yes \
+            -o NumberOfPasswordPrompts=1 \
+            -o StrictHostKeyChecking=yes \
             "${VPS_USER}@${VPS_HOST}" bash -se <<REMOTE
           set -euo pipefail
 
@@ -232,13 +238,19 @@ jobs:
             probe_fail "/health -> ${HEALTH_CODE} (expected 200)"
           fi
 
-          # Probe 2: /api/layouts count == 8 (PR #58 added Zero shell)
-          echo "probe 2: GET /api/layouts -> expect count=8"
-          LAYOUTS_COUNT=$(curl -sf "https://${HOST}/api/layouts" 2>/dev/null | jq -r '.count // empty' || echo "")
-          if [ "$LAYOUTS_COUNT" = "8" ]; then
-            probe_pass "/api/layouts count=8"
+          # Probe 2: /api/layouts count >= 9 — flexible because the layout
+          # surface grows as new shells land (8 baseline, +Zero=9, +Nuvio,
+          # +ExtremeInfiniTV, +Stremio, +LiveTV, +Iptvnator, +Ynotv...).
+          # Hard-coding the count couples deploys to PR sequence; we just
+          # require the canary "zero" entry is present in the list.
+          echo "probe 2: GET /api/layouts -> expect count>=9 and includes 'zero'"
+          LAYOUTS_JSON=$(curl -sf "https://${HOST}/api/layouts" 2>/dev/null || echo "{}")
+          LAYOUTS_COUNT=$(echo "$LAYOUTS_JSON" | jq -r '.count // 0')
+          HAS_ZERO=$(echo "$LAYOUTS_JSON" | jq -r '[.layouts[]?.id] | index("zero") // "missing"')
+          if [ "$LAYOUTS_COUNT" -ge 9 ] && [ "$HAS_ZERO" != "missing" ]; then
+            probe_pass "/api/layouts count=${LAYOUTS_COUNT} (>=9), 'zero' shell present"
           else
-            probe_fail "/api/layouts count='${LAYOUTS_COUNT}' (expected 8 — Zero shell from PR #58 missing?)"
+            probe_fail "/api/layouts count='${LAYOUTS_COUNT}' has_zero='${HAS_ZERO}' (expected count>=9 with zero shell)"
           fi
 
           # Probe 3: POST /api/download returns exact_size_human (PR #59)
