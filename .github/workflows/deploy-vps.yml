@@ -89,19 +89,23 @@ jobs:
       - name: Install sshpass and pre-seed known_hosts
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
           set -euo pipefail
           if [ -z "$VPS_HOST" ]; then
             echo "::error::Secret VPS_HOST is empty. See docs/42_VPS_DEPLOY_VIA_GH_ACTIONS.md."
             exit 1
           fi
+          # VPS_PORT is optional; defaults to 22 if not set. Hostinger VPSes
+          # often run SSH on a non-22 port for basic brute-force resistance.
+          PORT_ARG="${VPS_PORT:-22}"
           sudo apt-get update -qq
           sudo apt-get install -y -qq sshpass
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          ssh-keyscan -T 20 -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -T 20 -p "$PORT_ARG" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           chmod 600 ~/.ssh/known_hosts
-          echo "known_hosts pre-seeded ($(wc -l < ~/.ssh/known_hosts) entries)."
+          echo "known_hosts pre-seeded on port ${PORT_ARG} ($(wc -l < ~/.ssh/known_hosts) entries)."
 
       # ---------------------------------------------------------------------
       # 4) Run the redeploy on the VPS. This is the literal equivalent of
@@ -112,6 +116,7 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
           SSHPASS: ${{ secrets.VPS_PASS }}
           DEPLOY_REF: ${{ inputs.ref }}
         run: |
@@ -120,7 +125,8 @@ jobs:
             echo "::error::Secrets VPS_USER, VPS_HOST, VPS_PASS must all be set."
             exit 1
           fi
-          echo "Connecting to ${VPS_USER}@${VPS_HOST} (password auth via sshpass) ..."
+          PORT_ARG="${VPS_PORT:-22}"
+          echo "Connecting to ${VPS_USER}@${VPS_HOST}:${PORT_ARG} (password auth via sshpass) ..."
           # sshpass -e reads the password from the SSHPASS env var, never the
           # command line — `ps -ef` cannot leak it. ConnectTimeout=30 mirrors
           # the laptop script. BatchMode=yes is omitted because sshpass needs
@@ -130,6 +136,7 @@ jobs:
           # the local side are expanded by us, while \$vars on the remote
           # side are expanded by the remote shell.
           sshpass -e ssh \
+            -p "$PORT_ARG" \
             -o ConnectTimeout=30 \
             -o PasswordAuthentication=yes \
             -o NumberOfPasswordPrompts=1 \
