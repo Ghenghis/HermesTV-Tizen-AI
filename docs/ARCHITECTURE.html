@@ -253,7 +253,7 @@
 <!-- Section 1 - Public surface -->
 <h2>1. Public surface - Cloudflare to host nginx to containers</h2>
 <p>
-  Production traffic for <code>hermestv.daveai.tech</code> goes through Cloudflare in Flexible-TLS mode:
+  Production traffic for <code>tv.daveai.tech</code> (canonical; <code>hermestv.daveai.tech</code> kept as additive nginx alias) goes through Cloudflare in Flexible-TLS mode:
   the edge terminates HTTPS, the origin is HTTP. The Hostinger VPS runs a host-level nginx (not
   containerised) that owns ports <code>80/443</code> and reverse-proxies HermesTV's two private
   loopback ports to public hostnames. Caddy was originally planned in-stack but was removed in
@@ -284,7 +284,7 @@
     <text class="node-text" x="320" y="170" text-anchor="middle">Cloudflare edge</text>
     <text class="node-sub"  x="320" y="190" text-anchor="middle">TLS terminate</text>
     <text class="node-sub"  x="320" y="206" text-anchor="middle">Flexible mode</text>
-    <text class="node-sub"  x="320" y="222" text-anchor="middle">hermestv.daveai.tech</text>
+    <text class="node-sub"  x="320" y="222" text-anchor="middle">tv.daveai.tech (+ hermestv.daveai.tech alias)</text>
 
     <rect class="node-bg-accent" x="460" y="120" width="200" height="160" rx="6"/>
     <text class="node-text" x="560" y="150" text-anchor="middle">Hostinger VPS</text>

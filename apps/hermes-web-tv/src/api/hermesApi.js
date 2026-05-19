@@ -1,7 +1,9 @@
 // Local dev (Vite at localhost:5173) → cross-origin to the API on :3001.
 // LAN mirror (Mom's QN85 hitting workstation by IP) → same auto-detect.
-// Production (https://hermestv.daveai.tech served by host nginx that also
-// proxies /api/ to the API container) → same-origin, so BASE_URL is empty.
+// Production (https://tv.daveai.tech, with hermestv.daveai.tech as an
+// additive alias, both served by host nginx that also proxies /api/ to
+// the API container) → same-origin, so BASE_URL is empty. The browser
+// just hits whichever Host it loaded from.
 var BASE_URL = (function() {
   if (typeof window === 'undefined') return '';
   var h = window.location.hostname;

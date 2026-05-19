@@ -71,7 +71,9 @@ services:
   # another reverse proxy here would compete for those ports and break the
   # public sites. HermesTV's edge is the operator-installed host nginx site
   # at /etc/nginx/sites-enabled/hermestv.daveai.tech (deployed in Phase 1.5,
-  # template at upstream/nginx/hermestv.daveai.tech.conf.example).
+  # template at upstream/nginx/hermestv.daveai.tech.conf.example). The site
+  # config's server_name now lists BOTH tv.daveai.tech (canonical) and
+  # hermestv.daveai.tech (historical alias) so existing links keep working.
   #
   # If you ever migrate this VPS off host nginx, the Caddyfile at
   # upstream/docker-vps/Caddyfile is still here as a reference starter.

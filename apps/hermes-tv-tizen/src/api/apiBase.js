@@ -4,7 +4,9 @@
 // Mom's QN85 calls the public VPS. The VPS holds all API keys.
 // On dev workstation: override to local API via Samsung TV's Settings panel.
 
-var DEFAULT_API_BASE = 'https://hermestv.daveai.tech';
+// tv.daveai.tech is the canonical short URL. hermestv.daveai.tech remains
+// a valid alias on the VPS nginx (additive change in PR for tv.daveai.tech).
+var DEFAULT_API_BASE = 'https://tv.daveai.tech';
 
 var apiBase = DEFAULT_API_BASE;
 

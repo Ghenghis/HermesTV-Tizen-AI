@@ -13,7 +13,7 @@
  * Steps (strict mode, fails loudly on any missing file):
  *   1. Copy apps/hermes-web-tv/dist/  →  apps/hermes-tv-tizen/dist/
  *   2. Copy config.xml.example       →  dist/config.xml
- *      (substituting hermestv.example.com → hermestv.daveai.tech in case
+ *      (substituting hermestv.example.com → tv.daveai.tech in case
  *       any legacy placeholder slipped through)
  *   3. Copy apps/hermes-tv-tizen/icon.png → dist/icon.png
  *      If missing: generate a 117×117 placeholder PNG via Node Buffer.
@@ -40,7 +40,7 @@ const ICON_OUTPUT = path.join(TIZEN_DIST, 'icon.png');
 const API_BASE_SOURCE = path.join(TIZEN_DIR, 'src', 'api', 'apiBase.js');
 const API_BASE_OUTPUT = path.join(TIZEN_DIST, 'api', 'apiBase.js');
 
-const PROD_API_HOST = 'hermestv.daveai.tech';
+const PROD_API_HOST = 'tv.daveai.tech';
 const LEGACY_PLACEHOLDER = 'hermestv.example.com';
 
 function log(msg) {

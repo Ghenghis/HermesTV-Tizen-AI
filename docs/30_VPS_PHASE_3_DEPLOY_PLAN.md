@@ -174,7 +174,7 @@ The whole point of Phase 3 is that `hermes-tv-api` starts serving a real catalog
 
 ```
 # From workstation
-curl -s https://hermestv.daveai.tech/api/catalog?profile_id=mom_tv | python3 -c "import sys,json; d=json.load(sys.stdin); print('items=', d.get('total'), 'mock=', d.get('_meta',{}).get('mock_data',False))"
+curl -s https://tv.daveai.tech/api/catalog?profile_id=mom_tv | python3 -c "import sys,json; d=json.load(sys.stdin); print('items=', d.get('total'), 'mock=', d.get('_meta',{}).get('mock_data',False))"
 # Expect: items > 5, mock=False once Threadfin + Jellyfin are wired
 ```
 
@@ -189,7 +189,7 @@ for s in daveai.tech diy.daveai.tech fleet.daveai.tech game.daveai.tech \
 done
 ```
 
-All 9 must return 200. Plus `https://hermestv.daveai.tech/health` must still return 200.
+All 9 must return 200. Plus `https://tv.daveai.tech/health` (and its alias `https://hermestv.daveai.tech/health`) must still return 200.
 
 ---
 
@@ -213,7 +213,7 @@ Phase 2 stack (`hermes-tv-api`, `hermes-web-tv`) remains running. The whole site
 ```
 docker inspect -f '{{.State.Health.Status}}' hermestv-vps-api
 docker inspect -f '{{.State.Health.Status}}' hermestv-vps-web
-curl -sI https://hermestv.daveai.tech/health
+curl -sI https://tv.daveai.tech/health
 ```
 
 Both containers must still be `healthy` and `/health` must still return 200. If not, Phase 2 was destabilised — that is a separate incident; pull `hermes-tv-api` logs and treat as Phase 2 rollback per [29_HERMESTV_DEPLOY_RUNBOOK.md](29_HERMESTV_DEPLOY_RUNBOOK.md).

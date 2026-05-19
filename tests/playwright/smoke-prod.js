@@ -1,10 +1,13 @@
 // One-off smoke script for the live production URL.
 // Bypasses the local-dev Playwright config (which uses localhost:5173)
-// and hits https://hermestv.daveai.tech directly.
+// and hits https://tv.daveai.tech directly (canonical short URL).
+// hermestv.daveai.tech remains a valid alias served by the same nginx
+// server_name line, so swapping the canonical here does not break the
+// historical URL — it is still reachable.
 
 const { chromium } = require('C:/Users/Admin/AppData/Roaming/npm/node_modules/playwright/index.js');
 
-const BASE = 'https://hermestv.daveai.tech';
+const BASE = 'https://tv.daveai.tech';
 
 (async () => {
   const browser = await chromium.launch({ headless: true });

@@ -50,7 +50,7 @@ This document is **planning only**. It does NOT deploy anything. It does NOT tou
                  |
 +----------------v-------------------------+
 | Mom's QN85 (Tizen)  /  Dave's browser    |
-|   GET https://hermestv.daveai.tech/api/catalog
+|   GET https://tv.daveai.tech/api/catalog
 |   - Sees Jellyfin items in the response  |
 |   - NEVER sees JELLYFIN_API_KEY          |
 |   - NEVER calls Jellyfin directly        |
@@ -143,7 +143,7 @@ Once both `JELLYFIN_URL` and `JELLYFIN_API_KEY` are populated in `/home/operator
 
 ```
 # From the workstation, NOT from the VPS
-curl -s https://hermestv.daveai.tech/api/catalog?profile_id=dave_tv \
+curl -s https://tv.daveai.tech/api/catalog?profile_id=dave_tv \
   | python3 -c "import sys,json; d=json.load(sys.stdin); items=d.get('catalog',[]); jf=[i for i in items if i.get('source')=='jellyfin']; print('total=', len(items), 'jellyfin=', len(jf), 'mock_meta=', d.get('_meta',{}).get('mock_data', None))"
 ```
 

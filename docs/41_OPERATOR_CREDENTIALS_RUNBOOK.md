@@ -122,7 +122,7 @@ docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml up -d herm
 **Step 7.** Verify from the workstation:
 
 ```bash
-curl -s -i https://hermestv.daveai.tech/api/catalog | head -20
+curl -s -i https://tv.daveai.tech/api/catalog | head -20
 ```
 
 Expected response headers:
@@ -168,7 +168,7 @@ docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml up -d herm
 **Step 4.** Verify:
 
 ```bash
-curl -s https://hermestv.daveai.tech/api/catalog | jq '._meta.provider_counts'
+curl -s https://tv.daveai.tech/api/catalog | jq '._meta.provider_counts'
 ```
 
 Expected: `"iptv-org": 250+` (or higher, depending on the country/category filters).
@@ -207,7 +207,7 @@ docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml up -d herm
 **Step 5.** Verify:
 
 ```bash
-curl -s -i https://hermestv.daveai.tech/api/catalog | grep -i X-Catalog-Source
+curl -s -i https://tv.daveai.tech/api/catalog | grep -i X-Catalog-Source
 ```
 
 Expected: `X-Catalog-Source: jellyfin` (if Jellyfin alone) or `X-Catalog-Source: merged-with-iptv-org` (if iptv-org is also on) or `X-Catalog-Source: threadfin-merged` (if all three are on — Jellyfin contributes the on-disk library and Threadfin contributes the live channels).
@@ -243,17 +243,17 @@ After all four (or however many the operator configured) steps above are done, r
 
 - [ ] **Health endpoint**:
   ```bash
-  curl -s -o /dev/null -w '%{http_code}\n' https://hermestv.daveai.tech/health
+  curl -s -o /dev/null -w '%{http_code}\n' https://tv.daveai.tech/health
   ```
   → `200`
 
 - [ ] **Catalog endpoint reports the right merged sources**:
   ```bash
-  curl -s -i https://hermestv.daveai.tech/api/catalog | grep -E 'X-Catalog-Source|total'
+  curl -s -i https://tv.daveai.tech/api/catalog | grep -E 'X-Catalog-Source|total'
   ```
   → `X-Catalog-Source: threadfin-merged` (or whatever combination the operator enabled) and `total: 200+`
 
-- [ ] **Browser smoke test**: visit `https://hermestv.daveai.tech` in a desktop browser. The header chip in the top right shows a green **"Live providers"** badge (or **"Jellyfin"** if Jellyfin is the only enabled adapter). It should NOT show **"Seed catalog"** or **"Mock"**.
+- [ ] **Browser smoke test**: visit `https://tv.daveai.tech` in a desktop browser. The header chip in the top right shows a green **"Live providers"** badge (or **"Jellyfin"** if Jellyfin is the only enabled adapter). It should NOT show **"Seed catalog"** or **"Mock"**.
 
 - [ ] **Sherri profile / Mom Mode**: pick the **Sherri** profile from the profile picker. Mom Mode populates with **200+ channels**, not the 5-item mock and not the 147-item seed.
 
@@ -302,7 +302,7 @@ docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml up -d herm
 ```bash
 # Clear all of THREADFIN_URL, APOLLO_*, XTREMEHD_*, IPTV_ORG_ENABLED, JELLYFIN_URL, JELLYFIN_API_KEY:
 docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml up -d hermes-tv-api
-curl -s -i https://hermestv.daveai.tech/api/catalog | grep X-Catalog-Source
+curl -s -i https://tv.daveai.tech/api/catalog | grep X-Catalog-Source
 # expect: X-Catalog-Source: seed-147
 ```
 

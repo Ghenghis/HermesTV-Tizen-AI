@@ -10,7 +10,10 @@
   <tizen:setting screen-orientation="landscape" context-menu="disable"
                  background-support="disable" encryption="disable"
                  install-location="auto" hwkey-event="enable"/>
-  <!-- Production access: VPS-hosted API and assets at hermestv.daveai.tech -->
+  <!-- Production access: VPS-hosted API and assets. tv.daveai.tech is the
+       canonical short URL; hermestv.daveai.tech remains a valid alias so
+       existing .wgt installs and any cached references continue to work. -->
+  <access origin="https://tv.daveai.tech" subdomains="true"/>
   <access origin="https://hermestv.daveai.tech" subdomains="true"/>
   <!-- Local dev access: only used when localStorage override 'hermestv.api_base' points to LAN -->
   <access origin="http://localhost" subdomains="true"/>

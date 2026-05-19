@@ -6,8 +6,8 @@
 - PR for [docs/28_VPS_PHASE_2_DEPLOY_PLAN.md](28_VPS_PHASE_2_DEPLOY_PLAN.md) merged to main
 - Phase 1.5 gates all green ([21_VPS_PHASE_1_5_REMEDIATION_PLAN.md](21_VPS_PHASE_1_5_REMEDIATION_PLAN.md))
 - `operator` user exists on VPS ([22_CREATE_OPERATOR_USER_RUNBOOK.md](22_CREATE_OPERATOR_USER_RUNBOOK.md))
-- DNS A record `hermestv.daveai.tech` → VPS IP, Cloudflare-proxied
-- Host nginx site `/etc/nginx/sites-enabled/hermestv.daveai.tech` installed, `nginx -t` passes
+- DNS A records `tv.daveai.tech` AND `hermestv.daveai.tech` → VPS IP, Cloudflare-proxied. `tv.daveai.tech` is the canonical short URL; `hermestv.daveai.tech` is kept as an additive alias so historical links keep working.
+- Host nginx site `/etc/nginx/sites-enabled/hermestv.daveai.tech` installed (its `server_name` line lists BOTH `tv.daveai.tech` and `hermestv.daveai.tech`), `nginx -t` passes
 
 ---
 
@@ -153,20 +153,22 @@ for s in daveai.tech diy.daveai.tech fleet.daveai.tech game.daveai.tech \
 done
 # All 9 must be 200
 
-echo "=== 2. HermesTV /health ==="
-curl -sI "https://hermestv.daveai.tech/health"
+echo "=== 2. HermesTV /health (canonical + alias) ==="
+curl -sI "https://tv.daveai.tech/health"
 # HTTP/1.1 200 OK expected
+curl -sI "https://hermestv.daveai.tech/health"
+# HTTP/1.1 200 OK expected — alias must match canonical
 
 echo "=== 3. HermesTV /api/layouts ==="
-curl -s "https://hermestv.daveai.tech/api/layouts" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['count'], 'layouts')"
+curl -s "https://tv.daveai.tech/api/layouts" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['count'], 'layouts')"
 # 7 layouts expected
 
 echo "=== 4. HermesTV web app HTML ==="
-curl -s "https://hermestv.daveai.tech/" | grep -c '<div id="root">'
+curl -s "https://tv.daveai.tech/" | grep -c '<div id="root">'
 # 1 expected
 
 echo "=== 5. real browser ==="
-# Open https://hermestv.daveai.tech/ in your workstation Chrome.
+# Open https://tv.daveai.tech/ in your workstation Chrome.
 # Pick Sherri or Dave. Confirm:
 #   - profile picker renders
 #   - main app loads (catalog grid)
@@ -182,7 +184,7 @@ All five green = Phase 2 deploy complete.
 
 ### Triage decision
 - **Existing daveai.tech site regression** (one of the 9 ≠ 200) → IMMEDIATE rollback, then investigate
-- **HermesTV unhealthy** (502 on hermestv.daveai.tech but 9 existing sites still 200) → diagnose first, rollback only if root cause is unclear
+- **HermesTV unhealthy** (502 on tv.daveai.tech / hermestv.daveai.tech but 9 existing sites still 200) → diagnose first, rollback only if root cause is unclear
 
 ### Immediate rollback (60-second action)
 ```bash

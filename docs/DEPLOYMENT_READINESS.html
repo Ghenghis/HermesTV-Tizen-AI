@@ -38,7 +38,7 @@
 <p>
   <strong>Date:</strong> 2026-05-18 &middot;
   <strong>Branch:</strong> <code>main</code> &middot;
-  <strong>Target:</strong> <code>hermestv.daveai.tech</code> (Hostinger VPS) &middot;
+  <strong>Target:</strong> <code>tv.daveai.tech</code> (canonical; <code>hermestv.daveai.tech</code> alias) on Hostinger VPS &middot;
   <strong>Stack:</strong> docker compose project <code>hermestv-vps</code>
 </p>
 
@@ -102,7 +102,7 @@
 
     <rect x="180"  y="120" width="170" height="44" rx="6" fill="#1c3a1c" stroke="#56d364"/>
     <text x="265" y="140" text-anchor="middle" fill="#56d364">site live</text>
-    <text x="265" y="155" text-anchor="middle" fill="#8b949e">hermestv.daveai.tech</text>
+    <text x="265" y="155" text-anchor="middle" fill="#8b949e">tv.daveai.tech (+ alias)</text>
 
     <rect x="380"  y="210" width="320" height="44" rx="6" fill="#4d2a2a" stroke="#f85149"/>
     <text x="540" y="230" text-anchor="middle" fill="#f85149">acceptance fail -> rollback</text>
@@ -292,43 +292,43 @@ done</pre>
     <tr>
       <td class="checkbox">[ ]</td>
       <td>Health endpoint</td>
-      <td><code>curl -sI https://hermestv.daveai.tech/health</code></td>
+      <td><code>curl -sI https://tv.daveai.tech/health</code></td>
       <td class="ok"><code>HTTP/1.1 200 OK</code> (or HTTP/2 200)</td>
     </tr>
     <tr>
       <td class="checkbox">[ ]</td>
       <td><code>X-Catalog-Source</code> header present</td>
-      <td><code>curl -sI https://hermestv.daveai.tech/api/catalog</code></td>
+      <td><code>curl -sI https://tv.daveai.tech/api/catalog</code></td>
       <td class="ok">Header set to <code>seed-147</code>, <code>iptv-org</code>, <code>jellyfin</code>, <code>threadfin-merged</code>, or a <code>merged-with-*</code> combo</td>
     </tr>
     <tr>
       <td class="checkbox">[ ]</td>
       <td>Catalog item count &ge; 147 (seed floor)</td>
-      <td><code>curl -s https://hermestv.daveai.tech/api/catalog | jq .total</code></td>
+      <td><code>curl -s https://tv.daveai.tech/api/catalog | jq .total</code></td>
       <td class="ok">&ge; <code>147</code> (more once Threadfin / Jellyfin / iptv-org wire up)</td>
     </tr>
     <tr>
       <td class="checkbox">[ ]</td>
       <td>Layouts route returns 7</td>
-      <td><code>curl -s https://hermestv.daveai.tech/api/layouts | jq .count</code></td>
+      <td><code>curl -s https://tv.daveai.tech/api/layouts | jq .count</code></td>
       <td class="ok"><code>7</code></td>
     </tr>
     <tr>
       <td class="checkbox">[ ]</td>
       <td>Play returns a ticket envelope, no stream URL</td>
-      <td><code>curl -s -X POST https://hermestv.daveai.tech/api/play \<br>&nbsp;&nbsp;-H 'content-type: application/json' \<br>&nbsp;&nbsp;-d '{"item_id":"seed-news-001","profile_id":"mom_tv"}' | jq .</code></td>
+      <td><code>curl -s -X POST https://tv.daveai.tech/api/play \<br>&nbsp;&nbsp;-H 'content-type: application/json' \<br>&nbsp;&nbsp;-d '{"item_id":"seed-news-001","profile_id":"mom_tv"}' | jq .</code></td>
       <td class="ok">JSON with <code>ticket</code>, <code>stream_endpoint: /api/play/.../stream</code>, <code>expires_at</code>. Body MUST NOT contain a raw provider URL.</td>
     </tr>
     <tr>
       <td class="checkbox">[ ]</td>
       <td>Web SPA HTML serves</td>
-      <td><code>curl -s https://hermestv.daveai.tech/ | grep -c '&lt;div id="root"&gt;'</code></td>
+      <td><code>curl -s https://tv.daveai.tech/ | grep -c '&lt;div id="root"&gt;'</code></td>
       <td class="ok"><code>1</code></td>
     </tr>
     <tr>
       <td class="checkbox">[ ]</td>
       <td>All 7 layouts cycle without console errors in a real browser</td>
-      <td>Open <code>https://hermestv.daveai.tech</code> &rarr; pick profile &rarr; click "Look" &rarr; cycle all 7 layouts</td>
+      <td>Open <code>https://tv.daveai.tech</code> &rarr; pick profile &rarr; click "Look" &rarr; cycle all 7 layouts</td>
       <td class="ok">Layout switcher modal lists 7 entries, each renders, DevTools console has no <code>Uncaught</code> errors</td>
     </tr>
     <tr>
@@ -370,7 +370,7 @@ docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
 echo "containers stopped; volumes intact"</pre>
 
 <p class="muted">
-  After <code>stop</code>, host nginx returns <code>502</code> for <code>hermestv.daveai.tech</code>. The 9 other daveai.tech
+  After <code>stop</code>, host nginx returns <code>502</code> for both <code>tv.daveai.tech</code> and its alias <code>hermestv.daveai.tech</code>. The 9 other daveai.tech
   sites continue to serve <code>200</code> &mdash; verify with the regression sweep before doing anything else.
 </p>
 
@@ -399,8 +399,8 @@ docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
 docker compose -p hermestv-vps -f upstream/docker-vps/VPS_COMPOSE.yml \
   up -d --no-deps hermes-tv-api hermes-web-tv
 
-curl -sI https://hermestv.daveai.tech/health      # expect 200
-curl -sI https://hermestv.daveai.tech/            # expect 200</pre>
+curl -sI https://tv.daveai.tech/health      # expect 200
+curl -sI https://tv.daveai.tech/            # expect 200</pre>
 
 <h3>5.4 Forbidden during rollback</h3>
 <table>
@@ -465,7 +465,7 @@ curl -sI https://hermestv.daveai.tech/            # expect 200</pre>
     <tr>
       <td>Cloudflare returns <code>521</code> or <code>522</code></td>
       <td>Origin not reachable (api or web container down) or Cloudflare-flexible mis-set to "Full".</td>
-      <td>SSH in, confirm both containers <code>healthy</code>, confirm host nginx <code>listen 80;</code> still active for <code>hermestv.daveai.tech</code>. If origin is fine, Cloudflare dashboard &rarr; SSL/TLS &rarr; must be "Flexible" (per <code>upstream/nginx/hermestv.daveai.tech.conf.example</code>).</td>
+      <td>SSH in, confirm both containers <code>healthy</code>, confirm host nginx <code>listen 80;</code> still active for both <code>tv.daveai.tech</code> and <code>hermestv.daveai.tech</code>. If origin is fine, Cloudflare dashboard &rarr; SSL/TLS &rarr; must be "Flexible" (per <code>upstream/nginx/hermestv.daveai.tech.conf.example</code>).</td>
     </tr>
     <tr>
       <td>Cron-driven iptv-org refresh fills <code>/var/cache/iptv-org</code> indefinitely</td>
@@ -680,7 +680,7 @@ curl -sI https://hermestv.daveai.tech/            # expect 200</pre>
       <td>empty (defaults allow localhost, hermestv.local, 192.168.x.x)</td>
       <td><span class="pill opt">optional</span></td>
       <td><span class="pill pub">public</span></td>
-      <td>Comma-separated additional CORS origins. Production sets <code>https://hermestv.daveai.tech</code>.</td>
+      <td>Comma-separated additional CORS origins. Production sets <code>https://tv.daveai.tech,https://hermestv.daveai.tech</code> (canonical + additive alias).</td>
     </tr>
   </tbody>
 </table>

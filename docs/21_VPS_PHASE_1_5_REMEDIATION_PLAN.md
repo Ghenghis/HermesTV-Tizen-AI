@@ -4,6 +4,8 @@
 **Predecessor**: [20_VPS_PHASE_1_AUDIT_FINDINGS.md](20_VPS_PHASE_1_AUDIT_FINDINGS.md)
 **Successor**: Phase 2 deploy plan (not yet opened)
 
+> **2026-05-18 update**: The short canonical `tv.daveai.tech` was added as an additive nginx alias (same VPS IP, same upstream). `hermestv.daveai.tech` remains a valid alias indefinitely. References to `hermestv.daveai.tech` below are preserved as historical record; in current systems the canonical URL is `tv.daveai.tech` and the nginx `server_name` lists both.
+
 ---
 
 ## Why Phase 1.5 exists

@@ -139,7 +139,7 @@ docker compose -f upstream/docker-vps/VPS_COMPOSE.yml -p hermestv-vps \
 ```
 NODE_ENV=production
 PORT=3011
-PUBLIC_HOST=hermestv.daveai.tech
+PUBLIC_HOST=tv.daveai.tech
 
 # Azure TTS — paste from Azure portal → Speech service → Keys
 AZURE_TTS_KEY=<paste-here-and-only-here>
@@ -171,9 +171,11 @@ ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 LLM_DEFAULT_MODEL=claude-haiku-4-5-20251001
 
-# CORS — operator confirms the public domain matches the host nginx site
-EXTRA_CORS_ORIGINS=https://hermestv.daveai.tech
-PUBLIC_DOMAIN=hermestv.daveai.tech
+# CORS — operator confirms the public domain matches the host nginx site.
+# Both canonical (tv.daveai.tech) and alias (hermestv.daveai.tech) must be
+# accepted so any client typing either Host header succeeds.
+EXTRA_CORS_ORIGINS=https://tv.daveai.tech,https://hermestv.daveai.tech
+PUBLIC_DOMAIN=tv.daveai.tech
 ACME_EMAIL=admin@daveai.tech
 ```
 

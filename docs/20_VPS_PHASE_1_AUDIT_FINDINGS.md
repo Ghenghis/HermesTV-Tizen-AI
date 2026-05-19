@@ -62,7 +62,7 @@ Plenty of room for HermesTV (~1 GB image footprint, ~600 MB RAM peak).
 **Active nginx sites under daveai.tech** (10):
 - `daveai.tech`, `diy.daveai.tech`, `fleet.daveai.tech`, `game.daveai.tech`, `hermes-chat`, **`hermes.daveai.tech`**, `hermes3d.daveai.tech`, `openhands.daveai.tech`, `voice.daveai.tech`, `www-redirect`
 
-> **`hermes.daveai.tech` is already taken by a separate project.** HermesTV uses `hermestv.daveai.tech` (added in Phase 1.5).
+> **`hermes.daveai.tech` is already taken by a separate project.** HermesTV uses `hermestv.daveai.tech` (added in Phase 1.5). On 2026-05-18 the short canonical `tv.daveai.tech` was added as an additive nginx alias — same VPS IP, same upstream — so both URLs answer. `tv.daveai.tech` is the new canonical; `hermestv.daveai.tech` remains valid indefinitely.
 
 **Active systemd services** (selection):
 `docker`, `containerd`, `nginx`, `fail2ban`, `ollama`, `litellm`, `postgresql@16`, `nats`, `pm2-root`, `kilocode-runtime`, `kilocode-settings`, `kilocode-webui`, `shiba-gateway`. All `NEVER_TOUCH_SYSTEM_CRITICAL`.
