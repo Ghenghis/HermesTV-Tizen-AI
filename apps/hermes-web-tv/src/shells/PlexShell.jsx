@@ -1,6 +1,21 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PlexShell — HermesTV's media-server-style layout.
+//
+// Visual identity: amber/gold sidebar with landscape tile grid (16:9), drawing
+// from the home-media-server design language without copying brand assets.
+// HermesTV branding only — never reference upstream player names in copy.
+//
+// SOTA polish per PR #75: design tokens (--radius-*, --shadow-*, --gradient-*,
+// --ease-out), hover-lift cards (.hermes-card-hover style transform), focus-
+// visible shadow halo, gradient primary CTA, and reduced-motion respect.
+//
+// Tizen 6.5 / Chrome 76 safe: no :has(), no @container, no logical properties,
+// ES5-style function declarations to match the rest of the shell layer.
+// ─────────────────────────────────────────────────────────────────────────────
+
 var SIDEBAR_SECTIONS = [
   { icon: '🏠', label: 'Home' },
   { icon: '📡', label: 'Live TV' },
@@ -9,20 +24,34 @@ var SIDEBAR_SECTIONS = [
   { icon: '🗂️', label: 'My Library' },
 ];
 
+// Plex shell's signature amber accent — used inline as a fallback when the
+// active theme doesn't override --accent. Keep this local so the shell's
+// identity stays intact even on a CSS variable miss.
+var PLEX_ACCENT = '#e5a00d';
+
 function GridSection(props) {
   var title = props.title;
   var items = props.items;
   var onItemSelect = props.onItemSelect;
   var fontScale = props.fontScale;
   var profile = props.profile;
+  // Honour the user's reduced-motion preference — agents respect the
+  // .motion-reduced body class globally, but reading the profile flag here
+  // lets us skip the translateY hover-lift before the CSS even applies.
   var allowMotion = !(profile && profile.reduced_motion);
 
   if (!items || items.length === 0) return null;
 
   return (
     <div style={{ marginBottom: '28px' }}>
-      <h3 style={{ margin: '0 0 10px', fontSize: 'calc(14px * ' + fontScale + ')', color: '#c8d2e0', fontWeight: 700 }}>{title}</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+      <h3 style={{
+        margin: '0 0 12px',
+        fontSize: 'calc(14px * ' + fontScale + ')',
+        color: '#c8d2e0',
+        fontWeight: 700,
+        letterSpacing: '0.02em',
+      }}>{title}</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
         {items.slice(0, 8).map(function(item, idx) {
           return (
             <div
@@ -30,29 +59,86 @@ function GridSection(props) {
               data-focusable="true"
               tabIndex={0}
               role="button"
+              aria-label={item.title || 'Untitled'}
               onClick={function() { if (onItemSelect) onItemSelect(item); }}
               onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
-              style={{ cursor: 'pointer', borderRadius: '6px', overflow: 'hidden', border: '1px solid #2a2c2f', transition: 'border-color 120ms, transform 120ms, box-shadow 120ms', outline: 'none' }}
-              onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#e5a00d'; if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#2a2c2f'; e.currentTarget.style.transform = 'none'; }}
-              onFocus={function(e) { e.currentTarget.style.borderColor = '#e5a00d'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(229,160,13,0.35)'; }}
-              onBlur={function(e) { e.currentTarget.style.borderColor = '#2a2c2f'; e.currentTarget.style.boxShadow = 'none'; }}
+              style={{
+                cursor: 'pointer',
+                // var(--radius-md) gives every tile the same 12px softening
+                // that ZeroShell + the modal layer use; the inline 12px is a
+                // belt-and-braces fallback if the var is unresolved.
+                borderRadius: 'var(--radius-md, 12px)',
+                overflow: 'hidden',
+                border: '1px solid #2a2c2f',
+                // Shared --shadow-md token — keeps every shell's drop shadow
+                // in lockstep without a per-shell shadow recipe.
+                boxShadow: 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))',
+                // Animate transform + border-color only. Box-shadow is set
+                // up-front so we don't pay for a layout-affecting shadow tween.
+                transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms ease, box-shadow 180ms ease',
+                outline: 'none',
+                background: '#191b1d',
+              }}
+              onMouseEnter={function(e) {
+                e.currentTarget.style.borderColor = PLEX_ACCENT;
+                if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={function(e) {
+                e.currentTarget.style.borderColor = '#2a2c2f';
+                e.currentTarget.style.transform = 'none';
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.borderColor = PLEX_ACCENT;
+                // --shadow-focus is the shared accent halo recipe; fall back
+                // to a hand-rolled amber ring if the variable doesn't resolve.
+                e.currentTarget.style.boxShadow = 'var(--shadow-focus, 0 0 0 3px rgba(229,160,13,0.45), 0 12px 36px rgba(229,160,13,0.25))';
+                if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onBlur={function(e) {
+                e.currentTarget.style.borderColor = '#2a2c2f';
+                e.currentTarget.style.boxShadow = 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))';
+                e.currentTarget.style.transform = 'none';
+              }}
             >
               <div style={{ aspectRatio: '16/9', background: posterBg(item, idx), position: 'relative' }}>
                 {item.quality && (
-                  <div style={{ position: 'absolute', top: '4px', right: '4px', background: '#e5a00d', color: '#000', fontSize: '9px', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '6px',
+                    right: '6px',
+                    background: PLEX_ACCENT,
+                    color: '#000',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    // Pill-shaped quality chip — matches ZeroShell's 999px
+                    // star chip so badges feel like one family across shells.
+                    borderRadius: 'var(--radius-pill, 9999px)',
+                    letterSpacing: '0.05em',
+                  }}>
                     {item.quality}
                   </div>
                 )}
                 {item.type === 'live' && (
-                  <div style={{ position: 'absolute', top: '4px', left: '4px', background: '#e50914', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '6px',
+                    left: '6px',
+                    background: '#e50914',
+                    color: '#fff',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: 'var(--radius-pill, 9999px)',
+                    letterSpacing: '0.05em',
+                  }}>
                     LIVE
                   </div>
                 )}
               </div>
-              <div style={{ padding: '8px', background: '#191b1d' }}>
+              <div style={{ padding: '10px 10px 12px', background: '#191b1d' }}>
                 <div style={{ fontSize: 'calc(12px * ' + fontScale + ')', fontWeight: 600, color: '#eaeaea', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                {item.year && <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', marginTop: '2px' }}>{item.year}</div>}
+                {item.year && <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', marginTop: '3px' }}>{item.year}</div>}
               </div>
             </div>
           );
@@ -78,6 +164,7 @@ function PlexShell(props) {
   var movies = filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
   var series = filtered.filter(function(i) { return i.type === 'series'; });
   var fontScale = (profile && profile.font_scale) || 1;
+  var allowMotion = !(profile && profile.reduced_motion);
 
   var activeSectionResult = React.useState(0);
   var activeSection = activeSectionResult[0];
@@ -95,7 +182,20 @@ function PlexShell(props) {
 
       {/* Sidebar */}
       <div style={{ background: '#191b1d', borderRight: '1px solid #2a2c2f', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '18px 22px 14px', fontWeight: 800, color: '#e5a00d', fontSize: 'calc(20px * ' + fontScale + ')', flexShrink: 0 }}>PLEX</div>
+        {/* Wordmark — HermesTV branding only, never reference upstream player
+            names in user-visible strings. Gold gradient text echoes the
+            shell's amber identity without claiming the upstream brand. */}
+        <div style={{
+          padding: '18px 22px 14px',
+          fontWeight: 800,
+          fontSize: 'calc(20px * ' + fontScale + ')',
+          flexShrink: 0,
+          backgroundImage: 'linear-gradient(135deg, ' + PLEX_ACCENT + ', #f5c053)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          color: 'transparent',
+          letterSpacing: '0.04em',
+        }}>HermesTV</div>
 
         <div style={{ overflowY: 'auto', flex: 1 }}>
           <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Library</div>
@@ -122,20 +222,42 @@ function PlexShell(props) {
                   padding: isActive ? '14px 22px 14px 19px' : '14px 22px',
                   fontSize: 'calc(13px * ' + fontScale + ')',
                   cursor: 'pointer',
-                  color: isActive ? '#e5a00d' : '#b2b9c1',
-                  background: isActive ? '#22252a' : 'transparent',
-                  borderLeft: isActive ? '3px solid #e5a00d' : '3px solid transparent',
+                  color: isActive ? PLEX_ACCENT : '#b2b9c1',
+                  // Active row gets a subtle amber-tinted gradient that
+                  // matches the gradient header recipe — surface-raised
+                  // sliding into surface — so the row reads "this is
+                  // current" without painting a heavy block.
+                  background: isActive ? 'linear-gradient(90deg, rgba(229,160,13,0.14) 0%, #22252a 100%)' : 'transparent',
+                  borderLeft: isActive ? '3px solid ' + PLEX_ACCENT : '3px solid transparent',
                   borderTop: 'none',
                   borderRight: 'none',
                   borderBottom: 'none',
-                  transition: 'all 80ms, box-shadow 120ms',
+                  // Match the 180ms hover-lift duration used by .hermes-card-hover
+                  // so every transition in the shell feels like one cadence.
+                  transition: 'background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms ease, box-shadow 180ms ease',
                   fontFamily: 'inherit',
                   outline: 'none',
+                  // Even the side-rail rows get a small radius on the right
+                  // edge so the active strip doesn't slam into the panel edge.
+                  borderTopRightRadius: 'var(--radius-sm, 8px)',
+                  borderBottomRightRadius: 'var(--radius-sm, 8px)',
                 }}
                 onMouseEnter={function(e) { if (!isActive) e.currentTarget.style.background = '#22252a'; }}
                 onMouseLeave={function(e) { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-                onFocus={function(e) { e.currentTarget.style.background = '#22252a'; e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(229,160,13,0.6)'; }}
-                onBlur={function(e) { e.currentTarget.style.background = isActive ? '#22252a' : 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
+                onFocus={function(e) {
+                  e.currentTarget.style.background = isActive
+                    ? 'linear-gradient(90deg, rgba(229,160,13,0.24) 0%, #22252a 100%)'
+                    : '#22252a';
+                  // Shared focus halo so remote-control users see the same
+                  // accent glow ZeroShell paints on its poster cards.
+                  e.currentTarget.style.boxShadow = 'var(--shadow-focus, inset 0 0 0 2px rgba(229,160,13,0.6))';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.background = isActive
+                    ? 'linear-gradient(90deg, rgba(229,160,13,0.14) 0%, #22252a 100%)'
+                    : 'transparent';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               >
                 <span>{s.icon}</span>
                 <span>{s.label}</span>
@@ -149,7 +271,7 @@ function PlexShell(props) {
               {providers.map(function(p) {
                 return (
                   <div key={p.id} style={{ padding: '7px 22px', fontSize: 'calc(12px * ' + fontScale + ')', color: '#b2b9c1', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                    <span style={{ width: '8px', height: '8px', borderRadius: 'var(--radius-pill, 9999px)', background: '#22c55e', display: 'inline-block' }} />
                     {p.name || p.id}
                   </div>
                 );
@@ -162,19 +284,34 @@ function PlexShell(props) {
       {/* Main content */}
       <div style={{ overflowY: 'auto', padding: '22px 28px' }}>
 
-        {/* Hero card */}
+        {/* Hero card — bigger radius (lg) than the tile grid so it reads as
+            the visual anchor of the page. Shared --shadow-lg sits under it. */}
         {featured && (
           <div
             onClick={function() { if (onItemSelect) onItemSelect(featured); }}
-            style={{ height: '280px', borderRadius: '6px', background: posterBg(featured, 0), marginBottom: '24px', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
+            style={{
+              height: '280px',
+              borderRadius: 'var(--radius-lg, 16px)',
+              background: posterBg(featured, 0),
+              marginBottom: '24px',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              boxShadow: 'var(--shadow-lg, 0 12px 36px rgba(0,0,0,0.42))',
+            }}
           >
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(31,35,38,0.95) 0%, rgba(31,35,38,0.2) 60%, transparent 100%)' }} />
-            <div style={{ position: 'absolute', bottom: '20px', left: '20px' }}>
-              <div style={{ fontSize: 'calc(24px * ' + fontScale + ')', fontWeight: 700, marginBottom: '6px' }}>{featured.title}</div>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ position: 'absolute', bottom: '20px', left: '24px', right: '24px' }}>
+              <div style={{ fontSize: 'calc(26px * ' + fontScale + ')', fontWeight: 800, marginBottom: '6px', letterSpacing: '0.01em' }}>{featured.title}</div>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
                 {featured.year && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#b2b9c1' }}>{featured.year}</span>}
                 {featured.genre && <span style={{ fontSize: 'calc(12px * ' + fontScale + ')', color: '#b2b9c1' }}>{featured.genre}</span>}
               </div>
+              {/* Primary CTA: pill-shaped, accent gradient, soft drop shadow.
+                  Matches PR #75 modal CTAs. The amber stop in the gradient
+                  preserves Plex shell identity; the indigo stop slides toward
+                  the shared --gradient-accent direction so this button reads
+                  as part of the same family as ZeroShell's Z logo wordmark. */}
               <button
                 data-focusable="true"
                 tabIndex={0}
@@ -186,9 +323,30 @@ function PlexShell(props) {
                     if (onItemSelect) onItemSelect(featured);
                   }
                 }}
-                style={{ padding: '9px 20px', background: '#e5a00d', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: 'calc(13px * ' + fontScale + ')', cursor: 'pointer', outline: 'none' }}
-                onFocus={function(e) { e.currentTarget.style.outline = '3px solid #e5a00d'; e.currentTarget.style.outlineOffset = '2px'; }}
-                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+                style={{
+                  padding: '11px 28px',
+                  background: 'linear-gradient(135deg, ' + PLEX_ACCENT + ', #f59e0b)',
+                  color: '#0a0e1a',
+                  border: 'none',
+                  borderRadius: 'var(--radius-pill, 9999px)',
+                  fontWeight: 800,
+                  fontSize: 'calc(13px * ' + fontScale + ')',
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxShadow: 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))',
+                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease',
+                }}
+                onMouseEnter={function(e) { if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.transform = 'none'; }}
+                onFocus={function(e) {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-focus, 0 0 0 3px rgba(229,160,13,0.5), 0 12px 36px rgba(229,160,13,0.35))';
+                  if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))';
+                  e.currentTarget.style.transform = 'none';
+                }}
               >
                 ▶ Play
               </button>

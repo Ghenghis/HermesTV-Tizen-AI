@@ -1,6 +1,22 @@
 import React from 'react';
 import { applyShellFilters } from './shellHelpers.js';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TiviMateShell — HermesTV's IPTV / EPG-style layout.
+//
+// Visual identity: narrow channel rail on the left, EPG time grid on the right
+// with the orange sunset accent reading "live event guide." HermesTV branding
+// only — never reference upstream IPTV-player names in user-visible strings.
+//
+// SOTA polish per PR #75: design tokens (--radius-*, --shadow-*, --ease-out,
+// --shadow-focus), hover-lift on EPG cells + channel rows, gradient-accent
+// primary CTA (the bottom-nav "Search" pill), focus-visible halo, reduced-
+// motion respect.
+//
+// Tizen 6.5 / Chrome 76 safe: no :has(), no @container, no logical props,
+// ES5-style function declarations to match the rest of the shell layer.
+// ─────────────────────────────────────────────────────────────────────────────
+
 var NAV_ITEMS = [
   { icon: '📺', label: 'Live' },
   { icon: '🎬', label: 'Movies' },
@@ -9,6 +25,10 @@ var NAV_ITEMS = [
 ];
 
 var TIME_SLOTS = ['Now', '+30m', '+1h', '+90m', '+2h'];
+
+// TiviMate shell's signature orange accent — used inline as a fallback when
+// the active theme doesn't override --accent. Identity-preserving.
+var TM_ACCENT = '#ff7d3a';
 
 function TiviMateShell(props) {
   var catalog = props.catalog;
@@ -27,6 +47,13 @@ function TiviMateShell(props) {
   var activeIdx = activeIdxResult[0];
   var setActiveIdx = activeIdxResult[1];
 
+  // Honour the profile-level reduced-motion flag so we can skip the
+  // translateY hover-lift before the .motion-reduced CSS even applies.
+  // This is belt-and-braces — the body class already collapses transition
+  // durations to 0.01ms — but it lets us avoid setting a transform style
+  // at all on the reduced-motion path.
+  var allowMotion = !(profile && profile.reduced_motion);
+
   React.useEffect(function() {
     var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
     if (el && typeof el.focus === 'function') {
@@ -41,8 +68,27 @@ function TiviMateShell(props) {
 
       {/* Sidebar */}
       <div style={{ background: '#0a0d12', borderRight: '1px solid #1b1f27', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', fontWeight: 800, fontSize: 'calc(18px * ' + fontScale + ')', color: '#fff', borderBottom: '1px solid #1b1f27', letterSpacing: '0.5px', flexShrink: 0 }}>
-          Hermes<span style={{ color: '#ff7d3a' }}>TV</span>
+        <div style={{
+          padding: '16px 18px',
+          fontWeight: 800,
+          fontSize: 'calc(18px * ' + fontScale + ')',
+          color: '#fff',
+          borderBottom: '1px solid #1b1f27',
+          letterSpacing: '0.04em',
+          flexShrink: 0,
+          // Gradient header band — mirrors the .hermes-gradient-header
+          // recipe so the shell's top edge tells the same story as every
+          // modal in the app.
+          background: 'linear-gradient(180deg, #131720, #0a0d12)',
+        }}>
+          Hermes<span style={{
+            // Wordmark accent gets a gradient fill so the "TV" stop reads
+            // as part of the shared --gradient-accent family.
+            backgroundImage: 'linear-gradient(135deg, ' + TM_ACCENT + ', #f59e0b)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            color: 'transparent',
+          }}>TV</span>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -69,36 +115,126 @@ function TiviMateShell(props) {
                   width: '100%',
                   textAlign: 'left',
                   padding: isActive ? '11px 18px 11px 15px' : '11px 18px',
-                  borderLeft: isActive ? '3px solid #ff7d3a' : '3px solid transparent',
+                  borderLeft: isActive ? '3px solid ' + TM_ACCENT : '3px solid transparent',
                   borderTop: 'none',
                   borderRight: 'none',
                   borderBottom: 'none',
-                  background: isActive ? 'linear-gradient(90deg, rgba(255,125,58,0.18) 0%, transparent 100%)' : 'transparent',
+                  background: isActive ? 'linear-gradient(90deg, rgba(255,125,58,0.20) 0%, transparent 100%)' : 'transparent',
                   cursor: 'pointer',
-                  transition: 'all 120ms, box-shadow 120ms',
+                  // 180ms cubic-bezier cadence matches the .hermes-card-hover
+                  // and PlexShell tile transitions — every interactive
+                  // surface in the app shares one easing curve.
+                  transition: 'background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms ease, box-shadow 180ms ease',
                   color: isActive ? '#fff' : '#8b95a5',
                   fontSize: 'calc(13px * ' + fontScale + ')',
                   fontFamily: 'inherit',
                   outline: 'none',
+                  // Soften the right edge of the channel row so the active
+                  // strip doesn't slam into the panel border.
+                  borderTopRightRadius: 'var(--radius-sm, 8px)',
+                  borderBottomRightRadius: 'var(--radius-sm, 8px)',
                 }}
                 onMouseEnter={function(e) { if (!isActive) e.currentTarget.style.color = '#fff'; }}
                 onMouseLeave={function(e) { if (!isActive) e.currentTarget.style.color = '#8b95a5'; }}
-                onFocus={function(e) { e.currentTarget.style.borderLeft = '3px solid #ff7d3a'; e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(255,125,58,0.35)'; e.currentTarget.style.color = '#fff'; }}
-                onBlur={function(e) { e.currentTarget.style.borderLeft = isActive ? '3px solid #ff7d3a' : '3px solid transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.color = isActive ? '#fff' : '#8b95a5'; }}
+                onFocus={function(e) {
+                  e.currentTarget.style.borderLeft = '3px solid ' + TM_ACCENT;
+                  // Shared --shadow-focus halo — falls back to an inset
+                  // orange ring keyed to the shell's identity color.
+                  e.currentTarget.style.boxShadow = 'var(--shadow-focus, inset 0 0 0 2px rgba(255,125,58,0.5))';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.borderLeft = isActive ? '3px solid ' + TM_ACCENT : '3px solid transparent';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.color = isActive ? '#fff' : '#8b95a5';
+                }}
               >
                 <span style={{ color: '#8c95a5', fontSize: 'calc(11px * ' + fontScale + ')', width: '26px', fontWeight: 600 }}>{idx + 1}</span>
-                <span style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#1d2330', display: 'grid', placeItems: 'center', fontSize: '14px', flexShrink: 0 }}>📺</span>
+                <span style={{
+                  width: '34px',
+                  height: '34px',
+                  // Channel logo bubble uses --radius-sm (8px) so it reads
+                  // as a tile rather than a sharp square — matches the
+                  // EPG cell rounding below.
+                  borderRadius: 'var(--radius-sm, 8px)',
+                  background: '#1d2330',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: '14px',
+                  flexShrink: 0,
+                  boxShadow: 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))',
+                }}>📺</span>
                 <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Channel ' + (idx + 1)}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Bottom nav */}
-        <div style={{ borderTop: '1px solid #1b1f27', padding: '8px 0', flexShrink: 0 }}>
+        {/* Bottom nav — gradient header band visually anchors the rail's foot */}
+        <div style={{
+          borderTop: '1px solid #1b1f27',
+          padding: '10px 12px',
+          flexShrink: 0,
+          background: 'linear-gradient(180deg, #0a0d12, #060810)',
+          display: 'flex',
+          gap: '6px',
+          flexWrap: 'wrap',
+        }}>
           {NAV_ITEMS.map(function(n) {
+            // The "Search" entry is the primary CTA — gets the gradient
+            // accent pill treatment so it reads like a tab anchor, not just
+            // another rail item.
+            var isPrimary = n.label === 'Search';
             return (
-              <div key={n.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', fontSize: 'calc(12px * ' + fontScale + ')', color: '#8c95a5', cursor: 'pointer' }}>
+              <div
+                key={n.label}
+                tabIndex={0}
+                role="button"
+                aria-label={n.label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  // var(--radius-pill) pill geometry on every bottom-nav
+                  // entry — even the secondary ones — so the cluster reads
+                  // like a tab strip rather than rail rows.
+                  padding: '8px 14px',
+                  fontSize: 'calc(12px * ' + fontScale + ')',
+                  color: isPrimary ? '#0a0e1a' : '#8c95a5',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-pill, 9999px)',
+                  background: isPrimary
+                    ? 'linear-gradient(135deg, ' + TM_ACCENT + ', #f59e0b)'
+                    : 'transparent',
+                  fontWeight: isPrimary ? 800 : 500,
+                  letterSpacing: isPrimary ? '0.04em' : '0',
+                  boxShadow: isPrimary
+                    ? 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))'
+                    : 'none',
+                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 180ms ease, color 180ms ease, box-shadow 180ms ease',
+                  outline: 'none',
+                }}
+                onMouseEnter={function(e) {
+                  if (!isPrimary) e.currentTarget.style.color = '#fff';
+                  if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={function(e) {
+                  if (!isPrimary) e.currentTarget.style.color = '#8c95a5';
+                  e.currentTarget.style.transform = 'none';
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-focus, 0 0 0 3px rgba(255,125,58,0.5))';
+                  if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                  if (!isPrimary) e.currentTarget.style.color = '#fff';
+                }}
+                onBlur={function(e) {
+                  e.currentTarget.style.boxShadow = isPrimary
+                    ? 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))'
+                    : 'none';
+                  e.currentTarget.style.transform = 'none';
+                  if (!isPrimary) e.currentTarget.style.color = '#8c95a5';
+                }}
+              >
                 <span>{n.icon}</span><span>{n.label}</span>
               </div>
             );
@@ -108,11 +244,23 @@ function TiviMateShell(props) {
 
       {/* Main EPG area */}
       <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', overflow: 'hidden' }}>
-        {/* Time header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '200px repeat(5, 1fr)', background: '#13171f', borderBottom: '1px solid #1b1f27', padding: '10px 0', fontSize: 'calc(11px * ' + fontScale + ')', color: '#8c95a5', fontWeight: 600, flexShrink: 0 }}>
+        {/* Time header — gradient surface band matches sidebar foot recipe */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '200px repeat(5, 1fr)',
+          background: 'linear-gradient(180deg, #161b25, #13171f)',
+          borderBottom: '1px solid #1b1f27',
+          padding: '12px 0',
+          fontSize: 'calc(11px * ' + fontScale + ')',
+          color: '#8c95a5',
+          fontWeight: 600,
+          flexShrink: 0,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+        }}>
           <div style={{ padding: '0 12px' }}>Channel</div>
           {TIME_SLOTS.map(function(t, i) {
-            return <div key={t} style={{ padding: '0 12px', color: i === 0 ? '#ff7d3a' : '#8c95a5' }}>{t}</div>;
+            return <div key={t} style={{ padding: '0 12px', color: i === 0 ? TM_ACCENT : '#8c95a5' }}>{t}</div>;
           })}
         </div>
 
@@ -126,7 +274,16 @@ function TiviMateShell(props) {
               <div key={item.id || idx} style={{ display: 'grid', gridTemplateColumns: '200px repeat(5, 1fr)', borderBottom: '1px solid #161a22', height: '64px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 12px', background: '#10131a' }}>
                   <span style={{ color: '#8c95a5', fontSize: 'calc(11px * ' + fontScale + ')', width: '26px', fontWeight: 600 }}>{idx + 1}</span>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#1d2330', display: 'grid', placeItems: 'center', fontSize: '14px' }}>📺</div>
+                  <div style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: 'var(--radius-sm, 8px)',
+                    background: '#1d2330',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: '14px',
+                    boxShadow: 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))',
+                  }}>📺</div>
                   <span style={{ fontSize: 'calc(13px * ' + fontScale + ')', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
                 </div>
                 {[item, prog1, prog2, prog3, prog3].map(function(prog, si) {
@@ -137,26 +294,50 @@ function TiviMateShell(props) {
                       data-focusable="true"
                       tabIndex={0}
                       role="button"
+                      aria-label={(prog && prog.title) || 'Programme'}
                       onClick={function() { if (onItemSelect) onItemSelect(prog); }}
                       onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(prog); } }}
                       style={{
                         borderLeft: '1px solid #161a22',
+                        // EPG cells round inside the row so each programme
+                        // reads as a card rather than a hard grid cell.
+                        // Margins keep the 1px row dividers intact.
+                        margin: '6px 4px',
+                        borderRadius: 'var(--radius-sm, 8px)',
                         padding: '8px 10px',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
                         cursor: 'pointer',
                         background: isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.22) 0%, rgba(255,125,58,0.05) 100%)' : 'transparent',
-                        borderLeftColor: isLive ? '#ff7d3a' : '#161a22',
+                        borderLeftColor: isLive ? TM_ACCENT : '#161a22',
                         borderLeftWidth: isLive ? '2px' : '1px',
-                        transition: 'background 120ms, box-shadow 120ms',
+                        // 180ms cubic-bezier — same easing as the modal layer
+                        transition: 'background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                         overflow: 'hidden',
                         outline: 'none',
                       }}
-                      onMouseEnter={function(e) { if (!isLive) e.currentTarget.style.background = 'rgba(255,125,58,0.07)'; }}
-                      onMouseLeave={function(e) { if (!isLive) e.currentTarget.style.background = 'transparent'; }}
-                      onFocus={function(e) { e.currentTarget.style.background = isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.32) 0%, rgba(255,125,58,0.1) 100%)' : 'rgba(255,125,58,0.15)'; e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #ff7d3a'; }}
-                      onBlur={function(e) { e.currentTarget.style.background = isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.22) 0%, rgba(255,125,58,0.05) 100%)' : 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
+                      onMouseEnter={function(e) {
+                        if (!isLive) e.currentTarget.style.background = 'rgba(255,125,58,0.07)';
+                        if (allowMotion) e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={function(e) {
+                        if (!isLive) e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.transform = 'none';
+                      }}
+                      onFocus={function(e) {
+                        e.currentTarget.style.background = isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.34) 0%, rgba(255,125,58,0.12) 100%)' : 'rgba(255,125,58,0.18)';
+                        // Shared focus halo — same recipe the modal panels
+                        // use, so remote-control users see a single visual
+                        // language whether they're in an EPG cell or a modal.
+                        e.currentTarget.style.boxShadow = 'var(--shadow-focus, inset 0 0 0 2px rgba(255,125,58,0.6))';
+                        if (allowMotion) e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onBlur={function(e) {
+                        e.currentTarget.style.background = isLive ? 'linear-gradient(90deg, rgba(255,125,58,0.22) 0%, rgba(255,125,58,0.05) 100%)' : 'transparent';
+                        e.currentTarget.style.boxShadow = 'none';
+                        e.currentTarget.style.transform = 'none';
+                      }}
                     >
                       <div style={{ fontSize: 'calc(12px * ' + fontScale + ')', fontWeight: 600, color: '#e6e9ef', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(prog && prog.title) || '—'}
