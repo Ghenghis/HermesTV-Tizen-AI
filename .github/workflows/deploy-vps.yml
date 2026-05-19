@@ -148,6 +148,13 @@ jobs:
           echo "  remote: cd ${REPO_DIR}"
           cd "${REPO_DIR}"
 
+          # ${REPO_DIR} on the VPS is owned by root (cloned during initial
+          # provisioning) while we ssh in as the 'operator' user. Modern git
+          # treats this as 'dubious ownership' and refuses to operate. Mark
+          # the dir safe for this shell only — global config update is local
+          # to the operator user and survives container/host restarts.
+          git config --global --add safe.directory "${REPO_DIR}"
+
           echo "  remote: git fetch origin"
           git fetch origin
 
