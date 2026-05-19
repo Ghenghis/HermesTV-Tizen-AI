@@ -845,7 +845,10 @@ function ProfileManagementModal(props) {
         position: 'fixed',
         inset: '0',
         background: 'rgba(5,8,14,0.78)',
-        zIndex: 260,
+        // 1200 to sit above the OnboardingWizard (1100). The picker mounts
+        // this modal from inside the wizard's profile step, so z=260 would
+        // render the modal hidden behind the wizard overlay.
+        zIndex: 1200,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
