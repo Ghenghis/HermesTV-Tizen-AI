@@ -192,6 +192,75 @@ function patchSettings(patch) {
   }).then(_handleJson);
 }
 
+/**
+ * Bulk-cancel/delete multiple recordings in parallel.
+ *
+ * The backend has no native bulk endpoint — Phase 4 may add one, but until
+ * then this just fans out N concurrent DELETE calls. We wrap each one in a
+ * `.then(...).catch(...)` so a single failure doesn't reject the whole
+ * batch — instead, callers get a settled-style result list they can use to
+ * show per-row error toasts.
+ *
+ * Returns Promise<Array<{id, ok, error?}>> with one entry per input id, in
+ * the same order. Never rejects (unless inputs are invalid).
+ *
+ * @param {Array<string>} ids
+ * @param {string} profileId
+ */
+function deleteMany(ids, profileId) {
+  if (!Array.isArray(ids)) {
+    return Promise.reject(new Error('deleteMany requires an array of ids'));
+  }
+  if (typeof profileId !== 'string' || profileId.length === 0) {
+    return Promise.reject(new Error('deleteMany requires a profile id'));
+  }
+  if (ids.length === 0) { return Promise.resolve([]); }
+  var jobs = ids.map(function(id) {
+    return cancelRecording(id, profileId).then(function() {
+      return { id: id, ok: true };
+    }, function(err) {
+      var msg = (err && err.message) ? err.message : 'Could not delete recording.';
+      return { id: id, ok: false, error: msg };
+    });
+  });
+  return Promise.all(jobs);
+}
+
+/**
+ * Fetch aggregate storage stats for the recording library.
+ *
+ * The /api/dvr/storage-stats endpoint is **forward-looking** — until the
+ * Phase 4 muxer lands the server may not implement it, in which case the
+ * route returns 404. We catch that here and resolve with a sentinel
+ * envelope (`available: false`) so the caller can render
+ * "Storage stats unavailable" without error styling.
+ *
+ * Any other failure (network, 5xx, malformed body) is also normalised to
+ * the same shape — the caller never has to handle a rejection.
+ *
+ * Expected shape when implemented:
+ *   { available: true,
+ *     used_bytes: number,
+ *     total_bytes: number,
+ *     recording_count: number,
+ *     average_bytes: number }
+ *
+ * @returns {Promise<Object>}
+ */
+function getStorageStats() {
+  return _fetchWithTimeout(BASE_URL + '/api/dvr/storage-stats', { method: 'GET' })
+    .then(_handleJson)
+    .then(function(body) {
+      if (!body || typeof body !== 'object') {
+        return { available: false, reason: 'bad_response' };
+      }
+      return Object.assign({ available: true }, body);
+    }, function(err) {
+      var code = err && err.code ? err.code : 'unknown';
+      return { available: false, reason: code, status: err && err.status };
+    });
+}
+
 export {
   scheduleRecording,
   listRecordings,
@@ -200,4 +269,6 @@ export {
   playRecording,
   getSettings,
   patchSettings,
+  deleteMany,
+  getStorageStats,
 };

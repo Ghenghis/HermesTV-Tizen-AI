@@ -61,6 +61,31 @@ function getProfile(profileId) {
   });
 }
 
+// PATCH /api/profiles/:id — partial update of a profile record.
+// Whitelisted fields (server-side): display_name, agent_name, preferred_voice_id,
+// font_scale, audio_feedback, reduced_motion, active_theme. Returns the updated
+// record on success. Throws a network-style Error on HTTP >= 400 with the
+// server's message stitched on so the modal can surface "Profile saved" /
+// "Mom Mode requires font_scale >= 1.25" verbatim.
+function patchProfile(profileId, patch) {
+  return fetchWithTimeout(BASE_URL + '/api/profiles/' + encodeURIComponent(profileId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var msg = (body && body.message) ? body.message : ('Profile save failed: HTTP ' + response.status);
+        var err = new Error(msg);
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
 function getProviders() {
   return fetchWithTimeout(BASE_URL + '/api/providers').then(function(response) {
     if (!response.ok) {
@@ -223,7 +248,7 @@ function getPairingStatus(code) {
 }
 
 export {
-  isReachable, getProfile, getProviders, getCatalog, getEpg,
+  isReachable, getProfile, patchProfile, getProviders, getCatalog, getEpg,
   submitCommand, validateCommand, startPlayback,
   startDownload, listDownloads, cancelDownload,
   createPairing, getPairingStatus,

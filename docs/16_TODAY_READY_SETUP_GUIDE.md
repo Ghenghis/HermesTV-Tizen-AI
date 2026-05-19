@@ -1,11 +1,13 @@
-# 16 — Running HermesTV Today — Local Mock Mode
+# 16 — Running DaveTV Today — Local Mock Mode
 
 Repo: `https://github.com/Ghenghis/HermesTV-Tizen-AI`
 Local: `G:\Github\HermesTV-Tizen-AI`
 Target TVs: Mom `QN85Q7FAAFXZA`; Dave `UN55CU8000BXZA`.
 Audience: Dave — tech-savvy, not a developer. No terminal expertise required.
 
-This guide covers everything you need to run HermesTV on your PC right now, in Local Mock Mode. No real TV, no streaming account, no credentials required.
+This guide covers everything you need to run DaveTV on your PC right now, in Local Mock Mode. No real TV, no streaming account, no credentials required.
+
+> Note: the on-screen product name is **DaveTV**. The GitHub repo is still `HermesTV-Tizen-AI` and the backend service is still `hermes-tv-api` — these are technical identifiers and the clone/run commands below use them as-is.
 
 ---
 
@@ -200,3 +202,5 @@ Press `Ctrl+C` in each terminal to stop the API and the web app. Your browser ta
 - `docs/17_FIRST_RUN_FOR_DAVE_AND_SHERRI.md` — detailed first run walkthrough for each profile.
 - `docs/18_REAL_TV_DEPLOYMENT_CHECKLIST.md` — when you are ready to push to the actual Samsung TV.
 - `docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md` — how to add Apollo Group or XtremeHD safely.
+
+_(Rebranded HermesTV → DaveTV 2026-05-19 per user request; repo URL, npm scripts, service name `hermes-tv-api`, and log prefixes are technical identifiers and remain unchanged.)_

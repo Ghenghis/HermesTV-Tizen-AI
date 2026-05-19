@@ -1,26 +1,37 @@
 'use strict';
 
 /**
- * routes/sourceHealth.js — Real source-health probe endpoint.
+ * routes/sourceHealth.js — Source-health endpoints.
  *
- * GET /api/source-health/:provider_id/:item_id
+ *   GET /api/source-health
+ *     Aggregated cross-provider roll-up. Pulls cached state from
+ *     lib/iptvOrg.js, lib/m3uClient.js, and data/seedCatalog.js via
+ *     lib/sourceHealthAggregator.js. No network I/O on this path —
+ *     it reads whatever is already in process memory.
+ *
+ *   GET /api/source-health/:provider_id/:item_id
+ *     Real per-item probe. HEAD-requests the upstream URL via
+ *     lib/streamProbe.js with a 4-second timeout.
  *
  * SECURITY CONTRACT
- *   - The raw stream URL is NEVER returned to the client.
- *   - Only a redacted hint (scheme + host + path, no query string) is exposed.
+ *   - The raw stream URL is NEVER returned to the client (either path).
+ *   - Per-item probe exposes only a redacted hint (scheme + host + path,
+ *     no query string).
  *   - Providers without env-configured URLs return { reachable:false,
  *     reason:'not_configured', mock:true } so the UI can render a clear
  *     "Provider not connected" state instead of a fake number.
  *
  * BEHAVIOUR
- *   - HEAD request via lib/streamProbe.js with a 4-second timeout.
- *   - Results cached server-side for 60 s to avoid hammering providers.
+ *   - Aggregate path is in-memory only — safe to poll.
+ *   - Probe path: HEAD via lib/streamProbe.js with 4-second timeout,
+ *     results cached server-side for 60 s to avoid hammering providers.
  *   - Falls back gracefully whenever a provider URL template is missing.
  */
 
 const { Router } = require('express');
 const router = Router();
 const streamProbe = require('../lib/streamProbe');
+const sourceHealthAggregator = require('../lib/sourceHealthAggregator');
 
 // Provider IDs accepted by this route. Mirrors VALID_PROVIDERS in catalog.js.
 const VALID_PROVIDERS = ['apollo_group', 'xtremehd'];
@@ -59,6 +70,39 @@ function resolveStreamUrl(providerId, itemId) {
   }
   return trimmed;
 }
+
+/**
+ * GET /api/source-health
+ *
+ * Aggregated source-health roll-up across apollo_group, iptv-org, and
+ * xtremehd. Read-only; never touches the network. The aggregator wraps
+ * each per-provider lookup so any unexpected adapter failure degrades
+ * that single provider to offline rather than failing the whole call.
+ */
+router.get('/api/source-health', function(req, res) {
+  var payload;
+  try {
+    payload = sourceHealthAggregator.getSourceHealth();
+  } catch (err) {
+    // Defensive — aggregator is supposed to swallow its own errors, but
+    // if anything escapes we degrade gracefully so the UI gets a valid
+    // shape rather than a 500.
+    console.error('[sourceHealth] aggregator threw unexpectedly:', err && err.message);
+    var nowIso = new Date().toISOString();
+    payload = {
+      overall_status: 'offline',
+      providers: [],
+      summary: {
+        total_providers: 0,
+        providers_ok: 0,
+        providers_degraded: 0,
+        providers_offline: 0,
+        computed_at_utc: nowIso,
+      },
+    };
+  }
+  return res.json(payload);
+});
 
 router.get('/api/source-health/:provider_id/:item_id', async function(req, res) {
   var providerId = req.params.provider_id;

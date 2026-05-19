@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MomModeShell — Sherri's primary layout.
@@ -87,10 +88,10 @@ function MomModeShell(props) {
 
   var activeType = MOM_TABS[activeTab].type;
   var tabItems = activeType === 'live'
-    ? filtered.filter(function(i) { return i.type === 'live'; })
+    ? filtered.filter(isLive)
     : activeType === 'movies'
-    ? filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; })
-    : filtered.filter(function(i) { return i.type === 'series'; });
+    ? filtered.filter(isMovie)
+    : filtered.filter(isSeries);
   var displayItems = tabItems.length > 0 ? tabItems : filtered;
 
   // Mom's TV is never system-limited — we use an auto-fill grid keyed off

@@ -1,17 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // i18n core — flat-key string lookup with English fallback.
 //
-// HermesTV ships English + Spanish eagerly (combined < 12 KB) so the active
-// locale switch is instant. Additional locales (Portuguese, German, etc.)
-// should be added behind dynamic import() once the catalog grows.
+// English + Spanish ship eagerly (combined < 14 KB) so the active locale
+// switch is instant. French and German ship as smaller skeleton dictionaries
+// covering the ~30 most critical keys; everything else falls through to the
+// English string via the fallback in t(). Additional locales (Portuguese,
+// etc.) should be added behind dynamic import() once the catalog grows.
 //
 // API:
 //   t(key, params?)   → string. Looks up the current locale's value, falls
 //                       back to English, then to the key itself. Replaces
 //                       `{name}`-style placeholders from `params` (object).
-//   setLocale(code)   → switch active locale ('en' | 'es'). Persists to
-//                       localStorage under 'hermestv:locale' and notifies
-//                       any subscribed callbacks.
+//   setLocale(code)   → switch active locale ('en' | 'es' | 'fr' | 'de').
+//                       Persists to localStorage under 'hermestv:locale' and
+//                       notifies any subscribed callbacks.
 //   getLocale()       → current locale code.
 //   subscribe(fn)     → register a callback fired on every setLocale.
 //                       Returns an unsubscribe function. Used by the
@@ -24,10 +26,12 @@
 
 import en from './en.json';
 import es from './es.json';
+import fr from './fr.json';
+import de from './de.json';
 
 var STORAGE_KEY = 'hermestv:locale';
 var DEFAULT_LOCALE = 'en';
-var SUPPORTED = { en: en, es: es };
+var SUPPORTED = { en: en, es: es, fr: fr, de: de };
 
 // Active locale state. Initialised from localStorage if a previous session
 // persisted a choice; falls back to DEFAULT_LOCALE otherwise.

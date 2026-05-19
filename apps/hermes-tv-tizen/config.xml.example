@@ -12,9 +12,27 @@
   <feature name="http://tizen.org/feature/screen.size.normal.1920.1080"/>
   <feature name="http://tizen.org/feature/network.internet"/>
 
+  <!-- ─── Icon ──────────────────────────────────────────────────────────────
+       icon.png is gitignored (so each operator can drop in a branded asset
+       without polluting the repo) and is regenerated as a 117×117 placeholder
+       by tools/tizen-prep.js when missing. For production builds, ship a
+       512×512 PNG with transparent background — Tizen's launcher rescales
+       to the tile size of the target model (Q7 = 256×256, modern QLED =
+       117×117 default + 512×512 high-DPI). Path is relative to widget root. -->
   <icon src="icon.png"/>
-  <name>HermesTV</name>
+  <name>DaveTV</name>
   <tizen:profile name="tv"/>
+
+  <!-- ─── Splash ────────────────────────────────────────────────────────────
+       Solid dark background (#0b0d10 — matches the app's zero-shell BG)
+       prevents the white flash Tizen would otherwise paint while the
+       React bundle parses. orientation locked to landscape so the splash
+       never rotates on a TV that was last left in a portrait kiosk mode. -->
+  <tizen:splash-screens>
+    <tizen:splash-screen src="icon.png" type="img" dpi="hdpi"
+                         orientation="landscape" indicator="disable"
+                         background-color="#0b0d10"/>
+  </tizen:splash-screens>
 
   <!-- ─── Settings ──────────────────────────────────────────────────────────
        background-support="disable": app yields the foreground when the user
@@ -22,7 +40,12 @@
        <video> on visibilitychange so Tizen reclaims decoder slots cleanly).
        hwkey-event="enable": route the OS Back key to the page so our
        installTizenKeyHandler can cascade through the modal stack instead of
-       the OS hard-exiting the app. -->
+       the OS hard-exiting the app.
+       screen-orientation="landscape": Q7 QLED is fixed landscape; locking
+       here prevents an accidental rotation during sleep/wake. Baseline
+       viewport is the panel native 1920×1080 (declared via the index.html
+       <meta name="viewport"> the Vite build emits — Tizen has no
+       widget-level viewport attribute). -->
   <tizen:setting screen-orientation="landscape" context-menu="disable"
                  background-support="disable" encryption="disable"
                  install-location="auto" hwkey-event="enable"/>
@@ -50,27 +73,50 @@
                               apps/hermes-web-tv/src/utils/tizenKeyMap.js).
          mediaplaylist      : reserved for future AVPlay queue work; safe to
                               leave declared because AVPlay calls fall back
-                              to silent failure if the privilege is missing. -->
+                              to silent failure if the privilege is missing.
+         avplay (Samsung)   : window.webapis.avplay — the Samsung-specific
+                              media-controller used by useAvplayStream.js
+                              for native HLS playback on Tizen. Without
+                              this, AVPlay calls throw and the hook drops
+                              through to the hls.js fallback. See
+                              AVPLAY_INTEGRATION.md for the state machine.
+         keymanager         : tizen.keymanager — token-bearing playback
+                              URLs (the /api/play ticket flow) cache the
+                              short-lived JWT here instead of localStorage
+                              so the value can't be read by a hostile page
+                              loaded via the QR onboarding flow. -->
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
   <tizen:privilege name="http://tizen.org/privilege/network.get"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.audio"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
   <tizen:privilege name="http://tizen.org/privilege/mediaplaylist"/>
+  <tizen:privilege name="http://tizen.org/privilege/keymanager"/>
+  <tizen:privilege name="http://developer.samsung.com/privilege/avplay"/>
 
   <!-- ─── Content Security Policy ──────────────────────────────────────────
        Tizen's strict mode rejects 'unsafe-eval' and we have none in the
        Vite output — keep it that way. 'unsafe-inline' for style-src is
        still required because React inlines style attributes via JSX.
-       script-src includes 'self' only — no third-party CDN scripts are
-       loaded by the app. media-src / img-src allow http+https for poster
-       images and stream blobs returned by the VPS. -->
+       'unsafe-inline' for script-src is additionally required because the
+       Vite bundle emits an inline `__vite__mapDeps` initializer and a
+       module-preload polyfill stub.
+       connect-src must list every host the app fetches from at runtime:
+         - tv.daveai.tech / hermestv.daveai.tech : the VPS (canonical +
+           legacy alias; both kept so cached installs still resolve).
+         - api.cognitive.microsofttranslator.com : Azure translator.
+         - *.cognitiveservices.azure.com         : Azure TTS / speech.
+         The Azure entries are present even though the VPS proxies most
+         calls today — direct-from-TV fallback is allowed for the boot
+         greeting when the VPS round-trip would add audible latency.
+       media-src includes Azure TTS blob origins explicitly so the
+       <audio src="blob:..."> URLs produced by azureVoiceClient resolve. -->
   <tizen:content-security-policy>
-    default-src 'self' https://hermestv.daveai.tech;
-    connect-src 'self' https://hermestv.daveai.tech wss://hermestv.daveai.tech;
-    script-src 'self';
+    default-src 'self' https://tv.daveai.tech https://hermestv.daveai.tech;
+    connect-src 'self' https://tv.daveai.tech https://hermestv.daveai.tech wss://tv.daveai.tech wss://hermestv.daveai.tech https://api.cognitive.microsofttranslator.com https://*.cognitiveservices.azure.com;
+    script-src 'self' 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: http: https:;
-    media-src 'self' blob: http: https:;
+    media-src 'self' blob: http: https: https://tv.daveai.tech https://hermestv.daveai.tech https://*.cognitiveservices.azure.com;
     font-src 'self' data:;
     object-src 'none';
     frame-ancestors 'none';

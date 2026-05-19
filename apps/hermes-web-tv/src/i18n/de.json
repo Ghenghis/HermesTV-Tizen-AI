@@ -1,0 +1,59 @@
+{
+  "common.close": "Schließen",
+  "common.cancel": "Abbrechen",
+  "common.save": "Speichern",
+  "common.retry": "Erneut versuchen",
+  "common.you": "Du",
+  "common.offline": "OFFLINE",
+  "common.untitled": "Ohne Titel",
+  "common.loading": "Lädt…",
+  "common.search": "Suchen",
+  "common.back": "Zurück",
+
+  "settings.title": "Einstellungen",
+  "settings.tabs.general": "Allgemein",
+  "settings.tabs.appearance": "Darstellung",
+  "settings.tabs.features": "Funktionen",
+  "settings.tabs.about": "Über",
+  "settings.tabs.recordings": "Aufnahmen",
+  "settings.tabs.voice": "Stimme",
+
+  "settings.language.header": "Sprache",
+  "settings.language.english": "English",
+  "settings.language.spanish": "Español",
+  "settings.language.french": "Français",
+  "settings.language.german": "Deutsch",
+
+  "settings.about.header": "DaveTV",
+  "settings.about.credit": "Entwickelt für Sherri (Mama-Modus) und Dave. Designsprache inspiriert von IPTV Player Zero — keine kopierten Inhalte.",
+
+  "favorites.header": "Deine Favoriten",
+  "favorites.empty": "Noch keine Favoriten.",
+  "recent.header": "Kürzlich angesehen",
+  "recent.empty": "Noch nichts angesehen.",
+  "continue.header": "Weitersehen",
+
+  "recordings.title": "Meine Aufnahmen",
+  "recordings.empty": "Noch keine Aufnahmen",
+  "recordings.tab_scheduled": "Geplant",
+  "recordings.tab_recording": "Läuft",
+  "recordings.tab_completed": "Abgeschlossen",
+
+  "watchlist.header": "Merkliste",
+  "categories.header": "Kategorien",
+  "categories.all": "Alle",
+  "categories.live": "Live-TV",
+  "categories.movies": "Filme",
+  "categories.series": "Serien",
+  "categories.sports": "Sport",
+  "categories.news": "Nachrichten",
+  "categories.kids": "Kinder",
+
+  "timeshift.live": "LIVE",
+  "timeshift.back_to_live": "Zurück zum Live",
+  "catchup.tab": "Mediathek",
+  "catchup.header": "Mediathek",
+
+  "settings.sleep.header": "Sleep-Timer",
+  "settings.sleep.off": "Aus"
+}

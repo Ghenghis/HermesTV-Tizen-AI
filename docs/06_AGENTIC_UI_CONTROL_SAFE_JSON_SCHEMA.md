@@ -4,7 +4,9 @@ Repo: `https://github.com/Ghenghis/HermesTV-Tizen-AI`
 Local: `G:\Github\HermesTV-Tizen-AI`
 Target TVs: Mom `QN85Q7FAAFXZA`; Dave `UN55CU8000BXZA`.
 
-This document is the binding contract for how agents (and the floating chatbot) are allowed to change the HermesTV UI at runtime. It is the design lock referenced by `docs/00_MASTER_CONTRACT_CLAUDE_20_AGENT_SWARM.md` (agent 16) and `docs/03_UX_UI_EXTREME_CUSTOMIZATION_CONTRACT.md`.
+This document is the binding contract for how agents (and the floating chatbot) are allowed to change the DaveTV UI at runtime. It is the design lock referenced by `docs/00_MASTER_CONTRACT_CLAUDE_20_AGENT_SWARM.md` (agent 16) and `docs/03_UX_UI_EXTREME_CUSTOMIZATION_CONTRACT.md`.
+
+> Schema-key note: the JSONSchema namespace `hermestv.ui.v1` and the action `$id` URIs (e.g. `hermestv.ui.v1/commands/update_layout.json`) are technical identifiers. They remain as `hermestv.*` even though the product is now branded **DaveTV** in the UI — these keys are wire-compatibility names, not user-facing strings.
 
 ## Hard rules
 
@@ -432,3 +434,5 @@ User-driven deletion of profiles, memories, credentials, watch history, or favor
 - Cross-profile bulk operations (one profile per command).
 - Network-side commands (anything that reaches the backend stack goes through a different contract, not this one).
 - Tier overrides — automatic only, see `docs/05`.
+
+_(Rebranded HermesTV → DaveTV 2026-05-19 per user request; technical identifiers unchanged.)_

@@ -161,4 +161,34 @@ function searchCatalog(args) {
     .then(_handleJson);
 }
 
-export { searchCatalog };
+/**
+ * Fetch all items in a single category. Backs the "popular categories"
+ * chip row at the top of SearchModal (Sports / News / Movies / Kids → on
+ * click the chip fires this and renders the result list directly without
+ * needing a typed query).
+ *
+ * @param {Object}  args
+ * @param {string}  args.category   - slug from /api/search/category list
+ * @param {string=} args.profileId  - 'dave_tv' | 'mom_tv'
+ * @param {AbortSignal=} args.signal
+ * @returns {Promise<{ category: string, items: Array, total: number }>}
+ */
+function fetchCategory(args) {
+  args = args || {};
+  var category = typeof args.category === 'string' ? args.category.trim() : '';
+  if (category.length === 0) {
+    return Promise.reject(_makeError(
+      'validation_failed',
+      'category is required'
+    ));
+  }
+  var params = {};
+  if (args.profileId) { params.profile_id = args.profileId; }
+  var qs = _encodeParams(params);
+  var url = BASE_URL + '/api/search/category/' + encodeURIComponent(category)
+    + (qs.length > 0 ? ('?' + qs) : '');
+  return _fetchWithTimeout(url, { method: 'GET' }, DEFAULT_TIMEOUT_MS, args.signal)
+    .then(_handleJson);
+}
+
+export { searchCatalog, fetchCategory };

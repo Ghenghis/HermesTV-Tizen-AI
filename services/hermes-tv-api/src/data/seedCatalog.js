@@ -351,6 +351,116 @@ var APOLLO = ['apollo_group'];
 var XTREME = ['xtremehd'];
 
 // ---------------------------------------------------------------------------
+// DEMO CHANNELS — five known-stable iptv-org public HLS streams baked into
+// the seed so playback testing always has a deterministic, credential-free
+// input. Each entry carries:
+//   * id           — fixed "live-demo-NNN" handle so tests can reference
+//                    them directly (independent of LIVE_DEFS sequencing).
+//   * type         — 'live'
+//   * provider     — 'iptv-org' (matches the upstream adapter so UI badging
+//                    is consistent if/when the public adapter is loaded).
+//   * stream_url   — the actual public HLS m3u8 URL (no credentials).
+//   * demo         — true; UI / chatbot / verification scripts can filter on
+//                    this flag to highlight "guaranteed-playable demos".
+//
+// Stream URLs were verified against the iptv-org master playlist
+// (https://github.com/iptv-org/iptv/blob/master/streams/) — these endpoints
+// are public, credential-free, and known stable as of 2026-Q2. They live in
+// the seed so /api/catalog returns them even when IPTV_ORG_ENABLED=false
+// (i.e. on a freshly-deployed VPS where the operator hasn't wired the
+// iptv-org cron refresh yet).
+//
+// NOTE: lib/streamResolver.js currently only dispatches on "m3u-*" /
+// "iptv-*" prefixes — "live-demo-*" IDs fall through to null today. The
+// PB1 agent owns the play-time wiring; this seed exposes the stream_url
+// directly on the catalog item so a future resolver path can read
+// `item.stream_url` without needing the iptv-org cache.
+// ---------------------------------------------------------------------------
+
+var DEMO_DEFS = [
+  {
+    id: 'live-demo-001',
+    slug: 'nasa-tv-public',
+    title: 'NASA TV Public',
+    category: 'documentary',
+    resolution: '1080p',
+    logo_url: 'https://i.imgur.com/Ftbq7Zb.png',
+    stream_url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8',
+  },
+  {
+    id: 'live-demo-002',
+    slug: 'red-bull-tv',
+    title: 'Red Bull TV',
+    category: 'documentary',
+    resolution: '1080p',
+    logo_url: 'https://i.imgur.com/dZSeWCB.png',
+    stream_url: 'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
+  },
+  {
+    id: 'live-demo-003',
+    slug: 'bloomberg-tv-live',
+    title: 'Bloomberg TV Live',
+    category: 'news',
+    resolution: '1080p',
+    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Bloomberg_logo.svg/240px-Bloomberg_logo.svg.png',
+    stream_url: 'https://bloomberg.com/media-manifest/streams/us.m3u8',
+  },
+  {
+    id: 'live-demo-004',
+    slug: 'france-24-english',
+    title: 'France 24 English',
+    category: 'news',
+    resolution: '1080p',
+    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/FRANCE_24_logo.svg/240px-FRANCE_24_logo.svg.png',
+    stream_url: 'https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8',
+  },
+  {
+    id: 'live-demo-005',
+    slug: 'al-jazeera-english',
+    title: 'Al Jazeera English',
+    category: 'news',
+    resolution: '1080p',
+    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Aljazeera_eng.svg/240px-Aljazeera_eng.svg.png',
+    stream_url: 'https://live-hls-web-aje.getaj.net/AJE/01.m3u8',
+  },
+];
+
+function liveDemoItem(def) {
+  var poster = picsumPoster(def.slug);
+  var thumb = picsumThumb(def.slug);
+  return {
+    id: def.id,
+    type: 'live',
+    title: def.title,
+    provider: 'iptv-org',
+    category: def.category,
+    resolution: def.resolution,
+    logo_url: def.logo_url,
+    poster_url: poster,
+    poster: poster,
+    thumb: thumb,
+    thumbnail_url: thumb,
+    profile_access: ['dave_tv', 'mom_tv'],
+    providers: [
+      {
+        provider_id: 'iptv-org',
+        source_id: def.slug,
+        source_health: { status: 'ok', latency_ms: null, checked_utc: '2026-05-18T04:00:00Z' },
+      },
+    ],
+    metadata: {
+      resolution: def.resolution,
+      has_catchup: false,
+      genre: def.category,
+      demo: true,
+    },
+    quality: def.resolution,
+    stream_url: def.stream_url,
+    demo: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // LIVE CHANNELS (~80) — covers sports, news, entertainment, lifestyle, kids,
 // music, local broadcast, international. Mix of 1080p / 4K.
 // ---------------------------------------------------------------------------
@@ -567,6 +677,7 @@ var SERIES_DEFS = [
 var SEED_CATALOG = [];
 
 LIVE_DEFS.forEach(function(def, i) { SEED_CATALOG.push(liveItem(i, def)); });
+DEMO_DEFS.forEach(function(def) { SEED_CATALOG.push(liveDemoItem(def)); });
 VOD_DEFS.forEach(function(def, i) { SEED_CATALOG.push(vodItem(i, def)); });
 SERIES_DEFS.forEach(function(def, i) { SEED_CATALOG.push(seriesItem(i, def)); });
 
@@ -577,4 +688,5 @@ module.exports = {
   LIVE_DEFS: LIVE_DEFS,
   VOD_DEFS: VOD_DEFS,
   SERIES_DEFS: SERIES_DEFS,
+  DEMO_DEFS: DEMO_DEFS,
 };

@@ -1,5 +1,12 @@
 import React from 'react';
 import * as profileStore from '../store/profileStore.js';
+import * as voicePrefStore from '../store/voicePrefStore.js';
+import * as hermesApi from '../api/hermesApi.js';
+
+// Lazy so the management modal doesn't pull the full voice catalog list code
+// + Azure preview client until the user opens the voice picker. Keeps the
+// initial profile-modal bundle small on Tizen 6.5.
+var VoicePickerModal = React.lazy(function() { return import('./VoicePickerModal.jsx'); });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ProfileManagementModal — full CRUD over the local profiles list.
@@ -69,12 +76,22 @@ function _emptyFormState() {
     font_scale: 1.0,
     reduced_motion: false,
     mom_mode: false,
-    tier_override: 'auto'
+    tier_override: 'auto',
+    agent_name: 'Hermes',
+    audio_feedback: false,
+    preferred_voice_id: ''
   };
 }
 
 function _formFromProfile(p) {
   if (!p) { return _emptyFormState(); }
+  // Voice id lives in voicePrefStore (per-profile localStorage) because the
+  // FloatingChatbot + Azure TTS callers read it from there at runtime. We
+  // hydrate from voicePrefStore so the modal shows the currently active voice,
+  // then mirror it into the form so the eventual PATCH carries the same value.
+  var storedVoiceId = (p.id && typeof voicePrefStore.getVoiceId === 'function')
+    ? voicePrefStore.getVoiceId(p.id)
+    : null;
   return {
     id: p.id,
     display_name: p.display_name || '',
@@ -84,7 +101,10 @@ function _formFromProfile(p) {
     font_scale: typeof p.font_scale === 'number' ? p.font_scale : 1.0,
     reduced_motion: !!p.reduced_motion,
     mom_mode: !!p.mom_mode,
-    tier_override: p.tier_override || 'auto'
+    tier_override: p.tier_override || 'auto',
+    agent_name: typeof p.agent_name === 'string' && p.agent_name.length > 0 ? p.agent_name : 'Hermes',
+    audio_feedback: !!p.audio_feedback,
+    preferred_voice_id: storedVoiceId || p.preferred_voice_id || ''
   };
 }
 
@@ -450,6 +470,10 @@ function ProfileForm(props) {
   var setForm = props.setForm;
   var onSave = props.onSave;
   var onCancel = props.onCancel;
+  var onPickVoice = props.onPickVoice; // open VoicePickerModal
+  var saving = !!props.saving;
+  var statusMessage = props.statusMessage || null;
+  var statusTone = props.statusTone || 'info'; // 'info' | 'success' | 'error'
   var isEdit = !!form.id;
 
   // Live-clamp font scale when mom_mode is checked. The store also enforces
@@ -492,7 +516,8 @@ function ProfileForm(props) {
           type="text"
           value={form.display_name}
           onChange={function(e) { updateField('display_name', e.target.value); }}
-          maxLength={40}
+          maxLength={30}
+          required
           style={_inputStyle()}
         />
       </div>
@@ -512,6 +537,73 @@ function ProfileForm(props) {
           style={_inputStyle()}
         />
         <div style={_hintStyle()}>Hermes will use this name when speaking to you. Leave blank to use the display name.</div>
+      </div>
+
+      {/* Agent name — what the user calls the assistant */}
+      <div>
+        <label htmlFor="pm-agent-name" style={_fieldLabelStyle()}>Assistant name</label>
+        <input
+          id="pm-agent-name"
+          tabIndex={0}
+          className="hermes-focusable"
+          type="text"
+          value={form.agent_name}
+          onChange={function(e) { updateField('agent_name', e.target.value); }}
+          maxLength={30}
+          placeholder="Hermes"
+          style={_inputStyle()}
+        />
+        <div style={_hintStyle()}>What you&apos;d like to call your assistant (default: Hermes).</div>
+      </div>
+
+      {/* Voice picker launcher — opens VoicePickerModal which writes back into
+          form.preferred_voice_id via the onVoiceChange callback wired by the
+          parent. Disabled in 'add new' mode (no profile id yet) so the picker
+          can preview against a real profile rather than a draft. */}
+      <div>
+        <label style={_fieldLabelStyle()}>Assistant voice</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              padding: '0.55rem 0.75rem',
+              background: 'var(--surface, #161b22)',
+              border: '1px solid var(--border, #30363d)',
+              borderRadius: '6px',
+              color: 'var(--text)',
+              fontSize: 'calc(0.92rem * var(--font-scale, 1))',
+              minHeight: '1.2em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {form.preferred_voice_id ? form.preferred_voice_id : 'Default voice'}
+            </div>
+          </div>
+          <button
+            type="button"
+            tabIndex={0}
+            className="hermes-focusable"
+            disabled={!isEdit}
+            onClick={function() { if (isEdit && onPickVoice) { onPickVoice(); } }}
+            onKeyDown={function(e) {
+              if ((e.key === 'Enter' || e.key === ' ') && isEdit && onPickVoice) {
+                e.preventDefault();
+                onPickVoice();
+              }
+            }}
+            style={Object.assign({}, _secondaryButtonStyle(), {
+              opacity: isEdit ? 1 : 0.5,
+              cursor: isEdit ? 'pointer' : 'not-allowed'
+            })}
+          >
+            Change&hellip;
+          </button>
+        </div>
+        <div style={_hintStyle()}>
+          {isEdit
+            ? 'Pick the Azure neural voice your assistant uses.'
+            : 'Save the profile first, then come back to choose a voice.'}
+        </div>
       </div>
 
       {/* Avatar style */}
@@ -636,6 +728,25 @@ function ProfileForm(props) {
         </div>
       </div>
 
+      {/* Audio feedback (Azure TTS chime / greeting) */}
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
+          <input
+            tabIndex={0}
+            type="checkbox"
+            checked={form.audio_feedback}
+            onChange={function(e) { updateField('audio_feedback', e.target.checked); }}
+            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+          />
+          <span style={{ color: 'var(--text)', fontSize: 'calc(0.92rem * var(--font-scale, 1))', fontWeight: 600 }}>
+            Audio feedback
+          </span>
+        </label>
+        <div style={Object.assign({}, _hintStyle(), { marginLeft: '1.65rem' })}>
+          Plays a short Azure TTS greeting on boot and confirms voice actions out loud.
+        </div>
+      </div>
+
       {/* Mom Mode */}
       <div>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
@@ -673,6 +784,34 @@ function ProfileForm(props) {
         <div style={_hintStyle()}>Auto is recommended &mdash; HermesTV detects your TV model and picks the right tier.</div>
       </div>
 
+      {/* Inline status banner — surfaces "Profile saved", validation errors,
+          and network failures. We don't use a global toast because none exists
+          in this codebase yet; the banner sits inline so screen readers pick
+          it up via aria-live. */}
+      {statusMessage && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: '0.55rem 0.8rem',
+            borderRadius: '8px',
+            fontSize: 'calc(0.85rem * var(--font-scale, 1))',
+            background: statusTone === 'success'
+              ? 'rgba(46, 160, 67, 0.12)'
+              : (statusTone === 'error' ? 'rgba(248, 81, 73, 0.12)' : 'rgba(31, 111, 235, 0.12)'),
+            border: '1px solid ' + (statusTone === 'success'
+              ? '#2ea043'
+              : (statusTone === 'error' ? '#f85149' : '#1f6feb')),
+            color: statusTone === 'success'
+              ? '#3fb950'
+              : (statusTone === 'error' ? '#f85149' : 'var(--text)'),
+            fontWeight: 600
+          }}
+        >
+          {statusMessage}
+        </div>
+      )}
+
       {/* Action row */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
         <button
@@ -680,7 +819,11 @@ function ProfileForm(props) {
           tabIndex={0}
           className="hermes-focusable"
           onClick={onCancel}
-          style={_secondaryButtonStyle()}
+          disabled={saving}
+          style={Object.assign({}, _secondaryButtonStyle(), {
+            opacity: saving ? 0.5 : 1,
+            cursor: saving ? 'not-allowed' : 'pointer'
+          })}
         >
           Cancel
         </button>
@@ -688,9 +831,13 @@ function ProfileForm(props) {
           type="submit"
           tabIndex={0}
           className="hermes-focusable"
-          style={_primaryButtonStyle()}
+          disabled={saving}
+          style={Object.assign({}, _primaryButtonStyle(), {
+            opacity: saving ? 0.6 : 1,
+            cursor: saving ? 'wait' : 'pointer'
+          })}
         >
-          {isEdit ? 'Save changes' : 'Create profile'}
+          {saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Create profile')}
         </button>
       </div>
     </form>
@@ -728,6 +875,26 @@ function ProfileManagementModal(props) {
   var deleteTarget = deleteResult[0];
   var setDeleteTarget = deleteResult[1];
 
+  // Save flow state. `saving` disables the Save button while the PATCH is in
+  // flight so users can't double-fire. `status` + `statusTone` drive the inline
+  // banner above the action row. We auto-clear success banners after 3s but
+  // leave error banners until the user touches the form again (retryable).
+  var savingResult = React.useState(false);
+  var saving = savingResult[0];
+  var setSaving = savingResult[1];
+
+  var statusResult = React.useState(null);
+  var statusMessage = statusResult[0];
+  var setStatusMessage = statusResult[1];
+
+  var toneResult = React.useState('info');
+  var statusTone = toneResult[0];
+  var setStatusTone = toneResult[1];
+
+  var voicePickerResult = React.useState(false);
+  var voicePickerOpen = voicePickerResult[0];
+  var setVoicePickerOpen = voicePickerResult[1];
+
   // Refresh local snapshot from store after any CRUD so the list re-renders.
   function refreshProfiles() {
     var next = profileStore.listProfiles();
@@ -736,6 +903,13 @@ function ProfileManagementModal(props) {
     setSettings(nextSettings);
     if (onProfilesChange) { onProfilesChange(next); }
   }
+
+  // Auto-clear success banner so it doesn't linger after the modal is reused.
+  React.useEffect(function() {
+    if (!statusMessage || statusTone !== 'success') { return undefined; }
+    var t = setTimeout(function() { setStatusMessage(null); }, 3000);
+    return function() { clearTimeout(t); };
+  }, [statusMessage, statusTone]);
 
   // ── Esc handler ─────────────────────────────────────────────────────────
   React.useEffect(function() {
@@ -785,8 +959,13 @@ function ProfileManagementModal(props) {
       // don't fire a window.alert (Tizen kiosks don't always show them).
       var input = document.getElementById('pm-display-name');
       if (input) { input.style.borderColor = '#f85149'; input.focus(); }
+      setStatusMessage('Display name is required.');
+      setStatusTone('error');
       return;
     }
+    var agentName = (form.agent_name || '').trim();
+    if (agentName.length === 0) { agentName = 'Hermes'; }
+
     var payload = {
       display_name: name,
       nickname: (form.nickname || '').trim(),
@@ -795,21 +974,87 @@ function ProfileManagementModal(props) {
       font_scale: form.font_scale,
       reduced_motion: form.reduced_motion,
       mom_mode: form.mom_mode,
-      tier_override: form.tier_override
+      tier_override: form.tier_override,
+      agent_name: agentName,
+      audio_feedback: !!form.audio_feedback,
+      preferred_voice_id: form.preferred_voice_id || ''
     };
+
+    // 1. Local persistence first — this is the canonical source of truth on
+    //    Tizen because the backend store is in-memory and resets on restart.
+    //    Once this completes the picker + shells see the new values even if
+    //    the network is offline.
+    var savedRecord;
     if (form.id) {
-      profileStore.updateProfile(form.id, payload);
+      savedRecord = profileStore.updateProfile(form.id, payload);
     } else {
-      profileStore.createProfile(payload);
+      savedRecord = profileStore.createProfile(payload);
     }
-    setForm(_emptyFormState());
-    setActiveTab('profiles');
-    refreshProfiles();
+    var targetId = savedRecord ? savedRecord.id : form.id;
+
+    // 2. Mirror the voice preference into voicePrefStore so the runtime
+    //    consumers (FloatingChatbot, Azure TTS) read the same value the user
+    //    just picked. Empty string clears the stored preference.
+    if (targetId) {
+      voicePrefStore.setVoiceId(targetId, payload.preferred_voice_id);
+    }
+
+    // 3. PATCH the backend so the API surface (catalog / DVR routes that
+    //    consult /api/profile/:id) sees the same fields. The backend only
+    //    knows about dave_tv + mom_tv, so we skip the call for arbitrary
+    //    client-side profile IDs to avoid 404 spam.
+    var backendKnown = targetId === 'dave_tv' || targetId === 'mom_tv';
+    if (!backendKnown) {
+      setForm(_emptyFormState());
+      setActiveTab('profiles');
+      refreshProfiles();
+      setStatusMessage('Profile saved.');
+      setStatusTone('success');
+      return;
+    }
+
+    setSaving(true);
+    setStatusMessage(null);
+    hermesApi.patchProfile(targetId, payload).then(function() {
+      setSaving(false);
+      setStatusMessage('Profile saved.');
+      setStatusTone('success');
+      setForm(_emptyFormState());
+      setActiveTab('profiles');
+      refreshProfiles();
+    }).catch(function(err) {
+      setSaving(false);
+      // Local store already holds the new values — surface a soft error so
+      // the user knows the server didn't accept the patch (e.g. Mom Mode
+      // floor violation) without losing their typed changes.
+      var message = err && err.message
+        ? err.message
+        : 'Saved locally, but the server could not be reached.';
+      setStatusMessage(message);
+      setStatusTone('error');
+      refreshProfiles();
+    });
   }
 
   function handleCancelForm() {
     setForm(_emptyFormState());
     setActiveTab('profiles');
+    setStatusMessage(null);
+  }
+
+  function handlePickVoice() {
+    // Open the voice picker against the currently edited profile.
+    if (!form.id) { return; }
+    setVoicePickerOpen(true);
+  }
+
+  function handleVoiceChange(voiceId) {
+    var nextForm = Object.assign({}, form, { preferred_voice_id: voiceId || '' });
+    setForm(nextForm);
+    // Persist immediately to voicePrefStore so the change is live even if the
+    // user closes the modal without hitting Save. The eventual Save still
+    // mirrors this into the profile record + backend PATCH.
+    if (form.id) { voicePrefStore.setVoiceId(form.id, voiceId || ''); }
   }
 
   function handleTabChange(id) {
@@ -1004,6 +1249,10 @@ function ProfileManagementModal(props) {
               setForm={setForm}
               onSave={handleSave}
               onCancel={handleCancelForm}
+              onPickVoice={handlePickVoice}
+              saving={saving}
+              statusMessage={statusMessage}
+              statusTone={statusTone}
             />
           )}
 
@@ -1100,6 +1349,22 @@ function ProfileManagementModal(props) {
             onCancel={function() { setDeleteTarget(null); }}
             onConfirm={handleConfirmDelete}
           />
+        )}
+
+        {/* Voice picker — lazy. Mounted on top of the management modal at a
+            higher z-index so it sits above any underlying overlay. Closing
+            the picker drops back into the edit form so the user can hit Save. */}
+        {voicePickerOpen && form.id && (
+          <React.Suspense fallback={null}>
+            <VoicePickerModal
+              isOpen={voicePickerOpen}
+              profileId={form.id}
+              agentName={form.agent_name || 'Hermes'}
+              currentVoiceId={form.preferred_voice_id}
+              onClose={function() { setVoicePickerOpen(false); }}
+              onVoiceChange={handleVoiceChange}
+            />
+          </React.Suspense>
         )}
       </div>
     </div>

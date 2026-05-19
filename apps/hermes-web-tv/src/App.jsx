@@ -1734,6 +1734,7 @@ function App() {
               isOpen={state.showQR}
               onClose={handleCloseQR}
               online={state.online}
+              profile={profile}
               onCompleted={function() {
                 // Pairing handshake finished — refresh provider list so the
                 // newly-added entry shows up in ProviderFilter and chips.

@@ -1,6 +1,6 @@
 # apps/hermes-web-tv
 
-HermesTV web app — browser-based TV UI for development, testing, and hosted-app delivery to Samsung TVs.
+DaveTV web app — browser-based TV UI for development, testing, and hosted-app delivery to Samsung TVs. (Package + folder name `hermes-web-tv` retained as a technical identifier; the user-facing brand is DaveTV.)
 
 ## Role
 

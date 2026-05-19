@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StremioShell — HermesTV's 10th layout, modelled on the open-source Stremio
@@ -127,7 +128,7 @@ function StremioCard(props) {
   var year = (item.metadata && item.metadata.year) || item.year || '';
   var bg = posterBg(item, idx);
   var meta = _itemMeta(item);
-  var isLive = item.type === 'live';
+  var isLiveItem = isLive(item);
 
   return (
     <button
@@ -166,7 +167,7 @@ function StremioCard(props) {
           // Live channels stay 16:9 landscape; movies/series render as 2:3
           // portrait posters. Mixing one ratio across both types stretched
           // movie art into a landscape box (audit-03 stretched-card bug).
-          aspectRatio: isLive ? '16 / 9' : '2 / 3',
+          aspectRatio: isLiveItem ? '16 / 9' : '2 / 3',
           background: bg,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -207,7 +208,7 @@ function StremioCard(props) {
         })()}
 
         {/* Live pill (top-left) — visible only on live items */}
-        {isLive && (
+        {isLiveItem && (
           <span
             style={{
               position: 'absolute', top: '6px', left: '6px',
@@ -227,7 +228,7 @@ function StremioCard(props) {
         )}
 
         {/* Quality chip (bottom-left) */}
-        {item.quality && !isLive && (
+        {item.quality && !isLiveItem && (
           <span
             style={{
               position: 'absolute', bottom: '6px', left: '6px',
@@ -490,8 +491,8 @@ function StremioShell(props) {
   // plausible placeholder. Real data slots in once the progress endpoint
   // lands.
   var continueWatching = filtered.slice(0, 8);
-  var featuredMovies = filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
-  var featuredSeries = filtered.filter(function(i) { return i.type === 'series'; });
+  var featuredMovies = filtered.filter(isMovie);
+  var featuredSeries = filtered.filter(isSeries);
 
   // ─── Discover filtering ───────────────────────────────────────────────────
   var discoverItems = filtered;

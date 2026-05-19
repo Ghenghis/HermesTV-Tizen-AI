@@ -24,19 +24,51 @@ function LayoutSwitcher(props) {
   var tier = props.tier;
   var onSelect = props.onSelect;
   var onClose = props.onClose;
+  // Optional `profile` prop is forward-compatible: when the parent eventually
+  // wires it through we read mom_mode directly; today we infer it from the
+  // already-applied --font-scale CSS variable so this file remains the sole
+  // surface that changes for the a11y polish pass.
+  var profile = props.profile || null;
+
+  // Read the live --font-scale CSS variable so mom-mode auto-adapts even when
+  // the caller did not pass `profile`. Reads run only while the modal is open
+  // and on resize (rare) — the cost is one getComputedStyle call per gate.
+  var fontScaleResult = React.useState(1);
+  var fontScale = fontScaleResult[0];
+  var setFontScale = fontScaleResult[1];
 
   React.useEffect(function() {
     if (!isOpen) return;
+    function readScale() {
+      try {
+        var raw = getComputedStyle(document.documentElement).getPropertyValue('--font-scale');
+        var n = parseFloat(raw);
+        if (!isNaN(n) && n > 0) setFontScale(n);
+      } catch (_) { /* SSR / odd environments — keep default 1 */ }
+    }
+    readScale();
+    window.addEventListener('resize', readScale);
     function onKey(e) {
       if (e.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKey);
-    return function() { document.removeEventListener('keydown', onKey); };
+    return function() {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', readScale);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   var groups = groupBycat(ALL_LAYOUTS);
+  // Mom-mode: when the profile flag is set OR the font scale crosses the
+  // legibility threshold, switch to a 1-column tall list with 56-px hit
+  // targets. Sherri's TV always satisfies either condition (see
+  // user_profiles_sherri_dave) so she gets the larger touch surface.
+  var isMomMode = (profile && profile.mom_mode) || fontScale >= 1.4;
+  var gridColumns = isMomMode ? '1fr' : 'repeat(auto-fill, minmax(180px, 1fr))';
+  var cardPadding = isMomMode ? '18px 20px' : '14px 16px';
+  var cardMinHeight = isMomMode ? '56px' : 'auto';
 
   return (
     <div
@@ -98,7 +130,7 @@ function LayoutSwitcher(props) {
             }}
             onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
             onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
-            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent-color, var(--accent, #58a6ff))'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
             onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
           >
             &times;
@@ -113,22 +145,36 @@ function LayoutSwitcher(props) {
             return (
               <div key={cat} style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', fontWeight: 700, color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>{cat}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: '10px' }}>
                   {items.map(function(layout) {
                     var isActive = layout.id === activeLayout;
                     var isDisabled = layout.tier_required === 'enhanced' && tier !== 'enhanced';
                     return (
                       <button
                         key={layout.id}
+                        tabIndex={isDisabled ? -1 : 0}
                         onClick={function() {
                           if (!isDisabled) {
+                            if (onSelect) onSelect(layout.id);
+                          }
+                        }}
+                        onKeyDown={function(e) {
+                          // Native <button> already fires click on Enter/Space,
+                          // but Tizen 6.5's remote OK key surfaces as 'Enter'
+                          // only after keydown→keypress sequence that some
+                          // older WebKit builds drop. Handling keydown here
+                          // guarantees activation on every remote variant.
+                          if (isDisabled) return;
+                          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                            e.preventDefault();
                             if (onSelect) onSelect(layout.id);
                           }
                         }}
                         disabled={isDisabled}
                         style={{
                           textAlign: 'left',
-                          padding: '14px 16px',
+                          padding: cardPadding,
+                          minHeight: cardMinHeight,
                           borderRadius: '14px',
                           border: isActive ? ('2px solid ' + layout.accent) : '1px solid #2a2b3a',
                           background: isActive
@@ -198,10 +244,18 @@ function LayoutSwitcher(props) {
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', fontWeight: 700, color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>Default</div>
             <button
+              tabIndex={0}
               onClick={function() { if (onSelect) onSelect(''); }}
+              onKeyDown={function(e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                  e.preventDefault();
+                  if (onSelect) onSelect('');
+                }
+              }}
               style={{
                 textAlign: 'left',
-                padding: '14px 16px',
+                padding: cardPadding,
+                minHeight: cardMinHeight,
                 borderRadius: '14px',
                 border: (!activeLayout || activeLayout === '') ? '2px solid #1f6feb' : '1px solid #2a2b3a',
                 background: (!activeLayout || activeLayout === '')
@@ -228,7 +282,7 @@ function LayoutSwitcher(props) {
                   e.currentTarget.style.transform = 'translateY(0)';
                 }
               }}
-              onFocus={function(e) { e.currentTarget.style.outline = '2px solid #1f6feb'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent-color, #1f6feb)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onBlur={function(e) { e.currentTarget.style.outline = 'none'; if (activeLayout && activeLayout !== '') e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               <div style={{ fontWeight: 700, fontSize: 'calc(0.9rem * var(--font-scale, 1))', color: (!activeLayout || activeLayout === '') ? '#1f6feb' : '#c8d0db', marginBottom: '4px' }}>

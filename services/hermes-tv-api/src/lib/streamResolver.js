@@ -25,11 +25,13 @@
  * Channel/item ID dispatch table:
  *   "m3u-<provider>-<localId>"       → m3uClient
  *   "iptv-<iptvOrgChannelId>"        → iptvOrg
+ *   "live-demo-<NNN>"                → SEED_CATALOG item.stream_url
  *   anything else                    → null (handled upstream as 503)
  */
 
 var iptvOrg = require('./iptvOrg');
 var m3uClient = require('./m3uClient');
+var seed = require('../data/seedCatalog');
 
 // Credential-bearing URL patterns — mirror lib/sanitizeLog.js FORBIDDEN_PATTERNS.
 // If a resolved URL matches any of these we MUST NOT 302 the client at it,
@@ -86,6 +88,21 @@ function resolveStreamUrl(channelId) {
     var iptvId = channelId.slice('iptv-'.length);
     try { url = iptvOrg.internal.resolveStreamUrl(iptvId); }
     catch (_) { url = null; }
+  } else if (channelId.indexOf('live-demo-') === 0) {
+    // Baked-in iptv-org demo channels (NASA TV, Red Bull, Bloomberg,
+    // France 24, Al Jazeera). The stream_url field is set directly on
+    // the seed item — public HLS, no credentials. We look it up in the
+    // already-loaded SEED_CATALOG rather than re-importing the demo
+    // table because the catalog is the single source of truth for IDs.
+    try {
+      var catalog = (seed && seed.SEED_CATALOG) || [];
+      for (var di = 0; di < catalog.length; di++) {
+        if (catalog[di] && catalog[di].id === channelId && catalog[di].stream_url) {
+          url = catalog[di].stream_url;
+          break;
+        }
+      }
+    } catch (_) { url = null; }
   }
 
   if (!url) { return null; }
