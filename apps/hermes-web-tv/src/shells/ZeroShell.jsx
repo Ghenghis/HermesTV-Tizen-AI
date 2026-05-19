@@ -166,6 +166,9 @@ function ZeroShell(props) {
   }
 
   // Grid columns scale with tier — QN85 stretches wider on enhanced.
+  // The actual rendered grid below uses an auto-fill minmax(220 px) track
+  // so the column count adapts to viewport; this `cols` value only feeds the
+  // virtualizer row-height estimate.
   var cols = tier === 'enhanced' ? 7 : 5;
 
   // Virtualize the poster grid when the catalog exceeds the threshold
@@ -180,7 +183,8 @@ function ZeroShell(props) {
     scrollRef: gridScrollRef,
     itemCount: displayItems.length,
     columns: cols,
-    rowHeight: 280,
+    // 220 px-wide 2:3 poster = 330 px + ~30 px label + 14 px gap ≈ 374 px.
+    rowHeight: 374,
     overscan: 1,
   });
 
@@ -552,10 +556,13 @@ function ZeroShell(props) {
               {virt.topSpacer > 0 && (
                 <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
               )}
+              {/* auto-fill minmax(220 px) keeps 2:3 posters at a couch-readable
+                  size while filling the 1920×1080 viewport — ~7 cols × ~3
+                  rows visible without scrolling past the shell's main pane. */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
                   gap: '0.85rem',
                 }}
               >
@@ -596,8 +603,13 @@ function ZeroShell(props) {
                     <div
                       style={{
                         position: 'relative',
-                        aspectRatio: '2 / 3',
+                        // Per-type aspect: live=16:9 landscape thumb,
+                        // VOD/series=2:3 portrait poster. Hardcoded 2:3 was
+                        // stretching live-channel logos vertically (audit-03).
+                        aspectRatio: (item.type === 'live') ? '16 / 9' : '2 / 3',
                         background: bg,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
                         borderRadius: '10px',
                         overflow: 'hidden',
                         boxShadow: '0 6px 20px rgba(0,0,0,0.4)',

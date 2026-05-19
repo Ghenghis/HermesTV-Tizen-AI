@@ -52,8 +52,11 @@ function GridSection(props) {
         fontWeight: 700,
         letterSpacing: '0.02em',
       }}>{title}</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
-        {items.slice(0, 8).map(function(item, idx) {
+      {/* auto-fill minmax keeps the grid dense at 1920×1080 without
+          scrolling past the viewport: ~7 cols of 220 px tiles, 16/9
+          aspect-ratio caps row height so 3+ rows are visible at once. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' }}>
+        {items.slice(0, 14).map(function(item, idx) {
           return (
             <div
               key={item.id || idx}
@@ -101,7 +104,7 @@ function GridSection(props) {
                 e.currentTarget.style.transform = 'none';
               }}
             >
-              <div style={{ aspectRatio: '16/9', background: posterBg(item, idx), position: 'relative' }}>
+              <div style={{ aspectRatio: (item.type === 'live') ? '16 / 9' : '2 / 3', background: posterBg(item, idx), backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
                 {item.quality && (
                   <div style={{
                     position: 'absolute',

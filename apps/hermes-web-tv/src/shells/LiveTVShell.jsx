@@ -678,10 +678,13 @@ function LiveTVShell(props) {
             {virt.topSpacer > 0 && (
               <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
             )}
+            {/* auto-fill minmax(200 px) keeps 16:9 channel tiles dense
+                inside the centre column (≈1460 px after the 180 px category
+                rail + 280 px EPG pane) — 5-7 cols × 3 rows visible at once. */}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                 gap: '10px',
               }}
             >

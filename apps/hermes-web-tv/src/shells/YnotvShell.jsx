@@ -288,7 +288,9 @@ function YnotvShell(props) {
   }
 
   // Grid columns scale with tier — QN85 stretches wider on enhanced.
-  var cols = tier === 'enhanced' ? 6 : 4;
+  // Actual grid uses auto-fill minmax(180 px) so the rendered column count
+  // adapts to viewport; `cols` only feeds the virtualizer row-height math.
+  var cols = tier === 'enhanced' ? 9 : 6;
 
   var gridScrollRef = React.useRef(null);
   var virt = useGridVirtualizer({
@@ -903,10 +905,12 @@ function YnotvShell(props) {
                   No releases on this day.
                 </div>
               ) : (
+                // Calendar releases grid mirrors the main poster grid track
+                // so column widths stay consistent when toggling tabs.
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                     gap: '0.7rem',
                   }}
                 >
@@ -941,8 +945,13 @@ function YnotvShell(props) {
                       >
                         <div
                           style={{
-                            aspectRatio: '2 / 3',
+                            // Calendar shows release tiles — per-type aspect
+                            // so a live-event card lays out as a 16:9 thumb
+                            // and a film release stays a 2:3 poster.
+                            aspectRatio: (item.type === 'live') ? '16 / 9' : '2 / 3',
                             background: bg,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
                             borderRadius: '8px',
                             overflow: 'hidden',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
@@ -994,10 +1003,13 @@ function YnotvShell(props) {
                 {virt.topSpacer > 0 && (
                   <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
                 )}
+                {/* auto-fill minmax(180 px) keeps 2:3 posters dense across
+                    the centre column (≈1865 px after the 56 px mini-rail) —
+                    ~9 cols × ~2.5 rows of the 270 px-tall tiles visible. */}
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                     gap: '0.85rem',
                   }}
                 >
@@ -1043,8 +1055,14 @@ function YnotvShell(props) {
                         <div
                           style={{
                             position: 'relative',
-                            aspectRatio: '2 / 3',
+                            // Per-type aspect: live=16:9 landscape thumb,
+                            // VOD/series=2:3 portrait. Hardcoded 2:3 was
+                            // stretching live-channel logos into portrait
+                            // boxes (audit-03 stretched-card bug).
+                            aspectRatio: (item.type === 'live') ? '16 / 9' : '2 / 3',
                             background: bg,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
                             borderRadius: '10px',
                             overflow: 'hidden',
                             boxShadow: '0 6px 18px rgba(0,0,0,0.4)',

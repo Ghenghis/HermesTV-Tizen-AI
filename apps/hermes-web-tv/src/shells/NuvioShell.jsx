@@ -224,8 +224,14 @@ function NuvioRail(props) {
                 <div
                   style={{
                     width: '100%',
-                    aspectRatio: '2 / 3',
+                    // Per-type aspect — Nuvio defaults to portrait posters
+                    // but a 'live' channel mixed into the rail must render
+                    // as a 16:9 landscape thumb or the channel logo gets
+                    // stretched vertically.
+                    aspectRatio: (item.type === 'live') ? '16 / 9' : '2 / 3',
                     background: bg,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
                     borderRadius: '12px',
                     overflow: 'hidden',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.55)',

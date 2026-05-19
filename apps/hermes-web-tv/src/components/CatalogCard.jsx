@@ -60,9 +60,6 @@ function CatalogCard(props) {
   var typeLabel = CONTENT_TYPE_LABELS[contentType] || contentType.toUpperCase();
   var typeColor = CONTENT_TYPE_COLORS[contentType] || 'var(--muted)';
 
-  var isJumbo = profile.active_layout === 'jumbo-rail';
-  var cardHeight = isJumbo ? '180px' : '140px';
-
   var isEnhanced = tier === 'enhanced';
 
   // Resolution checks
@@ -72,10 +69,26 @@ function CatalogCard(props) {
   var bitrate = quality.bitrate_kbps || null;
   var codec = quality.codec || null;
 
-  // Poster image: enhanced uses full res, degraded uses thumbnail
-  var posterUrl = isEnhanced
-    ? (item.poster_url || item.logo_url || null)
-    : (item.thumbnail_url || item.logo_url || null);
+  // Aspect-ratio per content type — live channels are 16:9 landscape
+  // thumbnails (channel logo or NOW-playing still), VOD/movies/series are
+  // 2:3 portrait posters. Mixing the two in the same row without per-type
+  // aspect produced the stretched-poster bug the user flagged in audit-03.
+  var isLive = (contentType === 'live');
+  var aspectStr = isLive ? '16 / 9' : '2 / 3';
+
+  // Poster source — live items prefer landscape thumbs (then logo as a
+  // last resort), VOD prefers the 2:3 poster. Falling back the other way
+  // is what stretched a square channel logo into a portrait box.
+  var posterUrl;
+  if (isLive) {
+    posterUrl = isEnhanced
+      ? (item.thumbnail_url || item.logo_url || item.poster_url || null)
+      : (item.thumbnail_url || item.logo_url || null);
+  } else {
+    posterUrl = isEnhanced
+      ? (item.poster_url || item.thumbnail_url || item.logo_url || null)
+      : (item.thumbnail_url || item.poster_url || item.logo_url || null);
+  }
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -102,16 +115,19 @@ function CatalogCard(props) {
         backgroundColor: 'var(--surface)',
         border: '2px solid var(--border, #30363d)',
         borderRadius: '8px',
-        padding: '1rem',
+        padding: 0,
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.5rem',
+        gap: 0,
         cursor: 'pointer',
         outline: 'none',
-        minHeight: cardHeight,
         transition: isEnhanced ? 'border-color 0.15s' : 'none',
         position: 'relative',
         overflow: 'hidden',
+        // Stretch each card to fill its grid row so the type-segregated
+        // aspect-ratio poster on top still leaves equal-height text blocks
+        // below across the row (works with grid-auto-rows: 1fr).
+        height: '100%',
       }}
       onFocus={function(e) {
         e.currentTarget.classList.add('focus-active');
@@ -125,34 +141,43 @@ function CatalogCard(props) {
         e.currentTarget.style.outline = 'none';
       }}
     >
-      {/* Poster image (enhanced: full res; degraded: thumbnail/logo) */}
-      {posterUrl && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 0,
-            overflow: 'hidden',
-            borderRadius: '6px',
-          }}
-        >
+      {/* Poster slot — drives card height via aspect-ratio so a 16:9 live
+          tile and a 2:3 movie tile never share the same shape. object-fit:
+          cover crops without distortion; when posterUrl is absent we fall
+          back to a deterministic gradient via background-color so the slot
+          still maintains the type-correct ratio. */}
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: aspectStr,
+          background: 'linear-gradient(135deg, #1f2430, #11151c)',
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}
+      >
+        {posterUrl && (
           <img
             src={posterUrl}
             alt=""
             aria-hidden="true"
             style={{
+              position: 'absolute',
+              inset: 0,
               width: '100%',
               height: '100%',
-              objectFit: 'cover',
-              opacity: isEnhanced ? 0.18 : 0.1,
+              // For live, channel logos are often square — contain keeps the
+              // mark intact; for movies the 2:3 art fills with cover.
+              objectFit: isLive ? 'contain' : 'cover',
               imageRendering: isEnhanced ? 'auto' : 'pixelated',
+              backgroundColor: isLive ? 'rgba(0,0,0,0.35)' : 'transparent',
             }}
           />
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Card content sits above any poster overlay */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+      {/* Card content body — sits BELOW the poster, not behind it. */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, padding: '0.75rem 0.85rem 0.9rem' }}>
         {/* Top row: type badge + catch-up badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span
