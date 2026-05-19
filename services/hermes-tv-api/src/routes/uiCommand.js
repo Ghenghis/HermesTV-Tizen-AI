@@ -163,7 +163,7 @@ const COMMAND_TABLE = [
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
 const NO_MATCH_ERROR =
-  'Command not recognized. Try: show movies, mom mode, dark theme, show 4K, show sports, search, record this, reset filters';
+  'Command not recognized. Try: show movies, mom mode, dark theme, show 4K, search, play this, record this, reset filters';
 
 /**
  * Resolve a trimmed, lowercased command string against the command table.
