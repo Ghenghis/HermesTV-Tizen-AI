@@ -1,7 +1,12 @@
 import React from 'react';
 import ALL_LAYOUTS from '../layouts/manifests/index.js';
 
-var CAT_ORDER = ['IPTV Players', 'Streaming Services', 'Smart TV Shells', 'Special Modes'];
+// CAT_ORDER drives the section order in the layout picker modal. Layouts
+// whose `cat` value isn't in this list are hidden from the picker even
+// though /api/layouts still serves them — adding "Modern Players" here so
+// both Zero (PR #58) and Nuvio (this PR) become user-selectable from the
+// "Choose Your Look" modal.
+var CAT_ORDER = ['IPTV Players', 'Streaming Services', 'Modern Players', 'Smart TV Shells', 'Special Modes'];
 
 function groupBycat(layouts) {
   var groups = {};

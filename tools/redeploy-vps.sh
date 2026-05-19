@@ -193,16 +193,17 @@ else
   probe_fail "/health → $HEALTH_CODE (expected 200)"
 fi
 
-# --- Probe 2: /api/layouts count == 8 (PR #58 added Zero) -----------------
+# --- Probe 2: /api/layouts count == 9 (Nuvio shell ships as the 9th) ------
 # Pre-PR-#58 the manifest dir held 7 layouts (apple-tv, dave-power, mom-mode,
-# netflix, plex, samsung-tizen, tivimate). PR #58 added zero.json. A count
-# of 8 is the canary that "git pull && rebuild" actually shipped #58.
-echo "  probe 2: GET /api/layouts → expect count=8"
+# netflix, plex, samsung-tizen, tivimate). PR #58 added zero.json (8th). The
+# Nuvio shell PR adds nuvio.json (9th). A count of 9 is the canary that
+# "git pull && rebuild" actually shipped both follow-on PRs.
+echo "  probe 2: GET /api/layouts → expect count=9"
 LAYOUTS_COUNT=$(curl -sf "https://$PUBLIC_HOST/api/layouts" 2>/dev/null | jq -r '.count // empty' || echo "")
-if [ "$LAYOUTS_COUNT" = "8" ]; then
-  probe_pass "/api/layouts count=8"
+if [ "$LAYOUTS_COUNT" = "9" ]; then
+  probe_pass "/api/layouts count=9"
 else
-  probe_fail "/api/layouts count='$LAYOUTS_COUNT' (expected 8 — Zero shell from PR #58 missing?)"
+  probe_fail "/api/layouts count='$LAYOUTS_COUNT' (expected 9 — Nuvio shell missing?)"
 fi
 
 # --- Probe 3: POST /api/download returns exact_size_human (PR #59) --------
