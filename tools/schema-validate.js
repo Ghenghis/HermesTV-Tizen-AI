@@ -197,6 +197,62 @@ srcDirs.forEach(function(dir) {
 });
 if (!secretFound) pass('No raw credential assignments found in source files');
 
+// --- Playlist import endpoints registered ---
+// Verifies the 4 routes from routes/playlists.js are reachable from the main
+// router and that the route file enforces the agreed security caps. Cheap
+// static check — keeps the gate fast while still catching wiring regressions.
+console.log('\n--- Playlist import endpoints (routes/playlists.js) ---');
+var playlistsRoutePath = path.join(REPO, 'services/hermes-tv-api/src/routes/playlists.js');
+var apiIndexPath = path.join(REPO, 'services/hermes-tv-api/src/index.js');
+if (fs.existsSync(playlistsRoutePath) && fs.existsSync(apiIndexPath)) {
+  var routeText = fs.readFileSync(playlistsRoutePath, 'utf8');
+  var indexText = fs.readFileSync(apiIndexPath, 'utf8');
+  var EXPECTED_ROUTES = [
+    { method: 'post', path: '/api/playlists/preview' },
+    { method: 'post', path: '/api/playlists/save' },
+    { method: 'get',  path: '/api/playlists' },
+    { method: 'delete', path: '/api/playlists/:id' },
+  ];
+  EXPECTED_ROUTES.forEach(function(r) {
+    var needle = "router." + r.method + "('" + r.path + "'";
+    if (routeText.indexOf(needle) !== -1) {
+      pass('playlists route registered: ' + r.method.toUpperCase() + ' ' + r.path);
+    } else {
+      fail('playlists route MISSING: ' + r.method.toUpperCase() + ' ' + r.path);
+    }
+  });
+  // Router must be mounted in index.js
+  if (indexText.indexOf('playlistsRouter') !== -1) {
+    pass('playlistsRouter mounted in index.js');
+  } else {
+    fail('playlistsRouter not mounted in index.js');
+  }
+  // Security caps: URL allow-list + 10MB upload cap + name sanitiser
+  if (routeText.indexOf("'http://'") !== -1 && routeText.indexOf("'https://'") !== -1) {
+    pass('playlists URL allow-list (http:// / https:// only)');
+  } else {
+    fail('playlists URL allow-list missing — must reject file://, ftp://, etc.');
+  }
+  if (routeText.indexOf('MAX_UPLOAD_BYTES') !== -1 && routeText.indexOf('10 * 1024 * 1024') !== -1) {
+    pass('playlists upload size cap = 10 MB');
+  } else {
+    fail('playlists upload size cap MAX_UPLOAD_BYTES = 10 MB missing');
+  }
+  if (routeText.indexOf('_sanitiseName') !== -1 && routeText.indexOf('/[<>]/g') !== -1 && routeText.indexOf('/script/gi') !== -1) {
+    pass('playlists name sanitiser (strips <>, script)');
+  } else {
+    fail('playlists name sanitiser missing (must strip <>, script tokens)');
+  }
+  // Xtream / Stalker stubs MUST return 501 with explicit not_implemented
+  if (routeText.indexOf("'not_implemented'") !== -1 && routeText.indexOf('501') !== -1) {
+    pass('playlists Xtream/Stalker stubs return 501 not_implemented');
+  } else {
+    fail('playlists Xtream/Stalker stubs missing 501 not_implemented');
+  }
+} else {
+  fail('routes/playlists.js or index.js not found');
+}
+
 // --- uiCommand table size check ---
 console.log('\n--- uiCommand table (>= 20 commands) ---');
 var uiCommandPath = path.join(REPO, 'services/hermes-tv-api/src/routes/uiCommand.js');

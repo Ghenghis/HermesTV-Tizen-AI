@@ -26,6 +26,7 @@ const sourceHealthRouter = require('./routes/sourceHealth');
 const playRouter = require('./routes/play');
 const downloadsRouter = require('./routes/downloads');
 const pairingRouter = require('./routes/pairing');
+const playlistsRouter = require('./routes/playlists');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -47,6 +48,10 @@ app.use(
 );
 
 // --- Body parsing ---
+// Default 64kb is intentionally tight for the chatty endpoints. Playlist
+// imports (POST /api/playlists/preview, /save) carry up to a 10MB m3u file
+// inline in the JSON body, so the playlists router mounts its own parser
+// below with the 10MB cap that matches MAX_UPLOAD_BYTES in routes/playlists.js.
 app.use(express.json({ limit: '64kb' }));
 
 // --- Request logging ---
@@ -76,6 +81,11 @@ app.use('/', sourceHealthRouter);
 app.use('/', playRouter);
 app.use('/', downloadsRouter);
 app.use('/', pairingRouter);
+// Playlist import uses a 10MB JSON parser scoped to just its own paths so
+// the rest of the API keeps the tight 64kb default. The route handlers also
+// enforce the same cap in code (MAX_UPLOAD_BYTES) for defense-in-depth.
+app.use(/^\/api\/playlists(\/|$)/, express.json({ limit: '10mb' }));
+app.use('/', playlistsRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {

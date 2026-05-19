@@ -39,6 +39,9 @@ var LayoutSwitcher = React.lazy(function() { return import('./components/LayoutS
 var QROnboarding = React.lazy(function() { return import('./components/QROnboarding.jsx'); });
 var SettingsPanelTabbed = React.lazy(function() { return import('./components/SettingsPanelTabbed.jsx'); });
 var MediaDetailPanel = React.lazy(function() { return import('./components/MediaDetailPanel.jsx'); });
+// PlaylistImportModal is the 3-step wizard launched from Settings ▸ Playlists.
+// Lazy-loaded so its ~12 kB chunk only ships when the operator opens it.
+var PlaylistImportModal = React.lazy(function() { return import('./components/PlaylistImportModal.jsx'); });
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -328,6 +331,10 @@ var INITIAL_STATE = {
   showProfilePicker: false,
   showQR: false,
   showSettings: false,
+  // Playlist Import wizard — opened from Settings ▸ Playlists ▸ + Import playlist.
+  // Lives at App.jsx level so the Settings modal can close before the wizard
+  // opens; otherwise both overlays would stack and Tab focus would scramble.
+  showPlaylistImport: false,
   error: null,
   // Filters
   providerFilter: 'all',
@@ -426,6 +433,13 @@ function App() {
           patchState({ showVoicePicker: false });
           return true;
         }
+        if (state.showPlaylistImport) {
+          // Playlist import wizard owns its internal back step; the OS-level
+          // Back key just dismisses the whole modal. Re-opens Settings so
+          // the user is dropped back where they came from.
+          patchState({ showPlaylistImport: false, showSettings: true });
+          return true;
+        }
         if (state.showLayoutSwitcher) {
           patchState({ showLayoutSwitcher: false });
           return true;
@@ -447,7 +461,7 @@ function App() {
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
@@ -1336,6 +1350,7 @@ function App() {
               onClose={function() { patchState({ showSettings: false }); }}
               onOpenVoicePicker={function() { patchState({ showSettings: false, showVoicePicker: true }); }}
               onOpenLayoutSwitcher={function() { patchState({ showSettings: false, showLayoutSwitcher: true }); }}
+              onOpenPlaylistImport={function() { patchState({ showSettings: false, showPlaylistImport: true }); }}
               onSwitchProfile={function() {
                 profileStore.clearActiveProfileId();
                 patchState(Object.assign({}, INITIAL_STATE, {
@@ -1360,6 +1375,31 @@ function App() {
               tier={state.tier}
               onSelect={handleLayoutChange}
               onClose={function() { patchState({ showLayoutSwitcher: false }); }}
+            />
+          )}
+
+          {/* Playlist Import wizard — 3-step modal (Source → Validate → Confirm).
+              Opens from Settings ▸ Playlists ▸ + Import playlist. On a
+              successful save we refresh /api/providers so the new playlist
+              shows up in the provider filter chips without a hard reload. */}
+          {state.showPlaylistImport && (
+            <PlaylistImportModal
+              isOpen={state.showPlaylistImport}
+              onClose={function() { patchState({ showPlaylistImport: false }); }}
+              onSaved={function() {
+                // Refresh provider list so the new playlist tag appears in
+                // ProviderFilter / FilterBar selects. We re-open Settings so
+                // the user sees the new entry in the Playlists tab list.
+                var api = state.online ? hermesApi : mockApi;
+                api.getProviders().then(function(payload) {
+                  var list = payload && payload.providers
+                    ? payload.providers
+                    : (Array.isArray(payload) ? payload : []);
+                  patchState({ providers: list, showPlaylistImport: false, showSettings: true });
+                }).catch(function() {
+                  patchState({ showPlaylistImport: false, showSettings: true });
+                });
+              }}
             />
           )}
 
