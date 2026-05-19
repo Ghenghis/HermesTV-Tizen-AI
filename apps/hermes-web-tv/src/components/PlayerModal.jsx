@@ -62,6 +62,10 @@ function PlayerModal(props) {
   // hide the Multiview button when this prop is missing so older callers
   // don't show a broken button.
   var onOpenMultiview = props.onOpenMultiview;
+  // Optional — App.jsx passes a callback that opens ScheduleRecordingModal.
+  // Live items only; older callers that don't wire it just won't show a
+  // Record affordance.
+  var onScheduleRecording = props.onScheduleRecording;
 
   // Live "expires in M:SS" tick — re-renders every 5s.
   var tickResult = React.useState(0);
@@ -244,6 +248,43 @@ function PlayerModal(props) {
               for live channels, and the close button. Kept compact so the
               header stays single-row on narrow shells. */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Record entry — live channels only. Opens the App-level
+                ScheduleRecordingModal which posts to /api/dvr/schedule.
+                Hidden when the parent didn't wire onScheduleRecording. */}
+            {onScheduleRecording && item && item.type === 'live' && (
+              <button
+                type="button"
+                tabIndex={0}
+                onClick={function() { onScheduleRecording(item); }}
+                aria-label="Record this channel"
+                title="Schedule a recording for this channel"
+                style={{
+                  height: '36px',
+                  padding: '0 0.85rem',
+                  borderRadius: 'var(--radius-md, 12px)',
+                  border: '1px solid var(--border, #30363d)',
+                  background: 'transparent',
+                  color: 'var(--text, #e6edf3)',
+                  fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                  fontWeight: 700,
+                  letterSpacing: '0.03em',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  transition: 'transform 160ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)), background-color 160ms ease',
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              >
+                <span aria-hidden="true" style={{ color: '#ef4444' }}>●</span> Record
+              </button>
+            )}
+
             {/* Multiview entry — live channels only. Hidden when the
                 parent didn't wire onOpenMultiview, so legacy callsites
                 don't show a dead button. */}

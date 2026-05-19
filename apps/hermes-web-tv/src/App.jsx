@@ -1742,6 +1742,7 @@ function App() {
                   showMultiview: true,
                 });
               }}
+              onScheduleRecording={handleScheduleRecording}
             />
           )}
 
