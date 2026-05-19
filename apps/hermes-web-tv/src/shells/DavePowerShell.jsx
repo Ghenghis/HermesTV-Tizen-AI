@@ -1,12 +1,35 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DavePowerShell — Dave's preferred dense-info power-user layout.
+//
+// Design intent: maximise on-screen information density. Cards stay tight
+// (90px high) so we keep radii on the SMALL end of the token scale
+// (var(--radius-xs) / --radius-sm) to preserve the data-grid feel.
+// Where SOTA polish lands:
+//   - Sidebar icons + grid cards: var(--radius-sm)
+//   - Stats panel numbers stay monospace; pills get var(--radius-pill)
+//   - Hover-lift on cards: translateY(-1px) (subtler than other shells
+//     because density matters)
+//   - Search input upgrades to var(--radius-md) with shared focus shadow
+//   - Top-bar layout chip gets pill geometry so it reads as a status pill
+//
+// Tizen 6.5 / Chrome 76 safe — no :has(), no @container, no logical props.
+// The teal accent (#00d4aa) stays literal — it's Dave's identity colour,
+// not a tokenised value.
+// ─────────────────────────────────────────────────────────────────────────────
+
 var POWER_ICONS = [
   { icon: '📡', label: 'Live' },
   { icon: '🎬', label: 'Movies' },
   { icon: '📺', label: 'Series' },
   { icon: '📊', label: 'Stats' },
 ];
+
+var DAVE_ACCENT = '#00d4aa';
+var DAVE_ACCENT_SOFT = 'rgba(0,212,170,0.35)';
+var DAVE_EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 function DavePowerShell(props) {
   var catalog = props.catalog;
@@ -20,6 +43,7 @@ function DavePowerShell(props) {
 
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
   var fontScale = (profile && profile.font_scale) || 1.0;
+  var reducedMotion = !!(profile && profile.reduced_motion);
   var activeIconResult = React.useState(0);
   var activeIcon = activeIconResult[0];
   var setActiveIcon = activeIconResult[1];
@@ -77,20 +101,27 @@ function DavePowerShell(props) {
               style={{
                 width: '48px',
                 height: '48px',
-                borderRadius: '8px',
+                borderRadius: 'var(--radius-md)',
                 border: 'none',
                 background: activeIcon === i ? 'rgba(0,212,170,0.15)' : 'transparent',
-                color: activeIcon === i ? '#00d4aa' : '#8a98ab',
+                color: activeIcon === i ? DAVE_ACCENT : '#8a98ab',
                 fontSize: '20px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'background 120ms, color 120ms',
+                transition: 'background 180ms ease, color 180ms ease, box-shadow 180ms ease',
                 outline: 'none',
               }}
-              onFocus={function(e) { e.currentTarget.style.outline = '2px solid #00d4aa'; e.currentTarget.style.outlineOffset = '-2px'; }}
-              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid ' + DAVE_ACCENT;
+                e.currentTarget.style.outlineOffset = '-2px';
+                e.currentTarget.style.boxShadow = '0 0 0 3px ' + DAVE_ACCENT_SOFT;
+              }}
+              onBlur={function(e) {
+                e.currentTarget.style.outline = 'none';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             >
               {item.icon}
             </button>
@@ -101,29 +132,62 @@ function DavePowerShell(props) {
       {/* Main content */}
       <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Top bar */}
-        <div style={{ background: '#0d1120', borderBottom: '1px solid #1a2030', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        {/* Top bar — gentle gradient lift, pill-shaped filter chip */}
+        <div style={{ background: 'linear-gradient(180deg, #11162a, #0d1120)', borderBottom: '1px solid #1a2030', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 'calc(15px * ' + fontScale + ')', color: '#e0e8f0' }}>
-            Hermes<span style={{ color: '#00d4aa' }}>TV</span>
+            Hermes<span style={{ color: DAVE_ACCENT }}>TV</span>
           </div>
-          <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', color: '#8a98ab', flex: 1 }}>{filterLabel}</div>
+          {/* Status-pill — surfaces current filter set at a glance */}
+          <div style={{
+            fontSize: 'calc(11px * ' + fontScale + ')',
+            color: '#8a98ab',
+            flex: 1,
+            padding: '3px 10px',
+            background: 'rgba(0,212,170,0.06)',
+            border: '1px solid rgba(0,212,170,0.18)',
+            borderRadius: 'var(--radius-pill)',
+            display: 'inline-block',
+            maxWidth: 'fit-content',
+            letterSpacing: '0.02em',
+          }}>{filterLabel}</div>
           <input
             type="text"
             value={searchQuery}
             onChange={function(e) { setSearchQuery(e.target.value); }}
             placeholder="Search..."
+            aria-label="Search catalog"
             style={{
               background: '#131827',
               border: '1px solid #1a2030',
-              borderRadius: '4px',
+              borderRadius: 'var(--radius-md)',
               color: '#e0e8f0',
-              padding: '5px 10px',
+              padding: '5px 12px',
               fontSize: 'calc(12px * ' + fontScale + ')',
               outline: 'none',
-              width: '160px',
+              width: '180px',
+              transition: 'border-color 180ms ease, box-shadow 180ms ease',
+            }}
+            onFocus={function(e) {
+              e.currentTarget.style.borderColor = DAVE_ACCENT;
+              e.currentTarget.style.boxShadow = '0 0 0 3px ' + DAVE_ACCENT_SOFT;
+            }}
+            onBlur={function(e) {
+              e.currentTarget.style.borderColor = '#1a2030';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           />
-          <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab' }}>Ctrl+L: layout</div>
+          <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', fontFamily: 'inherit' }}>
+            <kbd style={{
+              padding: '1px 6px',
+              borderRadius: 'var(--radius-xs)',
+              background: '#131827',
+              border: '1px solid #1a2030',
+              fontSize: 'inherit',
+              fontFamily: 'inherit',
+              color: DAVE_ACCENT,
+            }}>Ctrl+L</kbd>
+            <span style={{ marginLeft: '4px' }}>layout</span>
+          </div>
         </div>
 
         {/* Grid */}
@@ -139,21 +203,44 @@ function DavePowerShell(props) {
                   onClick={function() { if (onItemSelect) onItemSelect(item); }}
                   onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
                   style={{
-                    borderRadius: '4px',
+                    // Tight radius preserves the data-grid feel; --radius-sm
+                    // gives a subtle warmth without softening the dense layout.
+                    borderRadius: 'var(--radius-sm)',
                     overflow: 'hidden',
                     cursor: 'pointer',
                     border: '1px solid #1a2030',
-                    transition: 'border-color 100ms, box-shadow 100ms',
+                    boxShadow: 'var(--shadow-md)',
+                    // Subtler hover-lift than the other shells (1px not 2px)
+                    // because dense grids look chaotic if every cell jumps.
+                    transition: 'transform 180ms ' + DAVE_EASE_OUT + ', border-color 180ms ease, box-shadow 180ms ease',
+                    willChange: 'transform',
+                    transform: 'translateY(0)',
                     outline: 'none',
                   }}
-                  onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#00d4aa'; }}
-                  onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#1a2030'; }}
-                  onFocus={function(e) { e.currentTarget.style.borderColor = '#00d4aa'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0,212,170,0.35)'; }}
-                  onBlur={function(e) { e.currentTarget.style.borderColor = '#1a2030'; e.currentTarget.style.boxShadow = 'none'; }}
+                  onMouseEnter={function(e) {
+                    e.currentTarget.style.borderColor = DAVE_ACCENT;
+                    e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                    if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={function(e) {
+                    e.currentTarget.style.borderColor = '#1a2030';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                  onFocus={function(e) {
+                    e.currentTarget.style.borderColor = DAVE_ACCENT;
+                    e.currentTarget.style.boxShadow = '0 0 0 2px ' + DAVE_ACCENT + ', 0 12px 36px ' + DAVE_ACCENT_SOFT;
+                    if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onBlur={function(e) {
+                    e.currentTarget.style.borderColor = '#1a2030';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
                 >
                   <div style={{ height: '90px', background: posterBg(item, idx), position: 'relative' }}>
-                    {item.quality && <div style={{ position: 'absolute', top: '3px', right: '3px', background: 'rgba(0,212,170,0.9)', color: '#000', fontSize: '8px', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>{item.quality}</div>}
-                    {item.type === 'live' && <div style={{ position: 'absolute', top: '3px', left: '3px', background: '#e50914', color: '#fff', fontSize: '8px', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>LIVE</div>}
+                    {item.quality && <div style={{ position: 'absolute', top: '3px', right: '3px', background: 'rgba(0,212,170,0.9)', color: '#000', fontSize: '8px', fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-pill)' }}>{item.quality}</div>}
+                    {item.type === 'live' && <div style={{ position: 'absolute', top: '3px', left: '3px', background: '#e50914', color: '#fff', fontSize: '8px', fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-pill)' }}>LIVE</div>}
                   </div>
                   <div style={{ padding: '5px 6px', background: '#0d1120' }}>
                     <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 600, color: '#e0e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
@@ -175,8 +262,8 @@ function DavePowerShell(props) {
 
       {/* Stats panel — enhanced tier only */}
       {tier === 'enhanced' && (
-        <div style={{ background: '#0d1120', borderLeft: '1px solid #1a2030', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
-          <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, color: '#00d4aa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Catalog Stats</div>
+        <div style={{ background: 'linear-gradient(180deg, #11162a, #0d1120)', borderLeft: '1px solid #1a2030', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+          <div style={{ fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, color: DAVE_ACCENT, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Catalog Stats</div>
 
           <div>
             <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginBottom: '6px' }}>TOTAL</div>
@@ -204,7 +291,7 @@ function DavePowerShell(props) {
             {Object.keys(qualityBreakdown).slice(0, 5).map(function(q) {
               return (
                 <div key={q} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: 'calc(11px * ' + fontScale + ')' }}>
-                  <span style={{ color: '#00d4aa' }}>{q}</span>
+                  <span style={{ color: DAVE_ACCENT }}>{q}</span>
                   <span style={{ color: '#e0e8f0', fontWeight: 600 }}>{qualityBreakdown[q]}</span>
                 </div>
               );
@@ -213,7 +300,7 @@ function DavePowerShell(props) {
 
           <div>
             <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginBottom: '6px' }}>FILTERED</div>
-            <div style={{ fontSize: 'calc(18px * ' + fontScale + ')', fontWeight: 700, color: '#00d4aa' }}>{displayItems.length}</div>
+            <div style={{ fontSize: 'calc(18px * ' + fontScale + ')', fontWeight: 700, color: DAVE_ACCENT }}>{displayItems.length}</div>
             <div style={{ fontSize: 'calc(10px * ' + fontScale + ')', color: '#8a98ab', marginTop: '2px' }}>of {(catalog || []).length}</div>
           </div>
         </div>

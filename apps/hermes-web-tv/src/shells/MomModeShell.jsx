@@ -1,11 +1,33 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MomModeShell — Sherri's primary layout.
+//
+// Design intent (per CLAUDE.md): Mom's TV is NEVER system-limited. We
+// upgrade the calm/warm aesthetic rather than degrade it. Larger font
+// scale already arrives via profile; this polish layer adds:
+//   - Softer, larger radii (var(--radius-lg) / --radius-xl on cards and CTAs)
+//   - Gentler shadows (var(--shadow-md) at rest, --shadow-lg on hover)
+//   - --gradient-warm on the primary play indicator for a hearth-fire feel
+//   - 180ms ease-out hover-lift (translateY(-2px)) — gated on reduced_motion
+//
+// The mom-calm palette (#1a1a2e bg, #ff7eb3 accent, #f0e6ff text) stays
+// EXACTLY as-is. We only swap the geometry tokens and the play-indicator
+// gradient; we do NOT touch the colour identity.
+//
+// Tizen 6.5 / Chrome 76 safe — no :has(), no @container, no logical props.
+// ─────────────────────────────────────────────────────────────────────────────
+
 var MOM_TABS = [
   { icon: '📡', label: 'Live TV', type: 'live' },
   { icon: '🎬', label: 'Movies', type: 'movies' },
   { icon: '📺', label: 'Series', type: 'series' },
 ];
+
+var MOM_ACCENT = '#ff7eb3';
+var MOM_ACCENT_SOFT = 'rgba(255,126,179,0.35)';
+var MOM_EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 function getGreeting() {
   var h = new Date().getHours();
@@ -36,6 +58,11 @@ function MomModeShell(props) {
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
   var fontScale = Math.max(1.4, (profile && profile.font_scale) || 1.4);
   var displayName = (profile && profile.display_name) || 'Sherri';
+  // Reduced-motion is honoured by short-circuiting the transform-on-hover.
+  // The shared .motion-reduced body class already clamps animation durations
+  // globally — this guard keeps us from kicking off transform changes that
+  // would still render once before that clamp catches them.
+  var reducedMotion = !!(profile && profile.reduced_motion);
 
   var activeTabResult = React.useState(0);
   var activeTab = activeTabResult[0];
@@ -65,15 +92,18 @@ function MomModeShell(props) {
     : filtered.filter(function(i) { return i.type === 'series'; });
   var displayItems = tabItems.length > 0 ? tabItems : filtered;
 
+  // Mom's TV is never system-limited — we keep the enhanced column count
+  // generous regardless of tier, so even on a UN-degraded fallback she
+  // still sees the warm/spacious 2-up that's easy from the couch.
   var cols = tier === 'enhanced' && fontScale < 1.5 ? 3 : 2;
 
   return (
     <div style={{ background: '#1a1a2e', color: '#f0e6ff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Georgia', 'Times New Roman', serif" }}>
 
-      {/* Greeting banner */}
+      {/* Greeting banner — gentle warm overlay over the calm-purple base */}
       <div style={{ background: 'linear-gradient(135deg, #1e2a4a, #2a1a3e)', padding: '20px 28px', flexShrink: 0, borderBottom: '1px solid #2a2a4a' }}>
         <h1 style={{ fontSize: 'calc(24px * ' + fontScale + ')', fontWeight: 700, color: '#f0e6ff', letterSpacing: '-0.01em', margin: 0 }}>
-          {getGreeting()}, <span style={{ color: '#ff7eb3' }}>{displayName}</span>! 👋
+          {getGreeting()}, <span style={{ color: MOM_ACCENT }}>{displayName}</span>! 👋
         </h1>
         <h2 style={{ fontSize: 'calc(14px * ' + fontScale + ')', color: '#c8b8e8', marginTop: '6px', marginBottom: 0, fontWeight: 'normal' }}>
           What would you like to watch today?
@@ -105,17 +135,25 @@ function MomModeShell(props) {
                 justifyContent: 'center',
                 gap: '10px',
                 border: 'none',
-                borderBottom: isActive ? '4px solid #ff7eb3' : '4px solid transparent',
+                borderRadius: 'var(--radius-sm)',
+                borderBottom: isActive ? '4px solid ' + MOM_ACCENT : '4px solid transparent',
                 background: isActive ? 'rgba(255,126,179,0.12)' : 'transparent',
-                color: isActive ? '#ff7eb3' : '#c8b8e8',
+                color: isActive ? MOM_ACCENT : '#c8b8e8',
                 fontSize: 'calc(17px * ' + fontScale + ')',
                 fontWeight: isActive ? 700 : 500,
                 cursor: 'pointer',
-                transition: 'all 120ms',
+                transition: 'color 180ms ease, background-color 180ms ease, box-shadow 180ms ease',
                 outline: 'none',
               }}
-              onFocus={function(e) { e.currentTarget.style.outline = '3px solid #ff7eb3'; e.currentTarget.style.outlineOffset = '-3px'; }}
-              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '3px solid ' + MOM_ACCENT;
+                e.currentTarget.style.outlineOffset = '-3px';
+                e.currentTarget.style.boxShadow = '0 0 0 3px ' + MOM_ACCENT_SOFT;
+              }}
+              onBlur={function(e) {
+                e.currentTarget.style.outline = 'none';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             >
               <span style={{ fontSize: 'calc(22px * ' + fontScale + ')' }}>{tab.icon}</span>
               <span>{tab.label}</span>
@@ -142,25 +180,64 @@ function MomModeShell(props) {
                   onClick={function() { if (onItemSelect) onItemSelect(item); }}
                   onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (onItemSelect) onItemSelect(item); } }}
                   style={{
-                    borderRadius: '14px',
+                    // Larger, softer radius — the calm aesthetic carries on
+                    // every corner; xl on the card body, the inner play
+                    // indicator gets pill rounding below.
+                    borderRadius: 'var(--radius-xl)',
                     overflow: 'hidden',
                     cursor: 'pointer',
                     border: '2px solid #2a2a4a',
-                    transition: 'border-color 150ms, transform 150ms, box-shadow 150ms',
+                    // Hover-lift on the shared 180ms ease-out; transform is
+                    // gated on reduced_motion so Sherri's preference wins.
+                    transition: 'border-color 180ms ease, transform 180ms ' + MOM_EASE_OUT + ', box-shadow 180ms ease',
                     background: '#16213e',
+                    boxShadow: 'var(--shadow-md)',
+                    willChange: 'transform',
+                    transform: 'translateY(0)',
+                    outline: 'none',
                   }}
-                  onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#ff7eb3'; if (!(profile && profile.reduced_motion)) e.currentTarget.style.transform = 'scale(1.02)'; }}
-                  onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#2a2a4a'; e.currentTarget.style.transform = 'scale(1)'; }}
-                  onFocus={function(e) { e.currentTarget.style.borderColor = '#ff7eb3'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,126,179,0.35)'; }}
-                  onBlur={function(e) { e.currentTarget.style.borderColor = '#2a2a4a'; e.currentTarget.style.boxShadow = 'none'; }}
+                  onMouseEnter={function(e) {
+                    e.currentTarget.style.borderColor = MOM_ACCENT;
+                    e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+                    if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={function(e) {
+                    e.currentTarget.style.borderColor = '#2a2a4a';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                  onFocus={function(e) {
+                    e.currentTarget.style.borderColor = MOM_ACCENT;
+                    e.currentTarget.style.boxShadow = 'var(--shadow-focus)';
+                    if (!reducedMotion) e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onBlur={function(e) {
+                    e.currentTarget.style.borderColor = '#2a2a4a';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
                 >
                   <div style={{ height: '260px', background: posterBg(item, idx), position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,126,179,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>▶</div>
+                    {/* Primary play indicator — warm gradient + pill radius +
+                        soft lifted shadow. This is the "primary CTA" surface
+                        Mom sees on every card so it gets the warm token. */}
+                    <div style={{
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: 'var(--radius-pill)',
+                      background: 'var(--gradient-warm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '30px',
+                      color: '#fff',
+                      boxShadow: 'var(--shadow-md)',
+                    }}>▶</div>
                     {item.quality && (
-                      <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: '#ff7eb3', fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, padding: '3px 8px', borderRadius: '4px' }}>{item.quality}</div>
+                      <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: MOM_ACCENT, fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-pill)' }}>{item.quality}</div>
                     )}
                     {item.type === 'live' && (
-                      <div style={{ position: 'absolute', top: '10px', left: '10px', background: '#e50914', color: '#fff', fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, padding: '3px 8px', borderRadius: '4px' }}>🔴 LIVE</div>
+                      <div style={{ position: 'absolute', top: '10px', left: '10px', background: '#e50914', color: '#fff', fontSize: 'calc(11px * ' + fontScale + ')', fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-pill)' }}>🔴 LIVE</div>
                     )}
                   </div>
                   <div style={{ padding: '14px 16px 16px' }}>
@@ -180,7 +257,7 @@ function MomModeShell(props) {
 
       {/* Bottom status bar */}
       <div style={{ background: '#16213e', borderTop: '1px solid #2a2a4a', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ fontSize: 'calc(22px * ' + fontScale + ')', fontWeight: 700, color: '#ff7eb3' }}>{currentTime}</div>
+        <div style={{ fontSize: 'calc(22px * ' + fontScale + ')', fontWeight: 700, color: MOM_ACCENT }}>{currentTime}</div>
         <div style={{ fontSize: 'calc(13px * ' + fontScale + ')', color: '#c8b8e8', textAlign: 'right' }}>
           Hermes is here to help — just ask! 💬
         </div>
