@@ -1,11 +1,22 @@
 import React from 'react';
 
+// Lazy-loaded deep-settings sections — code-split so the Settings
+// modal's initial render stays light. Each section file lives in
+// ./settings/ and reads/writes through src/store/settingsStore.js.
+var NetworkSettings = React.lazy(function() { return import('./settings/NetworkSettings.jsx'); });
+var PlaybackSettings = React.lazy(function() { return import('./settings/PlaybackSettings.jsx'); });
+var ParentalControls = React.lazy(function() { return import('./settings/ParentalControls.jsx'); });
+var BackupRestore = React.lazy(function() { return import('./settings/BackupRestore.jsx'); });
+var Diagnostics = React.lazy(function() { return import('./settings/Diagnostics.jsx'); });
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SettingsPanelTabbed — IPTV-Player-Zero-style centred-modal Settings panel.
 //
-// Replaces the old right-side dropdown with a centered modal that exposes
-// the 7 tabs the Zero screenshots show: Playlists, General, Backups,
-// Appearance, Features, Hotkeys, About.
+// The original 7 tabs (Playlists, General, Backups, Appearance, Features,
+// Hotkeys, About) ship from PR #61. This PR adds 4 new tabs to reach Zero
+// parity — Network, Playback, Parental, Diagnostics — and rebuilds the
+// existing Backups tab around the real Backup/Restore flow that the
+// parallel API agent is wiring up at `POST /api/backup/import`.
 //
 // Stateful props (read from App):
 //   isOpen, profile, tier, tvModel, catalogSource, iptvOrgCount,
@@ -21,13 +32,17 @@ import React from 'react';
 // ─────────────────────────────────────────────────────────────────────────────
 
 var TABS = [
-  { id: 'playlists',  label: 'Playlists',  icon: '☰' },
-  { id: 'general',    label: 'General',    icon: '⇅' },
-  { id: 'backups',    label: 'Backups',    icon: '⤒' },
-  { id: 'appearance', label: 'Appearance', icon: '◐' },
-  { id: 'features',   label: 'Features',   icon: '✦' },
-  { id: 'hotkeys',    label: 'Hotkeys',    icon: '⌨' },
-  { id: 'about',      label: 'About',      icon: 'ⓘ' },
+  { id: 'playlists',   label: 'Playlists',   icon: '☰' },
+  { id: 'general',     label: 'General',     icon: '⇅' },
+  { id: 'appearance',  label: 'Appearance',  icon: '◐' },
+  { id: 'features',    label: 'Features',    icon: '✦' },
+  { id: 'network',     label: 'Network',     icon: '⇄' },
+  { id: 'playback',    label: 'Playback',    icon: '▶' },
+  { id: 'parental',    label: 'Parental',    icon: '⛨' },
+  { id: 'backups',     label: 'Backup',      icon: '⤒' },
+  { id: 'hotkeys',     label: 'Hotkeys',     icon: '⌨' },
+  { id: 'diagnostics', label: 'Diagnostics', icon: '⚕' },
+  { id: 'about',       label: 'About',       icon: 'ⓘ' },
 ];
 
 // Themes mirror index.css. The first 6 are the legacy palettes; the next 6
@@ -366,14 +381,41 @@ function SettingsPanelTabbed(props) {
 
   function renderBackups() {
     return (
-      <_Card icon="⤒" header="Backups">
-        <div style={{ fontSize: 'calc(0.85rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
-          Per-profile settings (voice preference, theme, layout) persist to localStorage automatically. Catalog and watch history are stored server-side per profile.
-        </div>
-        <div style={{ marginTop: '0.6rem', fontSize: 'calc(0.78rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
-          Export / import a portable backup file lands in W4 Phase 2 alongside the settings store API.
-        </div>
-      </_Card>
+      <React.Suspense fallback={<_Card icon="⤒" header="Backup &amp; Restore"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
+        <BackupRestore profile={profile} />
+      </React.Suspense>
+    );
+  }
+
+  function renderNetwork() {
+    return (
+      <React.Suspense fallback={<_Card icon="⇄" header="Network"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
+        <NetworkSettings />
+      </React.Suspense>
+    );
+  }
+
+  function renderPlayback() {
+    return (
+      <React.Suspense fallback={<_Card icon="▶" header="Playback"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
+        <PlaybackSettings />
+      </React.Suspense>
+    );
+  }
+
+  function renderParental() {
+    return (
+      <React.Suspense fallback={<_Card icon="⛨" header="Parental controls"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
+        <ParentalControls />
+      </React.Suspense>
+    );
+  }
+
+  function renderDiagnostics() {
+    return (
+      <React.Suspense fallback={<_Card icon="⚕" header="Diagnostics"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
+        <Diagnostics profile={profile} tier={tier} tvModel={tvModel} />
+      </React.Suspense>
     );
   }
 
@@ -480,14 +522,44 @@ function SettingsPanelTabbed(props) {
   }
 
   function renderAbout() {
+    // Build version surfaces in Diagnostics; here we mirror it for the
+    // "About" card so curious users don't have to switch tabs.
+    var buildVersion = 'dev';
+    try {
+      /* eslint-disable no-undef */
+      if (typeof import.meta !== 'undefined' && import.meta && import.meta.env) {
+        if (import.meta.env.VITE_BUILD_VERSION) { buildVersion = String(import.meta.env.VITE_BUILD_VERSION); }
+        else if (import.meta.env.MODE) { buildVersion = import.meta.env.MODE + '-build'; }
+      }
+      /* eslint-enable no-undef */
+    } catch (_) { /* ignore */ }
     return (
       <_Card icon="ⓘ" header="HermesTV">
-        <_Row label="Web build" value="hermes-web-tv" />
+        <_Row label="Web build" value={<span style={{ fontFamily: 'monospace', color: 'var(--accent, #00d4ff)' }}>{buildVersion}</span>} />
+        <_Row label="App name" value="hermes-web-tv" />
         <_Row label="API service" value="hermes-tv-api" />
         <_Row label="Tizen target" value="Tizen 6.5 / Chrome 76 / QN85 QLED" />
         <_Row label="License" value="Internal — operator-owned deployment" />
+        <_Row
+          label="Source"
+          value={
+            <a
+              href="https://github.com/Ghenghis/HermesTV-Tizen-AI"
+              target="_blank"
+              rel="noopener noreferrer"
+              tabIndex={0}
+              onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #00d4ff)'; e.currentTarget.style.outlineOffset = '2px'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              style={{
+                color: 'var(--accent, #00d4ff)',
+                textDecoration: 'none',
+                fontWeight: 700,
+              }}
+            >GitHub · Ghenghis/HermesTV-Tizen-AI ↗</a>
+          }
+        />
         <div style={{ marginTop: '0.6rem', fontSize: 'calc(0.78rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
-          Built for Sherri (Mom mode) and Dave. Design language inspired by IPTV Player Zero — no copied assets.
+          Built for Sherri (Mom mode) and Dave. Design language inspired by IPTV Player Zero — no copied assets. Powered by Azure Neural TTS, Threadfin / iptv-org playlists, and the Apollo / XtremeHD provider mesh.
         </div>
       </_Card>
     );
@@ -495,14 +567,18 @@ function SettingsPanelTabbed(props) {
 
   function renderBody() {
     switch (activeTab) {
-      case 'playlists':  return renderPlaylists();
-      case 'general':    return renderGeneral();
-      case 'backups':    return renderBackups();
-      case 'appearance': return renderAppearance();
-      case 'features':   return renderFeatures();
-      case 'hotkeys':    return renderHotkeys();
-      case 'about':      return renderAbout();
-      default:           return renderGeneral();
+      case 'playlists':   return renderPlaylists();
+      case 'general':     return renderGeneral();
+      case 'appearance':  return renderAppearance();
+      case 'features':    return renderFeatures();
+      case 'network':     return renderNetwork();
+      case 'playback':    return renderPlayback();
+      case 'parental':    return renderParental();
+      case 'backups':     return renderBackups();
+      case 'hotkeys':     return renderHotkeys();
+      case 'diagnostics': return renderDiagnostics();
+      case 'about':       return renderAbout();
+      default:            return renderGeneral();
     }
   }
 
