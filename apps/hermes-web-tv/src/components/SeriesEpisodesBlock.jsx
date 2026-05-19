@@ -1,4 +1,5 @@
 import React from 'react';
+import SeriesNextUp from './SeriesNextUp.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SeriesEpisodesBlock — Smallville-style episode list rendered under the
@@ -7,19 +8,27 @@ import React from 'react';
 // Visual contract (matches the Zero/Smallville screenshot the operator
 // shared):
 //   - "EPISODES" header on the left, "MARK ALL WATCHED" button on the right.
+//   - "Next up" pinned hero card at the top — surfaces the first unwatched
+//     episode (S01E01 when watch history is empty).
 //   - One collapsible row per season showing "Season N  X eps", a
 //     "MARK WATCHED" pill, and a season-download ⤓ button with a
 //     "Download season" tooltip.
 //   - Below an expanded season: per-episode row with a thumbnail
 //     placeholder, "E{n}  {Title} - S0NE0N - {EpisodeTitle}" label,
-//     episode plot, star rating, ▶ Play button, ⤓ episode-download
-//     button.
+//     episode plot with a "Show more" toggle when the plot is long,
+//     star rating, ▶ Play button, ⤓ episode-download button, and a
+//     thin watch-progress bar at the bottom of every card.
 //
 // Data: episodes are synthesised client-side from item.metadata.seasons
 // (default 1). The backend's /api/download accepts {season, episode} so
 // these click handlers map cleanly onto the existing download flow.
 // Real episode titles + plots will arrive in a follow-up when we wire
 // TMDb / TVMaze metadata (W3-F3 backlog).
+//
+// Watch progress: the per-episode bar reads from watchHistoryStore.js.
+// TODO: wire when watchHistoryStore lands — the parallel agent owns that
+// file. Until then `_progressFor` returns null and the progress UI is
+// skipped without breaking layout.
 //
 // Tizen / Chrome 76 safe: no spread, no optional chaining, no nullish.
 // Every interactive control has tabIndex + Enter/Space handler.
@@ -36,6 +45,35 @@ var SYNTH_TITLES = [
   'Quicksilver', 'Untethered', 'Compass', 'Wildfire', 'Anchor',
 ];
 
+// Longer synthetic plots — gives the "Show more" toggle something real
+// to expand. The first sentence is the short summary shown by default;
+// the remainder appears after the user taps "Show more". The same plot
+// is used for every episode for now — when TVMaze / TMDb metadata lands
+// the per-episode lookup will replace this entirely.
+var SYNTH_PLOT_SHORT = 'Synthetic episode description — TVMaze / TMDb integration will replace this in the next iteration.';
+var SYNTH_PLOT_LONG = SYNTH_PLOT_SHORT + ' The expanded synopsis would normally include character beats, the central conflict for the hour, and any cliffhanger that bleeds into the next episode. We render the longer copy here so the operator can verify the "Show more" toggle responds the way it would once real metadata is wired through.';
+
+// Read percent_complete (0..1) from the watchHistory store if it exists.
+// Returns null when the store is missing OR when the episode has no
+// recorded progress. The progress bar UI skips rendering when null.
+// TODO: wire when watchHistoryStore lands — replace this no-op with
+// `import { getEpisodeProgress } from '../store/watchHistoryStore.js'`.
+function _progressFor(itemId, season, episode) {
+  if (!itemId) { return null; }
+  try {
+    // Defensive: a future watchHistoryStore may expose a global hook on
+    // window.__hermesWatchHistory for cross-tab sync. We probe it but
+    // fall through cleanly when absent so the UI never throws.
+    if (typeof window !== 'undefined' && window.__hermesWatchHistory) {
+      var rec = window.__hermesWatchHistory.get(itemId, season, episode);
+      if (rec && typeof rec.percent_complete === 'number') {
+        return rec.percent_complete;
+      }
+    }
+  } catch (e) { /* silent */ }
+  return null;
+}
+
 function _episodesForSeason(item, seasonIdx, episodeCount) {
   var out = [];
   for (var i = 0; i < episodeCount; i++) {
@@ -50,7 +88,8 @@ function _episodesForSeason(item, seasonIdx, episodeCount) {
       episode: ep,
       title: title,
       rating: Math.round(rating * 100) / 100,
-      plot: 'Synthetic episode description — TVMaze / TMDb integration will replace this in the next iteration.',
+      plot_short: SYNTH_PLOT_SHORT,
+      plot_long: SYNTH_PLOT_LONG,
       synth_id: (item.id || 'series') + '-s' + seasonIdx + 'e' + ep,
     });
   }
@@ -71,11 +110,24 @@ function SeriesEpisodesBlock(props) {
   var expanded = expandedResult[0];
   var setExpanded = expandedResult[1];
 
+  // Per-episode "Show more" state — keyed by synth_id so toggles persist
+  // across season-open/close. Map shape: { 'ser-300-s1e3': true, ... }.
+  var openPlotsResult = React.useState({});
+  var openPlots = openPlotsResult[0];
+  var setOpenPlots = openPlotsResult[1];
+
   function toggle(seasonIdx) {
     var next = {};
     Object.keys(expanded).forEach(function(k) { next[k] = expanded[k]; });
     next[seasonIdx] = !next[seasonIdx];
     setExpanded(next);
+  }
+
+  function togglePlot(synthId) {
+    var next = {};
+    Object.keys(openPlots).forEach(function(k) { next[k] = openPlots[k]; });
+    next[synthId] = !next[synthId];
+    setOpenPlots(next);
   }
 
   // Episode count default — matches Smallville's S1 21 eps in the
@@ -151,6 +203,12 @@ function SeriesEpisodesBlock(props) {
           Mark all watched
         </button>
       </div>
+
+      {/* Pinned "Next up" hero — picks the first unwatched episode, or
+          S01E01 when watch history is empty. Lives above the season list
+          so the user has a single-click resume path without expanding
+          anything. */}
+      <SeriesNextUp item={item} episodeCountFn={epCount} onPlay={onPlay} />
 
       {seasonRows.map(function(seasonIdx) {
         var count = epCount(seasonIdx);
@@ -246,14 +304,18 @@ function SeriesEpisodesBlock(props) {
               <div style={{ borderTop: '1px solid var(--border, #30363d)' }}>
                 {episodes.map(function(ep) {
                   var label = item.title + ' - S' + (ep.season < 10 ? '0' + ep.season : ep.season) + 'E' + (ep.episode < 10 ? '0' + ep.episode : ep.episode) + ' - ' + ep.title;
+                  var plotOpen = !!openPlots[ep.synth_id];
+                  var pct = _progressFor(item.id, ep.season, ep.episode);
+                  var hasProgress = (typeof pct === 'number' && pct > 0);
                   return (
                     <div
                       key={ep.synth_id}
                       style={{
+                        position: 'relative',
                         display: 'grid',
                         gridTemplateColumns: '110px 1fr auto',
                         gap: '0.9rem',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
                         padding: '0.6rem 0.9rem',
                         borderBottom: '1px solid var(--border, #30363d)',
                       }}
@@ -263,7 +325,7 @@ function SeriesEpisodesBlock(props) {
                         style={{
                           width: '110px', height: '62px',
                           background: 'linear-gradient(135deg, var(--surface-raised, #1c2128), var(--bg, #0d1117))',
-                          borderRadius: '6px',
+                          borderRadius: 'var(--radius-sm, 6px)',
                           border: '1px solid var(--border, #30363d)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: 'var(--muted)', fontSize: '11px', fontWeight: 700,
@@ -293,16 +355,46 @@ function SeriesEpisodesBlock(props) {
                         >
                           Season {ep.season}
                         </div>
+                        {/* Episode plot — truncates by default to a single
+                            line; tapping "Show more" reveals the long copy.
+                            We use whiteSpace: normal in the expanded state
+                            so the synopsis wraps naturally. */}
                         <div
                           style={{
                             fontSize: 'calc(0.7rem * var(--font-scale, 1))',
                             color: 'var(--muted, #8b949e)',
                             marginTop: '0.1rem',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: plotOpen ? 'clip' : 'ellipsis',
+                            whiteSpace: plotOpen ? 'normal' : 'nowrap',
+                            lineHeight: '1.45',
                           }}
                         >
-                          {ep.plot}
+                          {plotOpen ? ep.plot_long : ep.plot_short}
                         </div>
+                        <button
+                          tabIndex={0}
+                          aria-expanded={plotOpen}
+                          aria-label={(plotOpen ? 'Hide' : 'Show') + ' synopsis for S' + ep.season + 'E' + ep.episode}
+                          onClick={function() { togglePlot(ep.synth_id); }}
+                          onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePlot(ep.synth_id); } }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '0.1rem 0',
+                            marginTop: '0.15rem',
+                            color: 'var(--accent)',
+                            fontSize: 'calc(0.68rem * var(--font-scale, 1))',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            cursor: 'pointer',
+                            outline: 'none',
+                          }}
+                          onFocus={function(e) { e.currentTarget.style.textDecoration = 'underline'; }}
+                          onBlur={function(e) { e.currentTarget.style.textDecoration = 'none'; }}
+                        >
+                          {plotOpen ? '▲ Show less' : '▼ Show more'}
+                        </button>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span
@@ -310,7 +402,7 @@ function SeriesEpisodesBlock(props) {
                             fontSize: 'calc(0.7rem * var(--font-scale, 1))',
                             padding: '0.15rem 0.5rem',
                             border: '1px solid var(--border, #30363d)',
-                            borderRadius: '4px',
+                            borderRadius: 'var(--radius-xs, 4px)',
                             color: 'var(--text, #e6edf3)',
                             fontWeight: 700,
                           }}
@@ -327,7 +419,7 @@ function SeriesEpisodesBlock(props) {
                             padding: '0.35rem 0.9rem',
                             background: '#e6edf3',
                             border: 'none',
-                            borderRadius: '999px',
+                            borderRadius: 'var(--radius-pill, 999px)',
                             color: '#0d1117',
                             fontSize: 'calc(0.72rem * var(--font-scale, 1))',
                             fontWeight: 700,
@@ -337,7 +429,7 @@ function SeriesEpisodesBlock(props) {
                           onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent)'; }}
                           onBlur={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
                         >
-                          <span aria-hidden="true">▶</span> Play
+                          <span aria-hidden="true">▶</span> {hasProgress ? 'Resume' : 'Play'}
                         </button>
                         <button
                           tabIndex={0}
@@ -360,6 +452,35 @@ function SeriesEpisodesBlock(props) {
                           onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
                         >⤓</button>
                       </div>
+                      {/* Watch-progress bar — bottom of every row when a
+                          resume position exists. Bar is thin (3px), uses the
+                          accent gradient, and sits flush with the bottom
+                          border so it reads as a per-card status indicator
+                          rather than a divider. */}
+                      {hasProgress && (
+                        <div
+                          aria-label={'Watched ' + Math.round(pct * 100) + ' percent'}
+                          style={{
+                            gridColumn: '1 / -1',
+                            position: 'relative',
+                            height: '3px',
+                            width: '100%',
+                            background: 'rgba(255,255,255,0.08)',
+                            borderRadius: '2px',
+                            overflow: 'hidden',
+                            marginTop: '0.45rem',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: Math.round(pct * 100) + '%',
+                              height: '100%',
+                              background: 'var(--gradient-accent)',
+                              transition: 'width 240ms var(--ease-out, ease)',
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
