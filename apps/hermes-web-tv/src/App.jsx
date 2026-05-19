@@ -32,6 +32,20 @@ import './i18n/index.js';
 // in" intent. The wizard itself lazy-loads PlaylistImport + QR internally.
 import OnboardingWizard from './components/OnboardingWizard.jsx';
 import * as onboardingState from './store/onboardingState.js';
+// ProfileManagementModal is already statically imported by ProfilePicker so
+// it always ships in the eager bundle — using a regular import here avoids
+// Vite's "static import shadows dynamic import" warning while keeping the
+// same render-time cost. App.jsx mounts it as a second entry point from
+// Settings ▸ Profile actions so the user doesn't have to log out to edit.
+import ProfileManagementModal from './components/ProfileManagementModal.jsx';
+// Parental lock — the hook + overlay shipped in #102 already protect the
+// MediaDetailPanel's Play / Download buttons. Mounted at App level too so
+// any caller that goes through handlePlay / handleStartDownload — Multiview
+// tile-click, future shell quick-play, search-result direct-play — is
+// covered by the same PIN gate. The hook's unlock cache is module-scoped,
+// so unlocks made in MediaDetailPanel apply at App level and vice versa.
+import ParentalLockOverlay from './components/ParentalLockOverlay.jsx';
+import useParentalGate from './hooks/useParentalGate.js';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -62,6 +76,16 @@ var EPGModal = React.lazy(function() { return import('./components/EPGModal.jsx'
 // in a follow-up). Lazy so the four-stream HLS surface doesn't bloat the
 // initial paint.
 var MultiviewModal = React.lazy(function() { return import('./components/MultiviewModal.jsx'); });
+// SearchModal — global "/" or Ctrl+K search overlay. Hits /api/search with
+// a 200ms debounce and caches the last 10 queries via recentSearchesStore.
+// Lazy so the search payload (incl. recent-searches store + debounce util)
+// only ships when the user actually invokes search.
+var SearchModal = React.lazy(function() { return import('./components/SearchModal.jsx'); });
+// ScheduleRecordingModal — "Record this" dialog for live channels. Opens
+// from MediaDetailPanel's Record button (live items only). Hits
+// /api/dvr/schedule via dvrClient.scheduleRecording. Lazy so the form +
+// time-picker logic only ships when the user actually schedules.
+var ScheduleRecordingModal = React.lazy(function() { return import('./components/ScheduleRecordingModal.jsx'); });
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -369,6 +393,17 @@ var INITIAL_STATE = {
   actorFilter: null,
   activeLayout: '',
   showLayoutSwitcher: false,
+  // Global search overlay. Toggled by the header Search button, by "/" or
+  // Ctrl+K, and by the chatbot `open_search` command (follow-up).
+  showSearch: false,
+  // Profile management CRUD modal — opened from Settings ▸ Profile actions
+  // ▸ Manage profiles. Closes via Esc / Back / Close button.
+  showProfileManagement: false,
+  // Schedule recording modal — opened from MediaDetailPanel's Record button
+  // (live items only). The pending item is held aside so the modal can
+  // pre-fill channel_id / title without poking back into selectedItem.
+  showScheduleRecording: false,
+  scheduleRecordingItem: null,
   showVoicePicker: false,
   // EPG modal — opened from the "Guide" button in the header. Fetches
   // /api/epg via epgClient.fetchEPG(providerFilter, 4) on open. Closes on
@@ -424,15 +459,49 @@ function App() {
     });
   }
 
+  // Parental gate hook — used to guard handlePlay / handleStartDownload at
+  // the App level. See the import comment for why this duplicates the gate
+  // already mounted inside MediaDetailPanel.
+  var parentalGate = useParentalGate();
+
   React.useEffect(function() {
-    function onCtrlL(e) {
+    function onGlobalKey(e) {
+      // Bail when focus is in an editable field so "/" or Ctrl+K don't hijack
+      // typing inside the chatbot input, search box, etc. Tizen 6.5 has
+      // isContentEditable + tagName, so this check is safe.
+      var t = e.target;
+      var inEditable = !!t && (
+        t.tagName === 'INPUT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.tagName === 'SELECT' ||
+        (t.isContentEditable === true)
+      );
+
+      // Ctrl+L → layout switcher (existing)
       if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
         patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
+        return;
+      }
+
+      // Ctrl+K → global search (works from anywhere, including inputs)
+      if (e.ctrlKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        patchState(function(prev) { return Object.assign({}, prev, { showSearch: true }); });
+        return;
+      }
+
+      // "/" → global search (skipped when typing in a field — matches Vim,
+      // Stremio, GitHub conventions where slash is a search-from-anywhere
+      // shortcut that yields to the active editor).
+      if (e.key === '/' && !inEditable && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        patchState(function(prev) { return Object.assign({}, prev, { showSearch: true }); });
+        return;
       }
     }
-    document.addEventListener('keydown', onCtrlL);
-    return function() { document.removeEventListener('keydown', onCtrlL); };
+    document.addEventListener('keydown', onGlobalKey);
+    return function() { document.removeEventListener('keydown', onGlobalKey); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Samsung Tizen remote — color buttons + Smart Hub route to chatbot commands.
@@ -485,6 +554,18 @@ function App() {
           patchState({ showLayoutSwitcher: false });
           return true;
         }
+        if (state.showSearch) {
+          patchState({ showSearch: false });
+          return true;
+        }
+        if (state.showProfileManagement) {
+          patchState({ showProfileManagement: false });
+          return true;
+        }
+        if (state.showScheduleRecording) {
+          patchState({ showScheduleRecording: false, scheduleRecordingItem: null });
+          return true;
+        }
         if (state.selectedItem) {
           patchState({ selectedItem: null, selectedProviderId: null });
           return true;
@@ -509,7 +590,7 @@ function App() {
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch, state.showProfileManagement, state.showScheduleRecording]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
@@ -698,6 +779,21 @@ function App() {
   }
 
   function handlePlay(item, providerId) {
+    // Gate first — anyone calling handlePlay outside MediaDetailPanel
+    // (Multiview tile, future shell quick-play, etc.) is also protected.
+    // When the user comes from MediaDetailPanel the item is already in
+    // the hook's module-scoped unlock set, so isContentLocked returns
+    // false and we go straight through.
+    if (parentalGate.isContentLocked(item)) {
+      parentalGate.requestUnlock(item).then(function(res) {
+        if (res && res.ok) { _startPlayback(item, providerId); }
+      });
+      return;
+    }
+    _startPlayback(item, providerId);
+  }
+
+  function _startPlayback(item, providerId) {
     var profileId = (state.profile && state.profile.profile_id) || 'mom_tv';
     var args = { item_id: item.id, profile_id: profileId };
     if (providerId) { args.provider_id = providerId; }
@@ -724,6 +820,18 @@ function App() {
   // "download whole season N"; season + episode = "download S{nn}E{nn}".
   function handleStartDownload(item, opts) {
     if (!item || !item.id) { return; }
+    // Same gate as handlePlay — protects future call sites that bypass
+    // MediaDetailPanel (e.g. a "Download" chip on a long-press menu).
+    if (parentalGate.isContentLocked(item)) {
+      parentalGate.requestUnlock(item).then(function(res) {
+        if (res && res.ok) { _startDownload(item, opts); }
+      });
+      return;
+    }
+    _startDownload(item, opts);
+  }
+
+  function _startDownload(item, opts) {
     var pid = (state.profile && state.profile.profile_id) || 'mom_tv';
     var args = { item_id: item.id, profile_id: pid };
     if (opts && typeof opts.season === 'number' && opts.season > 0) { args.season = opts.season; }
@@ -826,6 +934,109 @@ function App() {
     patchState({ showSettings: false, showOnboarding: true });
   }
 
+  // Fired by ProfileManagementModal after any Add / Edit / Delete. Three
+  // cases the parent has to handle:
+  //   1. The active profile was deleted → profileStore auto-clears the
+  //      active id, so getActiveProfileId() is now null. Drop into the
+  //      profile picker so the user can pick a remaining profile.
+  //   2. The active profile was edited → re-read the live record so the
+  //      new theme / font scale / mom_mode applies immediately without
+  //      a reload. Tier is re-evaluated from tv_model.
+  //   3. A non-active profile was added/edited/deleted → no-op; the
+  //      modal's own list re-renders from its local snapshot.
+  function handleProfilesChange() {
+    var activeId = profileStore.getActiveProfileId();
+    if (!activeId) {
+      // Active profile was deleted — fall back to the picker.
+      patchState({ showProfileManagement: false, showProfilePicker: true, profile: null });
+      return;
+    }
+    var current = state.profile && state.profile.profile_id;
+    if (current && activeId === current) {
+      var live = profileStore.getProfile(activeId);
+      if (live) {
+        // The local store uses `id` while the API/state uses `profile_id`.
+        // Merge both for consumers that read either shape.
+        var merged = Object.assign({}, state.profile, live, { profile_id: live.id });
+        applyDocumentTheme(merged);
+        var nextTier = resolveTier(merged.tv_model || state.tvModel);
+        applyTierClasses(nextTier);
+        patchState({ profile: merged, tier: nextTier, tvModel: merged.tv_model || state.tvModel });
+      }
+    }
+  }
+
+  // Settings ▸ Manage profiles — opens the CRUD modal.
+  function handleManageProfiles() {
+    patchState({ showSettings: false, showProfileManagement: true });
+  }
+
+  // EPGModal ▸ click a program cell. Future programs route to the
+  // ScheduleRecordingModal with start_utc / end_utc pre-filled from the
+  // EPG entry; currently-airing programs route to handlePlay via the
+  // channel resolver so a single Enter key works for both cases.
+  function handleEPGProgramSelect(program) {
+    if (!program) { return; }
+    var startVal = program.start;
+    var startMs = (typeof startVal === 'number') ? startVal : Date.parse(startVal || '');
+    var endVal = program.end;
+    var endMs = (typeof endVal === 'number') ? endVal : Date.parse(endVal || '');
+    var now = Date.now();
+
+    if (isFinite(startMs) && startMs > now) {
+      // Future program → schedule. Synthesize an item that
+      // ScheduleRecordingModal can read directly (channel_id, title,
+      // start_utc, end_utc all flow through unchanged).
+      patchState({ showEPG: false });
+      handleScheduleRecording({
+        id: program.channel_id,
+        channel_id: program.channel_id,
+        title: program.title || '',
+        type: 'live',
+        start_utc: isFinite(startMs) ? new Date(startMs).toISOString() : undefined,
+        end_utc: isFinite(endMs) ? new Date(endMs).toISOString() : undefined,
+      });
+      return;
+    }
+
+    // Currently airing (or past — backend will reject if it's no longer
+    // streamable). Fall through to the channel resolver.
+    handleEPGChannelSelect({ id: program.channel_id, name: program.title || '' });
+  }
+
+  // EPGModal ▸ click a channel name in the sticky left column. Resolves
+  // the channel id to a catalog item and hands off to handlePlay. When
+  // the catalog doesn't carry the channel yet (iptv-org cron hasn't
+  // landed it), we still call handlePlay with a synthesized live item —
+  // /api/play decides whether it can serve a stream.
+  function handleEPGChannelSelect(channel) {
+    if (!channel || !channel.id) { return; }
+    patchState({ showEPG: false });
+    for (var i = 0; i < state.catalog.length; i++) {
+      if (String(state.catalog[i].id) === String(channel.id)) {
+        handlePlay(state.catalog[i], null);
+        return;
+      }
+    }
+    handlePlay({ id: channel.id, title: channel.name || '', type: 'live' }, null);
+  }
+
+  // MediaDetailPanel ▸ Record (live items) — opens ScheduleRecordingModal
+  // with the channel pre-selected. Parental-gated through the App-level
+  // hook so a PIN cap on the rating is enforced before scheduling.
+  function handleScheduleRecording(item) {
+    if (!item) { return; }
+    if (parentalGate.isContentLocked(item)) {
+      parentalGate.requestUnlock(item).then(function(res) {
+        if (res && res.ok) {
+          patchState({ showScheduleRecording: true, scheduleRecordingItem: item });
+        }
+      });
+      return;
+    }
+    patchState({ showScheduleRecording: true, scheduleRecordingItem: item });
+  }
+
   function handleChatbotCommand(commandResult) {
     var action = commandResult.action;
     var params = commandResult.params || {};
@@ -858,6 +1069,29 @@ function App() {
       }
     } else if (action === 'reset_filters') {
       patchState({ providerFilter: 'all', contentFilter: 'all', qualityFilter: 'all', actorFilter: null });
+    } else if (action === 'open_search') {
+      patchState({ showSearch: true });
+    } else if (action === 'schedule_recording') {
+      // Pick a target item: focused MediaDetailPanel item first, then the
+      // currently-playing PlayerModal ticket. Skip silently when nothing
+      // live is on screen — chatbot text response handles the "nothing to
+      // record right now" hint.
+      var target = null;
+      if (state.selectedItem && state.selectedItem.type === 'live') {
+        target = state.selectedItem;
+      } else if (state.showPlayer && state.playerTicket && state.playerTicket.item && state.playerTicket.item.type === 'live') {
+        target = state.playerTicket.item;
+      }
+      if (target) {
+        handleScheduleRecording(target);
+      }
+    } else if (action === 'play_this') {
+      // Same target-picking rule as schedule_recording, but works on every
+      // content type — movies, series, live, all play through handlePlay.
+      // Skip silently when nothing is focused.
+      if (state.selectedItem) {
+        handlePlay(state.selectedItem, state.selectedProviderId || null);
+      }
     }
     // show_detail and find_similar_actor: no state mutation needed (chatbot response text handles UX)
   }
@@ -1257,6 +1491,37 @@ function App() {
               &#x2699;
             </button>
 
+            {/* Global search button — opens SearchModal. Also wired to the
+                "/" and Ctrl+K keyboard shortcuts at the App level. Hits
+                /api/search through searchClient with a 200ms debounce. */}
+            <button
+              tabIndex={0}
+              onClick={function() { patchState({ showSearch: true }); }}
+              title="Search (/ or Ctrl+K)"
+              aria-label="Open search"
+              style={{
+                padding: '0.4rem 0.9rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text)',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+                letterSpacing: '0.03em',
+                flexShrink: 0,
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid var(--accent)';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              &#x1F50D; Search
+            </button>
+
             {/* TV Guide (EPG) button — opens the EPG modal. Reaches the
                 shipped EPGGrid via EPGModal which fetches /api/epg through
                 epgClient.fetchEPG(providerFilter, 4). Visible on every
@@ -1458,6 +1723,7 @@ function App() {
               onPlay={handlePlay}
               onFindSimilarActor={handleFindSimilarActor}
               onDownload={handleStartDownload}
+              onScheduleRecording={handleScheduleRecording}
               profileId={profile.profile_id || 'mom_tv'}
             />
           )}
@@ -1499,6 +1765,7 @@ function App() {
                   showMultiview: true,
                 });
               }}
+              onScheduleRecording={handleScheduleRecording}
             />
           )}
 
@@ -1531,6 +1798,7 @@ function App() {
               }}
               onResetDefaults={handleResetDefaults}
               onReplayOnboarding={handleReplayOnboarding}
+              onManageProfiles={handleManageProfiles}
               onThemeChange={function(themeName) {
                 applyThemeByName(themeName);
                 patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
@@ -1584,12 +1852,8 @@ function App() {
               isOpen={state.showEPG}
               providerFilter={state.providerFilter}
               onClose={function() { patchState({ showEPG: false }); }}
-              onProgramSelect={function(/* program */) {
-                // Future: resolve program.channel_id → catalog item, call handlePlay.
-              }}
-              onChannelSelect={function(/* channel */) {
-                // Future: resolve channel.id → catalog item, call handlePlay.
-              }}
+              onProgramSelect={handleEPGProgramSelect}
+              onChannelSelect={handleEPGChannelSelect}
             />
           )}
 
@@ -1621,6 +1885,57 @@ function App() {
             />
           )}
 
+          {/* Global search modal — opened from header Search button, "/"
+              keypress (outside editable fields), or Ctrl+K. Enter on a
+              result hands the item off to the regular detail panel flow
+              via handleItemClick so playback / favorites work end-to-end. */}
+          {state.showSearch && (
+            <SearchModal
+              isOpen={state.showSearch}
+              profileId={(state.profile && state.profile.profile_id) || 'mom_tv'}
+              onClose={function() { patchState({ showSearch: false }); }}
+              onItemSelect={function(item) {
+                patchState({ showSearch: false });
+                handleItemClick(item);
+              }}
+            />
+          )}
+
+          {/* Profile management — full CRUD over the local profileStore.
+              Opens from Settings ▸ Profile actions ▸ Manage profiles.
+              onProfilesChange refreshes state.profile in-place when the
+              active record changes, and falls back to the picker when
+              the active profile is deleted (profileStore auto-clears
+              the active id on delete). */}
+          {state.showProfileManagement && (
+            <ProfileManagementModal
+              isOpen={state.showProfileManagement}
+              onClose={function() { patchState({ showProfileManagement: false }); }}
+              onProfilesChange={handleProfilesChange}
+            />
+          )}
+
+          {/* Schedule recording — opens from MediaDetailPanel's Record
+              button for live items. The modal owns time / duration /
+              repeat / quality picking and posts to /api/dvr/schedule.
+              On success we just close; the user can review the result
+              in Settings ▸ Playback ▸ View all recordings. */}
+          {state.showScheduleRecording && state.scheduleRecordingItem && (
+            <ScheduleRecordingModal
+              isOpen={state.showScheduleRecording}
+              item={state.scheduleRecordingItem}
+              profileId={(state.profile && state.profile.profile_id) || 'mom_tv'}
+              tier={state.tier}
+              onClose={function() { patchState({ showScheduleRecording: false, scheduleRecordingItem: null }); }}
+              onScheduled={function() {
+                // The modal already shows its own success state and auto-
+                // closes; we just clean up the pending item so the next
+                // open re-reads from a fresh selection.
+                patchState({ showScheduleRecording: false, scheduleRecordingItem: null });
+              }}
+            />
+          )}
+
           {/* Voice picker modal — Mom can switch Azure voices seamlessly */}
           {state.showVoicePicker && (
             <VoicePickerModal
@@ -1639,6 +1954,12 @@ function App() {
             />
           )}
         </React.Suspense>
+
+        {/* App-level parental lock — sits above every modal because PIN
+            unlock can be requested from inside any flow (Multiview tile
+            click, handlePlay, handleStartDownload). The overlay is eager-
+            imported, so no Suspense wrap is needed. */}
+        <ParentalLockOverlay {...parentalGate.overlayProps} />
 
       </LayoutShell>
     </ThemeProvider>

@@ -305,34 +305,20 @@ function TvModelOption(props) {
 
 // ── Embedded profile picker — Step 3 ───────────────────────────────────────
 // We reuse ProfilePicker so we never drift from the production look.
-// onSelectInternal fires when the user picks Dave or Sherri (handled by
-// the existing ProfilePicker → profileStore wiring). The wizard then auto-
-// advances. "Create new profile" is shown alongside as a stub; tapping it
-// shows a small "coming soon" line so the user understands the option
-// exists without our wizard locking up. This matches the brief: the
-// production picker only ships Dave + Sherri today, and we don't redesign it.
+// onSelectInternal fires when the user picks an existing profile (handled
+// by the existing ProfilePicker → profileStore wiring) and the wizard
+// auto-advances. The embedded ProfilePicker also exposes an AddProfileTile
+// + a "Manage profiles" button which mount ProfileManagementModal directly,
+// so creating a new profile mid-wizard works out of the box. The modal's
+// z-index (1200) sits above the wizard (1100), so it paints over us.
 function EmbeddedProfileStep(props) {
   var onPicked = props.onPicked;
-
-  var newStub = React.useState(false);
-  var showStub = newStub[0];
-  var setShowStub = newStub[1];
 
   function handleProfileSelected(profileId) {
     // ProfilePicker already calls profileStore.setActiveProfileId before
     // invoking onSelect — see ProfilePicker.jsx. We just need to notify
     // the wizard so it can advance.
     if (typeof onPicked === 'function') { onPicked(profileId); }
-  }
-
-  function handleNewProfileClick() {
-    setShowStub(true);
-  }
-  function handleNewProfileKey(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleNewProfileClick();
-    }
   }
 
   return (
@@ -373,50 +359,6 @@ function EmbeddedProfileStep(props) {
           </div>
         </div>
       </div>
-
-      <button
-        type="button"
-        tabIndex={0}
-        onClick={handleNewProfileClick}
-        onKeyDown={handleNewProfileKey}
-        aria-label="Create new profile"
-        style={{
-          padding: '0.8rem 1.6rem',
-          backgroundColor: 'transparent',
-          border: '1px dashed var(--border, #30363d)',
-          borderRadius: '14px',
-          color: 'var(--muted, #8b949e)',
-          cursor: 'pointer',
-          fontSize: 'calc(0.95rem * var(--font-scale, 1))',
-          fontWeight: '700',
-          outline: 'none',
-          transition: 'border-color 180ms ease, color 180ms ease',
-        }}
-        onFocus={function(e) {
-          e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)';
-          e.currentTarget.style.outlineOffset = '2px';
-        }}
-        onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
-      >
-        + Create new profile
-      </button>
-
-      {showStub ? (
-        <p
-          role="status"
-          aria-live="polite"
-          style={{
-            margin: 0,
-            color: 'var(--muted, #8b949e)',
-            fontSize: 'calc(0.85rem * var(--font-scale, 1))',
-            textAlign: 'center',
-            maxWidth: '480px',
-          }}
-        >
-          New profiles are coming soon — Sherri and Dave cover the household for now.
-          Pick one of the existing profiles to continue.
-        </p>
-      ) : null}
     </div>
   );
 }

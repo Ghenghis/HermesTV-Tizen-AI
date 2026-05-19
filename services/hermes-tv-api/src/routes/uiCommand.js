@@ -125,6 +125,33 @@ const COMMAND_TABLE = [
     action: 'update_theme',
     params: { theme: 'mom-calm' },
   },
+  // --- Search overlay ---
+  // Resolves on the client side to opening the SearchModal — there's no
+  // server-side search bound to this; the modal handles the query itself.
+  {
+    patterns: ['search', 'open search', 'search for', 'find something'],
+    action: 'open_search',
+    params: {},
+  },
+  // --- Schedule recording ---
+  // The client picks the target item from state (focused MediaDetailPanel
+  // item, or the currently-playing PlayerModal ticket). `target: 'current'`
+  // is a hint, not a hard rule — the client may ignore it if nothing is on
+  // screen.
+  {
+    patterns: ['record this', 'schedule recording', 'record now'],
+    action: 'schedule_recording',
+    params: { target: 'current' },
+  },
+  // --- Play focused item ---
+  // Symmetric with schedule_recording — when the user has an item on screen
+  // (catalog tile selected, MediaDetailPanel open), this routes to handlePlay.
+  // No-op when nothing is focused, same convention.
+  {
+    patterns: ['play this', 'play it', 'watch this', 'watch it'],
+    action: 'play_this',
+    params: { target: 'current' },
+  },
   // --- Reset ---
   {
     patterns: ['reset filters', 'clear filters', 'show everything'],
@@ -136,7 +163,7 @@ const COMMAND_TABLE = [
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
 const NO_MATCH_ERROR =
-  'Command not recognized. Try: show movies, mom mode, dark theme, show 4K, show sports, reset filters';
+  'Command not recognized. Try: show movies, mom mode, dark theme, show 4K, search, play this, record this, reset filters';
 
 /**
  * Resolve a trimmed, lowercased command string against the command table.

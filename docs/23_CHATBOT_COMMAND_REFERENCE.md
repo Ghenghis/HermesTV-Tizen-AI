@@ -1,7 +1,7 @@
 # HermesTV — Chatbot Command Reference
 
-**Version:** 1.0.0
-**Date:** 2026-05-17
+**Version:** 1.1.0
+**Date:** 2026-05-19
 **For:** Dave and Sherri
 
 This guide explains how to use the HermesTV chatbot and covers every command you can say or type to it.
@@ -95,6 +95,36 @@ These switch the whole app to a preset bundle of layout, theme, and content filt
 |---|---|
 | `what is this` | Shows information about the currently selected channel or title — name, description, genre, and quality |
 | `find more with this actor` | Searches the catalog for other titles featuring the actor shown in the current selection |
+
+### Search
+
+| Say this... | What happens |
+|---|---|
+| `search` | Opens the global search overlay (same as pressing **/** or **Ctrl+K** on the keyboard) |
+| `open search` | Same as `search` |
+| `search for` | Same as `search` |
+| `find something` | Same as `search` |
+
+### Play the Focused Item
+
+These act on whatever you have selected on screen — a tile in the catalog, a card in the detail panel, etc. If nothing is focused, the command is a silent no-op.
+
+| Say this... | What happens |
+|---|---|
+| `play this` | Starts playback of the focused item |
+| `play it` | Same as `play this` |
+| `watch this` | Same as `play this` |
+| `watch it` | Same as `play this` |
+
+### Record (DVR)
+
+These open the **Schedule Recording** dialog for whatever live channel is on screen — the focused MediaDetailPanel item, or the channel currently in PlayerModal. If nothing live is on screen, the command is a silent no-op.
+
+| Say this... | What happens |
+|---|---|
+| `record this` | Opens Schedule Recording for the focused live channel |
+| `schedule recording` | Same as `record this` |
+| `record now` | Same as `record this` |
 
 ---
 

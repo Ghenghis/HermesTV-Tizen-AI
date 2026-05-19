@@ -19,6 +19,7 @@ function MediaDetailPanel(props) {
   var onPlay = props.onPlay;  // (item, providerId?) → parent calls /api/play
   var onFindSimilarActor = props.onFindSimilarActor;  // (actor) → parent filters catalog by actor_id
   var onDownload = props.onDownload;  // (item) → parent opens DownloadModal w/ /api/download envelope
+  var onScheduleRecording = props.onScheduleRecording;  // (item) → parent opens ScheduleRecordingModal (live items only)
   // Profile id is read from props.profileId when wired, otherwise we use a
   // shared 'shared' bucket so the toggle still works for unauthenticated
   // sessions. App.jsx can pass props.profileId in a follow-up.
@@ -554,6 +555,49 @@ function MediaDetailPanel(props) {
             >
               {canPlay ? '▶ Watch' : '▶ Provider not configured'}
             </button>
+
+            {/* Record button — live channels only. Opens the App-level
+                ScheduleRecordingModal which posts to /api/dvr/schedule.
+                Parental gating happens at the App handler too so a PIN
+                prompt covers this path even when the gate cache is empty.
+                Hidden + skipped when the parent didn't wire the callback. */}
+            {item.type === 'live' && typeof onScheduleRecording === 'function' && (
+              <button
+                tabIndex={0}
+                title="Schedule a recording for this channel"
+                aria-label={'Record ' + (item.title || 'channel')}
+                onClick={function() {
+                  if (parentalGate.isContentLocked(item)) {
+                    parentalGate.requestUnlock(item).then(function(res) {
+                      if (res && res.ok) { onScheduleRecording(item); }
+                    });
+                    return;
+                  }
+                  onScheduleRecording(item);
+                }}
+                style={{
+                  padding: '0.7rem 1.3rem',
+                  fontSize: 'calc(0.9rem * var(--font-scale, 1))',
+                  fontWeight: 700,
+                  color: 'var(--text, #e6edf3)',
+                  background: 'transparent',
+                  border: '1px solid var(--border, #30363d)',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  transition: 'border-color 160ms ease, background-color 160ms ease',
+                }}
+                onMouseEnter={function(e) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.borderColor = 'var(--border, #30363d)'; e.currentTarget.style.background = 'transparent'; }}
+                onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent)'; e.currentTarget.style.outlineOffset = '2px'; }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              >
+                <span aria-hidden="true" style={{ color: '#ef4444' }}>●</span> Record
+              </button>
+            )}
 
             {/* Download button — Zero-shell parity. Opens the exact-size
                 modal which calls POST /api/download. Disabled when no
