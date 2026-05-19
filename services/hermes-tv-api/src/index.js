@@ -27,6 +27,12 @@ const playRouter = require('./routes/play');
 const downloadsRouter = require('./routes/downloads');
 const pairingRouter = require('./routes/pairing');
 const playlistsRouter = require('./routes/playlists');
+const dvrRouter = require('./routes/dvr');
+const catchupRouter = require('./routes/catchup');
+const seriesRouter = require('./routes/series');
+const parentalRouter = require('./routes/parental');
+const searchRouter = require('./routes/search');
+const backupRouter = require('./routes/backup');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -86,6 +92,13 @@ app.use('/', pairingRouter);
 // enforce the same cap in code (MAX_UPLOAD_BYTES) for defense-in-depth.
 app.use(/^\/api\/playlists(\/|$)/, express.json({ limit: '10mb' }));
 app.use('/', playlistsRouter);
+// New Tauri-equivalent surfaces (see services/hermes-tv-api/src/routes/{dvr,catchup,series,parental,search,backup}.js)
+app.use('/', dvrRouter);
+app.use('/', catchupRouter);
+app.use('/', seriesRouter);
+app.use('/', parentalRouter);
+app.use('/', searchRouter);
+app.use('/', backupRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {

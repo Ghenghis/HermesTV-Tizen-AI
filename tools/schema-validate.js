@@ -293,5 +293,127 @@ if (fs.existsSync(epgRoutePath) && fs.existsSync(apiIndexPath)) {
   fail('epg.js or index.js not found');
 }
 
+// --- Tauri-equivalent route modules (PR: feat/backend-tauri-equivalent-endpoints) ---
+// Each new route module must:
+//   1. Exist on disk.
+//   2. Export an Express Router (module.exports = router).
+//   3. Register all expected endpoints (text-grep against the source file —
+//      we don't boot Express for the schema validator, this stays fast).
+console.log('\n--- Tauri-equivalent route modules ---');
+
+function checkRouteModule(label, relPath, expectedEndpoints) {
+  var abs = path.join(REPO, relPath);
+  if (!fs.existsSync(abs)) {
+    fail(label + ' — file missing: ' + relPath);
+    return;
+  }
+  var src = fs.readFileSync(abs, 'utf8');
+  if (!/module\.exports\s*=\s*router/.test(src)) {
+    fail(label + ' — must export `module.exports = router`');
+    return;
+  }
+  pass(label + ' — file exists and exports router');
+
+  expectedEndpoints.forEach(function(ep) {
+    // Match: router.get('/api/foo', ...) | router.post('/api/foo', ...)
+    // We escape /:/ and ensure the path appears anywhere in a router.* call.
+    var safePath = ep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var pattern = new RegExp('router\\.' + ep.method.toLowerCase() + '\\(\\s*[\'"`]' + safePath + '[\'"`]', 'i');
+    if (pattern.test(src)) {
+      pass(label + ' — ' + ep.method + ' ' + ep.path);
+    } else {
+      fail(label + ' — missing endpoint ' + ep.method + ' ' + ep.path);
+    }
+  });
+}
+
+// EPG (existing route extended with new endpoints)
+checkRouteModule('routes/epg.js', 'services/hermes-tv-api/src/routes/epg.js', [
+  { method: 'GET',   path: '/api/epg/coverage' },
+  { method: 'GET',   path: '/api/epg/settings' },
+  { method: 'PATCH', path: '/api/epg/settings' },
+  { method: 'POST',  path: '/api/epg/refresh' },
+  { method: 'POST',  path: '/api/epg/clear' },
+  { method: 'POST',  path: '/api/epg/import-xmltv' },
+  { method: 'GET',   path: '/api/epg/suggest-channels' },
+  { method: 'POST',  path: '/api/epg/mapping' },
+  { method: 'GET',   path: '/api/epg/:channelId' },
+]);
+
+// DVR
+checkRouteModule('routes/dvr.js', 'services/hermes-tv-api/src/routes/dvr.js', [
+  { method: 'POST',   path: '/api/dvr/schedule' },
+  { method: 'GET',    path: '/api/dvr/recordings' },
+  { method: 'GET',    path: '/api/dvr/recording/:id' },
+  { method: 'DELETE', path: '/api/dvr/recording/:id' },
+  { method: 'GET',    path: '/api/dvr/settings' },
+  { method: 'PATCH',  path: '/api/dvr/settings' },
+  { method: 'POST',   path: '/api/dvr/recording/:id/poster' },
+  { method: 'DELETE', path: '/api/dvr/recording/:id/poster' },
+]);
+
+// Catchup
+checkRouteModule('routes/catchup.js', 'services/hermes-tv-api/src/routes/catchup.js', [
+  { method: 'GET',  path: '/api/catchup/:channelId' },
+  { method: 'POST', path: '/api/catchup/play' },
+]);
+
+// Series + Movies + Continue-Watching
+checkRouteModule('routes/series.js', 'services/hermes-tv-api/src/routes/series.js', [
+  { method: 'GET',    path: '/api/series' },
+  { method: 'GET',    path: '/api/series/:seriesId' },
+  { method: 'GET',    path: '/api/series/:seriesId/next-episode' },
+  { method: 'POST',   path: '/api/series/episode/watched' },
+  { method: 'POST',   path: '/api/series/episodes/watched' },
+  { method: 'POST',   path: '/api/series/episodes/unwatched' },
+  { method: 'POST',   path: '/api/series/:seriesId/favorite' },
+  { method: 'POST',   path: '/api/movies/:movieId/watched' },
+  { method: 'POST',   path: '/api/movies/:movieId/favorite' },
+  { method: 'GET',    path: '/api/continue-watching' },
+  { method: 'POST',   path: '/api/continue-watching' },
+  { method: 'DELETE', path: '/api/continue-watching/:itemId' },
+]);
+
+// Parental
+checkRouteModule('routes/parental.js', 'services/hermes-tv-api/src/routes/parental.js', [
+  { method: 'GET',    path: '/api/parental' },
+  { method: 'POST',   path: '/api/parental/pin' },
+  { method: 'DELETE', path: '/api/parental/pin' },
+  { method: 'POST',   path: '/api/parental/verify' },
+  { method: 'POST',   path: '/api/parental/lock' },
+  { method: 'POST',   path: '/api/parental/unlock' },
+]);
+
+// Search
+checkRouteModule('routes/search.js', 'services/hermes-tv-api/src/routes/search.js', [
+  { method: 'GET', path: '/api/search' },
+  { method: 'GET', path: '/api/search/actor/:actorId' },
+  { method: 'GET', path: '/api/search/category/:category' },
+]);
+
+// Backup
+checkRouteModule('routes/backup.js', 'services/hermes-tv-api/src/routes/backup.js', [
+  { method: 'GET',  path: '/api/backup/export' },
+  { method: 'POST', path: '/api/backup/import' },
+]);
+
+// Index router registration check — make sure every new module is mounted.
+console.log('\n--- index.js router registration ---');
+var indexPath = path.join(REPO, 'services/hermes-tv-api/src/index.js');
+if (fs.existsSync(indexPath)) {
+  var indexSrc = fs.readFileSync(indexPath, 'utf8');
+  ['dvrRouter', 'catchupRouter', 'seriesRouter', 'parentalRouter', 'searchRouter', 'backupRouter'].forEach(function(name) {
+    var requirePattern = new RegExp('require\\([\'"`]\\./routes/' + name.replace(/Router$/, '') + '[\'"`]\\)');
+    var usePattern = new RegExp('app\\.use\\([^)]+,\\s*' + name + '\\s*\\)');
+    if (requirePattern.test(indexSrc) && usePattern.test(indexSrc)) {
+      pass('index.js — ' + name + ' required + mounted');
+    } else {
+      fail('index.js — ' + name + ' must be required AND mounted via app.use()');
+    }
+  });
+} else {
+  fail('services/hermes-tv-api/src/index.js missing');
+}
+
 console.log('\n=== Results: ' + totalPass + ' PASS, ' + totalFail + ' FAIL ===');
 process.exit(totalFail > 0 ? 1 : 0);
