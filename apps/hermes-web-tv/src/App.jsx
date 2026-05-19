@@ -38,6 +38,14 @@ import * as onboardingState from './store/onboardingState.js';
 // same render-time cost. App.jsx mounts it as a second entry point from
 // Settings ▸ Profile actions so the user doesn't have to log out to edit.
 import ProfileManagementModal from './components/ProfileManagementModal.jsx';
+// Parental lock — the hook + overlay shipped in #102 already protect the
+// MediaDetailPanel's Play / Download buttons. Mounted at App level too so
+// any caller that goes through handlePlay / handleStartDownload — Multiview
+// tile-click, future shell quick-play, search-result direct-play — is
+// covered by the same PIN gate. The hook's unlock cache is module-scoped,
+// so unlocks made in MediaDetailPanel apply at App level and vice versa.
+import ParentalLockOverlay from './components/ParentalLockOverlay.jsx';
+import useParentalGate from './hooks/useParentalGate.js';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -441,6 +449,11 @@ function App() {
     });
   }
 
+  // Parental gate hook — used to guard handlePlay / handleStartDownload at
+  // the App level. See the import comment for why this duplicates the gate
+  // already mounted inside MediaDetailPanel.
+  var parentalGate = useParentalGate();
+
   React.useEffect(function() {
     function onGlobalKey(e) {
       // Bail when focus is in an editable field so "/" or Ctrl+K don't hijack
@@ -752,6 +765,21 @@ function App() {
   }
 
   function handlePlay(item, providerId) {
+    // Gate first — anyone calling handlePlay outside MediaDetailPanel
+    // (Multiview tile, future shell quick-play, etc.) is also protected.
+    // When the user comes from MediaDetailPanel the item is already in
+    // the hook's module-scoped unlock set, so isContentLocked returns
+    // false and we go straight through.
+    if (parentalGate.isContentLocked(item)) {
+      parentalGate.requestUnlock(item).then(function(res) {
+        if (res && res.ok) { _startPlayback(item, providerId); }
+      });
+      return;
+    }
+    _startPlayback(item, providerId);
+  }
+
+  function _startPlayback(item, providerId) {
     var profileId = (state.profile && state.profile.profile_id) || 'mom_tv';
     var args = { item_id: item.id, profile_id: profileId };
     if (providerId) { args.provider_id = providerId; }
@@ -778,6 +806,18 @@ function App() {
   // "download whole season N"; season + episode = "download S{nn}E{nn}".
   function handleStartDownload(item, opts) {
     if (!item || !item.id) { return; }
+    // Same gate as handlePlay — protects future call sites that bypass
+    // MediaDetailPanel (e.g. a "Download" chip on a long-press menu).
+    if (parentalGate.isContentLocked(item)) {
+      parentalGate.requestUnlock(item).then(function(res) {
+        if (res && res.ok) { _startDownload(item, opts); }
+      });
+      return;
+    }
+    _startDownload(item, opts);
+  }
+
+  function _startDownload(item, opts) {
     var pid = (state.profile && state.profile.profile_id) || 'mom_tv';
     var args = { item_id: item.id, profile_id: pid };
     if (opts && typeof opts.season === 'number' && opts.season > 0) { args.season = opts.season; }
@@ -1792,6 +1832,12 @@ function App() {
             />
           )}
         </React.Suspense>
+
+        {/* App-level parental lock — sits above every modal because PIN
+            unlock can be requested from inside any flow (Multiview tile
+            click, handlePlay, handleStartDownload). The overlay is eager-
+            imported, so no Suspense wrap is needed. */}
+        <ParentalLockOverlay {...parentalGate.overlayProps} />
 
       </LayoutShell>
     </ThemeProvider>
