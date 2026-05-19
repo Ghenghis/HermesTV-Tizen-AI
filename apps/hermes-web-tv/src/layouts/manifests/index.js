@@ -11,6 +11,7 @@ import extremeInfinitv from './extreme-infinitv.json';
 import stremio from './stremio.json';
 import liveTv from './live-tv.json';
 import iptvnator from './iptvnator.json';
+import ynotv from './ynotv.json';
 
-export const ALL_LAYOUTS = [tivimate, netflix, plex, appleTv, samsungTizen, momMode, davePower, zero, nuvio, extremeInfinitv, stremio, liveTv, iptvnator];
+export const ALL_LAYOUTS = [tivimate, netflix, plex, appleTv, samsungTizen, momMode, davePower, zero, nuvio, extremeInfinitv, stremio, liveTv, iptvnator, ynotv];
 export default ALL_LAYOUTS;
