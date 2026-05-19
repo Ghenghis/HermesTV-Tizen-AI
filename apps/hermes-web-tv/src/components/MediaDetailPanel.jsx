@@ -92,6 +92,7 @@ function MediaDetailPanel(props) {
       aria-modal="true"
       aria-label={'Details for ' + title}
       onClick={handleBackdropClick}
+      className="hermes-modal-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -99,27 +100,30 @@ function MediaDetailPanel(props) {
         width: '100%',
         height: '100%',
         zIndex: 50,
-        backgroundColor: 'rgba(0,0,0,0.88)',
+        backgroundColor: 'rgba(8,12,20,0.78)',
         overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
-      {/* Inner panel — constrained width, centred */}
+      {/* Inner panel — constrained width, centred. Soft drop-shadow + 18px
+          radius + scale-in entrance choreographed by .hermes-modal-panel. */}
       <div
+        className="hermes-modal-panel"
         style={{
           position: 'relative',
           margin: '2rem auto',
           width: '100%',
           maxWidth: '900px',
           backgroundColor: 'var(--surface)',
-          borderRadius: '12px',
+          border: '1px solid var(--border, #30363d)',
+          borderRadius: '20px',
           overflow: 'hidden',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.7)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02) inset',
           color: 'var(--text)',
         }}
       >
-        {/* Close button — top-right */}
+        {/* Close button — circular, soft hover bg, accent focus ring */}
         <button
           tabIndex={0}
           autoFocus
@@ -127,15 +131,15 @@ function MediaDetailPanel(props) {
           aria-label="Close details"
           style={{
             position: 'absolute',
-            top: '0.75rem',
-            right: '0.75rem',
-            width: '36px',
-            height: '36px',
+            top: '0.9rem',
+            right: '0.9rem',
+            width: '40px',
+            height: '40px',
             borderRadius: '50%',
             backgroundColor: 'rgba(0,0,0,0.55)',
             border: '1px solid var(--border, #30363d)',
             color: '#ffffff',
-            fontSize: '1.1rem',
+            fontSize: '1.2rem',
             fontWeight: '700',
             cursor: 'pointer',
             display: 'flex',
@@ -144,13 +148,26 @@ function MediaDetailPanel(props) {
             zIndex: 10,
             outline: 'none',
             lineHeight: '1',
+            transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}
+          onMouseEnter={function(e) {
+            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.14)';
+            e.currentTarget.style.transform = 'scale(1.06)';
+          }}
+          onMouseLeave={function(e) {
+            e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.55)';
+            e.currentTarget.style.transform = 'scale(1)';
           }}
           onFocus={function(e) {
             e.currentTarget.style.outline = '2px solid var(--accent)';
             e.currentTarget.style.outlineOffset = '2px';
+            e.currentTarget.style.transform = 'scale(1.06)';
           }}
           onBlur={function(e) {
             e.currentTarget.style.outline = 'none';
+            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
           &times;
@@ -230,7 +247,7 @@ function MediaDetailPanel(props) {
               </span>
             )}
 
-            {/* MPAA rating */}
+            {/* MPAA rating — rounded-pill */}
             {ratingMpaa && (
               <span
                 style={{
@@ -238,17 +255,18 @@ function MediaDetailPanel(props) {
                   fontWeight: '700',
                   color: 'var(--muted)',
                   border: '1px solid var(--border, #30363d)',
-                  borderRadius: '3px',
-                  padding: '0.1rem 0.4rem',
+                  borderRadius: '999px',
+                  padding: '0.15rem 0.55rem',
                   alignSelf: 'center',
                   flexShrink: 0,
+                  background: 'rgba(255,255,255,0.04)',
                 }}
               >
                 {ratingMpaa}
               </span>
             )}
 
-            {/* Resolution badge */}
+            {/* Resolution badge — rounded-pill */}
             {resolution && (
               <span
                 style={{
@@ -256,28 +274,32 @@ function MediaDetailPanel(props) {
                   fontWeight: '700',
                   color: 'var(--text)',
                   border: '1px solid var(--border, #30363d)',
-                  borderRadius: '3px',
-                  padding: '0.1rem 0.4rem',
+                  borderRadius: '999px',
+                  padding: '0.15rem 0.55rem',
                   alignSelf: 'center',
                   flexShrink: 0,
+                  background: 'rgba(255,255,255,0.04)',
                 }}
               >
                 {resolution}
               </span>
             )}
 
-            {/* HDR badge */}
+            {/* HDR badge — pill with soft glow */}
             {hasHdr && (
               <span
                 style={{
                   fontSize: 'calc(0.7rem * var(--font-scale, 1))',
-                  fontWeight: '700',
-                  color: '#a78bfa',
-                  border: '1px solid #a78bfa',
-                  borderRadius: '3px',
-                  padding: '0.1rem 0.4rem',
+                  fontWeight: '800',
+                  color: '#ffffff',
+                  border: '1px solid rgba(167,139,250,0.6)',
+                  borderRadius: '999px',
+                  padding: '0.15rem 0.55rem',
                   alignSelf: 'center',
                   flexShrink: 0,
+                  background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+                  boxShadow: '0 0 8px rgba(167,139,250,0.35) inset',
+                  letterSpacing: '0.05em',
                 }}
               >
                 HDR
@@ -314,24 +336,30 @@ function MediaDetailPanel(props) {
                 }
               }}
               style={{
-                padding: '0.75rem 1.5rem',
+                padding: '0.8rem 1.8rem',
                 fontSize: 'calc(1rem * var(--font-scale, 1))',
                 fontWeight: 800,
                 color: canPlay ? '#fff' : 'var(--muted, #8b949e)',
-                backgroundColor: canPlay ? '#e50914' : 'transparent',
+                background: canPlay ? 'linear-gradient(135deg, #e50914, #c1121f 60%, #6366f1)' : 'transparent',
                 border: canPlay ? 'none' : '1px solid var(--border, #30363d)',
-                borderRadius: '6px',
+                borderRadius: '999px',
                 cursor: canPlay ? 'pointer' : 'not-allowed',
                 outline: 'none',
                 opacity: canPlay ? 1 : 0.65,
+                boxShadow: canPlay ? '0 6px 18px rgba(229,9,20,0.35)' : 'none',
+                transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), opacity 160ms ease',
+                letterSpacing: '0.02em',
               }}
               onFocus={function(e) {
                 if (canPlay) {
                   e.currentTarget.style.outline = '3px solid #fff';
-                  e.currentTarget.style.outlineOffset = '2px';
+                  e.currentTarget.style.outlineOffset = '3px';
+                  e.currentTarget.style.transform = 'scale(1.05)';
                 }
               }}
-              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
+              onMouseEnter={function(e) { if (canPlay) e.currentTarget.style.transform = 'scale(1.03)'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
             >
               {canPlay ? '▶ Watch' : '▶ Provider not configured'}
             </button>
@@ -353,19 +381,27 @@ function MediaDetailPanel(props) {
                 }}
                 aria-label={'Download ' + (item.title || 'item')}
                 style={{
-                  padding: '0.75rem 1.2rem',
+                  padding: '0.7rem 1.3rem',
                   fontSize: 'calc(0.9rem * var(--font-scale, 1))',
                   fontWeight: 700,
                   color: canPlay ? 'var(--text, #e6edf3)' : 'var(--muted, #8b949e)',
                   background: 'transparent',
                   border: '1px solid var(--border, #30363d)',
-                  borderRadius: '6px',
+                  borderRadius: '10px',
                   cursor: canPlay ? 'pointer' : 'not-allowed',
                   outline: 'none',
                   opacity: canPlay ? 1 : 0.6,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.35rem',
+                  gap: '0.4rem',
+                  transition: 'border-color 160ms ease, background-color 160ms ease',
+                }}
+                onMouseEnter={function(e) {
+                  if (canPlay) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }
+                }}
+                onMouseLeave={function(e) {
+                  e.currentTarget.style.borderColor = 'var(--border, #30363d)';
+                  e.currentTarget.style.background = 'transparent';
                 }}
                 onFocus={function(e) {
                   if (canPlay) {
@@ -473,13 +509,16 @@ function MediaDetailPanel(props) {
           {/* Similar titles — fetch pending until W3-B3 lands. Skeleton
               rows beat the old static "coming soon" line because the user
               sees where the recommendations will appear instead of a
-              dead-end placeholder. */}
+              dead-end placeholder. Polished with 12px radius + inner shadow
+              for depth. */}
           <div
             aria-label="Loading similar titles"
             style={{
-              padding: '0.75rem',
+              padding: '0.9rem',
               backgroundColor: 'var(--surface-raised, #1c2128)',
-              borderRadius: '8px',
+              borderRadius: '12px',
+              border: '1px solid var(--border, #30363d)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 24px rgba(0,0,0,0.25)',
               marginTop: '1.25rem',
             }}
           >

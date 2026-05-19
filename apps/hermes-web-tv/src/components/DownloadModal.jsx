@@ -66,11 +66,12 @@ function DownloadModal(props) {
       onClick={function(e) {
         if (e.target === e.currentTarget && typeof onClose === 'function') { onClose(); }
       }}
+      className="hermes-modal-overlay"
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
         zIndex: 70,
-        background: 'rgba(0, 0, 0, 0.7)',
+        background: 'rgba(5,8,14,0.78)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -78,29 +79,43 @@ function DownloadModal(props) {
       }}
     >
       <div
+        className="hermes-modal-panel"
         style={{
           width: '100%',
           maxWidth: '520px',
           background: 'var(--surface, #112240)',
           color: 'var(--text, #e0f2fe)',
           border: '1px solid var(--border, #1c3a5e)',
-          borderRadius: '14px',
-          padding: '1.4rem 1.4rem 1.2rem',
-          boxShadow: '0 16px 48px rgba(0,0,0,0.55)',
+          borderRadius: '20px',
+          padding: '0',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.02) inset',
+          overflow: 'hidden',
         }}
       >
-        {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
+        {/* Gradient header band */}
+        <div
+          className="hermes-gradient-header"
+          style={{
+            padding: '1.2rem 1.4rem 1.1rem',
+            borderBottom: '1px solid var(--border, #1c3a5e)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
             <div
               aria-hidden="true"
               style={{
-                width: '44px', height: '44px', flexShrink: 0,
-                borderRadius: '10px',
-                background: 'rgba(0, 212, 255, 0.12)',
+                width: '46px', height: '46px', flexShrink: 0,
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, rgba(0,212,255,0.22), rgba(99,102,241,0.16))',
+                border: '1px solid rgba(0,212,255,0.28)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--accent, #00d4ff)',
-                fontSize: '20px',
+                fontSize: '22px',
+                boxShadow: '0 4px 12px rgba(0,212,255,0.18)',
               }}
             >⤓</div>
             <div>
@@ -149,25 +164,38 @@ function DownloadModal(props) {
             onClick={function() { if (typeof onClose === 'function') { onClose(); } }}
             style={{
               flexShrink: 0,
-              width: '32px', height: '32px',
+              width: '38px', height: '38px',
               borderRadius: '50%',
               background: 'rgba(255,255,255,0.06)',
               border: '1px solid var(--border, #1c3a5e)',
               color: 'var(--text, #e0f2fe)',
               cursor: 'pointer',
-              fontSize: '14px',
+              fontSize: '16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              outline: 'none',
+              transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
+              lineHeight: 1,
             }}
+            onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+            onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
+            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #00d4ff)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+            onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
           >&times;</button>
         </div>
+
+        {/* Body wrapper — restored padding now that header is its own band */}
+        <div style={{ padding: '1.1rem 1.4rem 1.2rem' }}>
 
         {/* Body: size pill, error notice, or queued confirmation */}
         <div
           style={{
-            marginTop: '1.1rem',
             padding: '1rem 1.1rem',
             background: 'var(--bg, #0a1628)',
             border: '1px solid var(--border, #1c3a5e)',
-            borderRadius: '10px',
+            borderRadius: '12px',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 24px rgba(0,0,0,0.3)',
           }}
         >
           {isError && (
@@ -279,7 +307,7 @@ function DownloadModal(props) {
                 disabled={pending || !sizeHuman}
                 onClick={function() { if (typeof onProceed === 'function' && sizeHuman && !pending) { onProceed(); } }}
                 style={{
-                  padding: '0.55rem 1.4rem',
+                  padding: '0.6rem 1.6rem',
                   background: 'linear-gradient(135deg, var(--accent, #00d4ff), #6366f1)',
                   border: 'none',
                   borderRadius: '999px',
@@ -289,9 +317,13 @@ function DownloadModal(props) {
                   cursor: pending ? 'not-allowed' : 'pointer',
                   opacity: pending ? 0.6 : 1,
                   outline: 'none',
+                  boxShadow: '0 6px 18px rgba(0,212,255,0.28)',
+                  transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), box-shadow 160ms ease',
                 }}
-                onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 212, 255, 0.4)'; }}
-                onBlur={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
+                onMouseEnter={function(e) { if (!pending) e.currentTarget.style.transform = 'scale(1.03)'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
+                onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 212, 255, 0.45), 0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1.05)'; }}
+                onBlur={function(e) { e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 Proceed
               </button>
@@ -304,7 +336,7 @@ function DownloadModal(props) {
               autoFocus
               onClick={function() { if (typeof onClose === 'function') { onClose(); } }}
               style={{
-                padding: '0.55rem 1.4rem',
+                padding: '0.6rem 1.6rem',
                 background: 'linear-gradient(135deg, var(--accent, #00d4ff), #6366f1)',
                 border: 'none',
                 borderRadius: '999px',
@@ -313,13 +345,18 @@ function DownloadModal(props) {
                 fontWeight: 800,
                 cursor: 'pointer',
                 outline: 'none',
+                boxShadow: '0 6px 18px rgba(0,212,255,0.28)',
+                transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), box-shadow 160ms ease',
               }}
-              onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 212, 255, 0.4)'; }}
-              onBlur={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
+              onMouseEnter={function(e) { e.currentTarget.style.transform = 'scale(1.03)'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
+              onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 212, 255, 0.45), 0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1.05)'; }}
+              onBlur={function(e) { e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,212,255,0.28)'; e.currentTarget.style.transform = 'scale(1)'; }}
             >
               Close
             </button>
           )}
+        </div>
         </div>
       </div>
     </div>

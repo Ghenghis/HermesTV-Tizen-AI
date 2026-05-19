@@ -51,24 +51,37 @@ function CommandChips(props) {
             aria-label={'Send: ' + chip.label}
             style={{
               flexShrink: 0,
-              padding: '0.25rem 0.65rem',
-              fontSize: 'calc(0.7rem * var(--font-scale, 1))',
-              fontWeight: '600',
-              backgroundColor: 'transparent',
+              padding: '0.35rem 0.85rem',
+              fontSize: 'calc(0.72rem * var(--font-scale, 1))',
+              fontWeight: '700',
+              background: 'transparent',
               border: '1px solid var(--accent)',
-              borderRadius: '12px',
+              borderRadius: '999px',
               color: 'var(--accent)',
               cursor: 'pointer',
               outline: 'none',
               whiteSpace: 'nowrap',
-              transition: 'background-color 0.1s',
+              transition: 'background-color 160ms ease, transform 160ms cubic-bezier(0.16,1,0.3,1), color 160ms ease',
+              willChange: 'transform',
+            }}
+            onMouseEnter={function(e) {
+              e.currentTarget.style.background = 'var(--accent)';
+              e.currentTarget.style.color = '#0a1628';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={function(e) {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = 'var(--accent)';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
             onFocus={function(e) {
               e.currentTarget.style.outline = '2px solid var(--accent)';
               e.currentTarget.style.outlineOffset = '2px';
+              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onBlur={function(e) {
               e.currentTarget.style.outline = 'none';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             {chip.label}
