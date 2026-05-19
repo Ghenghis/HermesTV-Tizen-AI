@@ -7,6 +7,7 @@ import { SkeletonRow } from './Skeleton.jsx';
 import ParentalLockOverlay from './ParentalLockOverlay.jsx';
 import useParentalGate from '../hooks/useParentalGate.js';
 import { getSkipIntro, setSkipIntro } from '../store/skipIntroPrefStore.js';
+import useFavorites from '../hooks/useFavorites.js';
 
 function MediaDetailPanel(props) {
   var item = props.item || {};
@@ -94,6 +95,13 @@ function MediaDetailPanel(props) {
     setSkipIntro(profileId, next);
   }
 
+  // Favorites — useFavorites owns the IDB read on mount + the optimistic
+  // toggle. The heart button below reflects fav.isFavorite(item.id) and
+  // calls fav.toggleFavorite(item) on click. Per-profile keyed via
+  // profileId so Sherri and Dave never share favorites.
+  var fav = useFavorites(profileId);
+  var isFavorited = fav.isFavorite(item && item.id);
+
   // Quality fields
   var quality = item.quality || {};
   var resolution = item.resolution || quality.resolution || '';
@@ -162,6 +170,75 @@ function MediaDetailPanel(props) {
           color: 'var(--text)',
         }}
       >
+        {/* Favorite heart button — sits to the LEFT of the close X so the
+            top-right area still anchors close. Filled red heart = favorited,
+            outline = not. Tap-target is 40x40 to match Close. */}
+        <button
+          type="button"
+          tabIndex={0}
+          onClick={function() { if (item && item.id) { fav.toggleFavorite(item); } }}
+          onKeyDown={function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              if (item && item.id) { fav.toggleFavorite(item); }
+            }
+          }}
+          aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          aria-pressed={isFavorited}
+          title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          style={{
+            position: 'absolute',
+            top: '0.9rem',
+            right: '3.4rem',
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: isFavorited ? 'rgba(239,68,68,0.18)' : 'rgba(0,0,0,0.55)',
+            border: '1px solid ' + (isFavorited ? '#ef4444' : 'var(--border, #30363d)'),
+            color: isFavorited ? '#ef4444' : '#ffffff',
+            fontSize: '1.2rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+            outline: 'none',
+            lineHeight: '1',
+            padding: 0,
+            transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease, color 160ms ease',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}
+          onMouseEnter={function(e) {
+            e.currentTarget.style.transform = 'scale(1.08)';
+          }}
+          onMouseLeave={function(e) {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          onFocus={function(e) {
+            e.currentTarget.style.outline = '2px solid var(--accent)';
+            e.currentTarget.style.outlineOffset = '2px';
+            e.currentTarget.style.transform = 'scale(1.08)';
+          }}
+          onBlur={function(e) {
+            e.currentTarget.style.outline = 'none';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          {/* Heart glyph — filled solid heart vs outline heart. Inline SVG
+              so we don't depend on font ranges that may differ on Tizen. */}
+          {isFavorited ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 21s-7.5-4.6-10-9.2C0.6 8.6 2 4.5 5.7 4 8 3.7 10 5 12 7c2-2 4-3.3 6.3-3 3.7 0.5 5.1 4.6 3.7 7.8C19.5 16.4 12 21 12 21z" />
+            </svg>
+          )}
+        </button>
+
         {/* Close button — circular, soft hover bg, accent focus ring */}
         <button
           tabIndex={0}

@@ -47,6 +47,15 @@ var MediaDetailPanel = React.lazy(function() { return import('./components/Media
 // PlaylistImportModal is the 3-step wizard launched from Settings ▸ Playlists.
 // Lazy-loaded so its ~12 kB chunk only ships when the operator opens it.
 var PlaylistImportModal = React.lazy(function() { return import('./components/PlaylistImportModal.jsx'); });
+// EPGModal hosts the shipped EPGGrid behind a thin loading/error shell.
+// Opened from the "Guide" button in the header. Lazy so the 14 kB EPGGrid
+// payload (incl. virtualizer) only ships when the user opens it.
+var EPGModal = React.lazy(function() { return import('./components/EPGModal.jsx'); });
+// MultiviewModal hosts the shipped MultiviewPlayer + LayoutPicker. Opened
+// from the "Multi" button in the header (and from the PlayerModal toolbar
+// in a follow-up). Lazy so the four-stream HLS surface doesn't bloat the
+// initial paint.
+var MultiviewModal = React.lazy(function() { return import('./components/MultiviewModal.jsx'); });
 
 // Determine tier from TV model prefix
 // QN prefix → enhanced, UN prefix → degraded, custom → enhanced (assume capable TV)
@@ -351,6 +360,15 @@ var INITIAL_STATE = {
   activeLayout: '',
   showLayoutSwitcher: false,
   showVoicePicker: false,
+  // EPG modal — opened from the "Guide" button in the header. Fetches
+  // /api/epg via epgClient.fetchEPG(providerFilter, 4) on open. Closes on
+  // Escape / Tizen Back via the cascade in installTizenKeyHandler below.
+  showEPG: false,
+  // Multiview modal — opened from the "Multi" button in the header. On
+  // open, MultiviewModal pulls the last 4 watched LIVE channels from
+  // watchHistoryStore and joins them against the in-memory catalog so it
+  // can resolve stream_url + title for each tile.
+  showMultiview: false,
   activeVoiceId: '',
   // Selected item for detail panel
   selectedItem: null,
@@ -434,6 +452,14 @@ function App() {
           patchState({ showPlayer: false, playerTicket: null, playerError: '' });
           return true;
         }
+        if (state.showMultiview) {
+          patchState({ showMultiview: false });
+          return true;
+        }
+        if (state.showEPG) {
+          patchState({ showEPG: false });
+          return true;
+        }
         if (state.showVoicePicker) {
           patchState({ showVoicePicker: false });
           return true;
@@ -466,7 +492,7 @@ function App() {
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
@@ -1168,6 +1194,69 @@ function App() {
               &#x2699;
             </button>
 
+            {/* TV Guide (EPG) button — opens the EPG modal. Reaches the
+                shipped EPGGrid via EPGModal which fetches /api/epg through
+                epgClient.fetchEPG(providerFilter, 4). Visible on every
+                shell because it's parked in the App-level header. */}
+            <button
+              tabIndex={0}
+              onClick={function() { patchState({ showEPG: true }); }}
+              title="TV Guide"
+              aria-label="Open TV Guide"
+              style={{
+                padding: '0.4rem 0.9rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text)',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+                letterSpacing: '0.03em',
+                flexShrink: 0,
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid var(--accent)';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              &#x1F4FA; Guide
+            </button>
+
+            {/* Multiview button — opens the MultiviewModal which uses the
+                shipped MultiviewPlayer + LayoutPicker and seeds tiles from
+                watchHistoryStore.listRecent(profile.id, 4). */}
+            <button
+              tabIndex={0}
+              onClick={function() { patchState({ showMultiview: true }); }}
+              title="Multiview — watch up to 4 channels at once"
+              aria-label="Open Multiview"
+              style={{
+                padding: '0.4rem 0.9rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text)',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+                letterSpacing: '0.03em',
+                flexShrink: 0,
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid var(--accent)';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              &#x25A6; Multi
+            </button>
+
             {/* Layout switcher button */}
             <button
               tabIndex={0}
@@ -1306,6 +1395,7 @@ function App() {
               onPlay={handlePlay}
               onFindSimilarActor={handleFindSimilarActor}
               onDownload={handleStartDownload}
+              profileId={profile.profile_id || 'mom_tv'}
             />
           )}
 
@@ -1334,6 +1424,18 @@ function App() {
               ticket={state.playerTicket}
               error={state.playerError}
               onClose={handleClosePlayer}
+              profileId={profile.profile_id || 'mom_tv'}
+              onOpenMultiview={function(/* item */) {
+                // Close the single-stream player so Multiview can take the
+                // foreground. Tile click inside Multiview can promote a
+                // stream back to single-stream via handlePlay.
+                patchState({
+                  showPlayer: false,
+                  playerTicket: null,
+                  playerError: '',
+                  showMultiview: true,
+                });
+              }}
             />
           )}
 
@@ -1404,6 +1506,53 @@ function App() {
                 }).catch(function() {
                   patchState({ showPlaylistImport: false, showSettings: true });
                 });
+              }}
+            />
+          )}
+
+          {/* EPG modal — TV Guide grid, opened from the "Guide" header
+              button. Esc / Tizen Back close it (cascade above). Program
+              selection currently logs to console; downstream wire-up
+              (open PlayerModal for the program's channel) lands when the
+              EPG → channel resolver is exposed by the API. */}
+          {state.showEPG && (
+            <EPGModal
+              isOpen={state.showEPG}
+              providerFilter={state.providerFilter}
+              onClose={function() { patchState({ showEPG: false }); }}
+              onProgramSelect={function(/* program */) {
+                // Future: resolve program.channel_id → catalog item, call handlePlay.
+              }}
+              onChannelSelect={function(/* channel */) {
+                // Future: resolve channel.id → catalog item, call handlePlay.
+              }}
+            />
+          )}
+
+          {/* Multiview modal — 2-4 simultaneous tiles seeded by the user's
+              last 4 watched channels. Tile click hands the stream off to
+              the single-stream PlayerModal so the user can promote a tile
+              to fullscreen without losing the watched-progress wiring. */}
+          {state.showMultiview && (
+            <MultiviewModal
+              isOpen={state.showMultiview}
+              profileId={profile.profile_id || 'mom_tv'}
+              catalog={state.catalog}
+              tier={state.tier}
+              onClose={function() { patchState({ showMultiview: false }); }}
+              onStreamSelect={function(stream) {
+                // Find the matching catalog item so handlePlay can drive
+                // the regular /api/play ticket flow. Fall back to closing
+                // Multiview only if the join fails — silent no-op is OK
+                // because the user can still keep watching the grid.
+                if (!stream || !stream.id) { return; }
+                for (var k = 0; k < state.catalog.length; k++) {
+                  if (String(state.catalog[k].id) === String(stream.id)) {
+                    patchState({ showMultiview: false });
+                    handlePlay(state.catalog[k], null);
+                    return;
+                  }
+                }
               }}
             />
           )}

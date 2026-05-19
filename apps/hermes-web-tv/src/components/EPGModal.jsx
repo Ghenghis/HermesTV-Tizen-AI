@@ -1,0 +1,249 @@
+import React from 'react';
+import EPGGrid from './EPGGrid.jsx';
+import { SkeletonRow } from './Skeleton.jsx';
+import { fetchEPG } from '../api/epgClient.js';
+
+// EPGModal — full-screen modal that wraps the shipped EPGGrid component.
+// Fetches /api/epg via the epgClient on mount, shows a skeleton while
+// loading, surfaces an operator-actionable error banner on failure, and
+// closes on Escape / Tizen Back. The grid itself handles keyboard nav.
+//
+// Reached from the "EPG" button in the App header (always visible) so the
+// user can launch the guide without opening the LayoutSwitcher modal.
+// Per the wiring spec: data comes from fetchEPG(providerFilter, 4) — i.e.
+// whichever provider is currently selected in the FilterBar, with a 4 hour
+// look-ahead window matching the EPGGrid default render window.
+//
+// Tizen 6.5 / Chrome 76 safe — no destructuring in params, no arrow funcs,
+// no optional chaining, no nullish coalescing.
+
+function EPGModal(props) {
+  var isOpen = props.isOpen;
+  var providerFilter = props.providerFilter;
+  var onClose = props.onClose;
+  var onProgramSelect = props.onProgramSelect;
+  var onChannelSelect = props.onChannelSelect;
+
+  // Local fetch state — { status, channels, programs, errorMessage }.
+  // status: 'idle' | 'loading' | 'ready' | 'error'.
+  var dataResult = React.useState({ status: 'idle', channels: [], programs: [], errorMessage: '' });
+  var data = dataResult[0];
+  var setData = dataResult[1];
+
+  // Esc / Tizen Back closes — keyboard nav inside the grid is owned by
+  // EPGGrid itself, so we only handle the modal-level escape here.
+  React.useEffect(function() {
+    if (!isOpen) { return undefined; }
+    function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Back' || e.keyCode === 10009) {
+        e.preventDefault();
+        if (onClose) { onClose(); }
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return function() { document.removeEventListener('keydown', onKey); };
+  }, [isOpen, onClose]);
+
+  // Re-fetch whenever the modal opens or the provider filter changes. The
+  // fetchEPG call already maps providerFilter='all' → empty string for the
+  // backend's "default provider" path.
+  React.useEffect(function() {
+    if (!isOpen) { return undefined; }
+    var cancelled = false;
+    setData({ status: 'loading', channels: [], programs: [], errorMessage: '' });
+    var provider = providerFilter && providerFilter !== 'all' ? providerFilter : '';
+    fetchEPG(provider, 4).then(function(body) {
+      if (cancelled) { return; }
+      setData({
+        status: 'ready',
+        channels: body.channels || [],
+        programs: body.programs || [],
+        errorMessage: '',
+      });
+    }).catch(function(err) {
+      if (cancelled) { return; }
+      var msg = (err && err.message) ? err.message : 'EPG fetch failed';
+      setData({ status: 'error', channels: [], programs: [], errorMessage: msg });
+    });
+    return function() { cancelled = true; };
+  }, [isOpen, providerFilter]);
+
+  if (!isOpen) { return null; }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Electronic Program Guide"
+      onClick={function(e) { if (e.target === e.currentTarget && onClose) { onClose(); } }}
+      className="hermes-modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 70,
+        backgroundColor: 'rgba(5,8,14,0.86)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem',
+      }}
+    >
+      <div
+        className="hermes-modal-panel"
+        style={{
+          width: '100%',
+          maxWidth: '1320px',
+          height: '92vh',
+          backgroundColor: 'var(--surface, #161b22)',
+          border: '1px solid var(--border, #30363d)',
+          borderRadius: 'var(--radius-lg, 20px)',
+          color: 'var(--text, #e6edf3)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: '0 28px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02) inset',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="hermes-gradient-header"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '1rem 1.25rem',
+            borderBottom: '1px solid var(--border, #30363d)',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, fontSize: 'calc(1.05rem * var(--font-scale, 1))', letterSpacing: '0.01em' }}>
+              TV Guide
+            </span>
+            <span
+              style={{
+                fontSize: 'calc(0.7rem * var(--font-scale, 1))',
+                fontWeight: 700,
+                color: 'var(--muted, #8b949e)',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-pill, 999px)',
+                padding: '0.15rem 0.55rem',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                background: 'rgba(255,255,255,0.04)',
+              }}
+            >
+              {providerFilter && providerFilter !== 'all' ? providerFilter : 'all providers'}
+            </span>
+            {data.status === 'ready' && (
+              <span
+                style={{
+                  fontSize: 'calc(0.72rem * var(--font-scale, 1))',
+                  color: 'var(--muted, #8b949e)',
+                }}
+              >
+                {data.channels.length} channels &middot; {data.programs.length} programs
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            tabIndex={0}
+            autoFocus
+            onClick={onClose}
+            aria-label="Close TV Guide"
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--border, #30363d)',
+              color: 'var(--text, #e6edf3)',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              padding: 0,
+              outline: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 160ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)), background-color 160ms ease',
+              lineHeight: 1,
+            }}
+            onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+            onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
+            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)'; e.currentTarget.style.outlineOffset = '2px'; }}
+            onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '0.75rem' }}>
+          {(data.status === 'idle' || data.status === 'loading') && (
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label="Loading TV guide"
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                padding: '0.5rem',
+                backgroundColor: 'var(--bg, #0d1117)',
+                borderRadius: 'var(--radius-md, 12px)',
+                overflow: 'hidden',
+              }}
+            >
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+          )}
+
+          {data.status === 'error' && (
+            <div
+              role="alert"
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem',
+                color: 'var(--muted, #8b949e)',
+                textAlign: 'center',
+                padding: '2rem',
+              }}
+            >
+              <div style={{ fontSize: '2rem', color: '#e3b341' }}>&#x26A0;</div>
+              <div style={{ fontWeight: 600, fontSize: 'calc(1rem * var(--font-scale, 1))', color: 'var(--text, #e6edf3)' }}>
+                Could not load TV guide
+              </div>
+              <div style={{ fontSize: 'calc(0.85rem * var(--font-scale, 1))', maxWidth: '520px' }}>
+                {data.errorMessage}
+              </div>
+            </div>
+          )}
+
+          {data.status === 'ready' && (
+            <EPGGrid
+              channels={data.channels}
+              programs={data.programs}
+              onProgramSelect={onProgramSelect}
+              onChannelSelect={onChannelSelect}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default EPGModal;
