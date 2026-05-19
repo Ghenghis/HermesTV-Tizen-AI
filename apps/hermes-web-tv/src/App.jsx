@@ -26,6 +26,12 @@ import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
 // `t` directly from `./i18n/...`; this top-level import just guarantees
 // the module evaluates eagerly rather than lazily with the first modal.
 import './i18n/index.js';
+// First-launch onboarding — eager because it gates the very first paint
+// path. Lazy-loading would add a render-blocking suspense fallback in front
+// of Step 1, which is the opposite of the wizard's "drop the user straight
+// in" intent. The wizard itself lazy-loads PlaylistImport + QR internally.
+import OnboardingWizard from './components/OnboardingWizard.jsx';
+import * as onboardingState from './store/onboardingState.js';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -343,6 +349,10 @@ var INITIAL_STATE = {
   tvModel: 'QN85Q7FAAFXZA',
   online: true,
   showProfilePicker: false,
+  // First-launch onboarding overlay. Set true by the boot useEffect when
+  // there's no active profile AND the onboarded flag has never been set,
+  // or by the Settings ▸ Replay onboarding action.
+  showOnboarding: false,
   showQR: false,
   showSettings: false,
   // Playlist Import wizard — opened from Settings ▸ Playlists ▸ + Import playlist.
@@ -487,19 +497,33 @@ function App() {
           patchState({ showQR: false });
           return true;
         }
+        // First-launch wizard owns its own Esc → skip-confirm flow. Swallow
+        // Tizen Back here so an accidental remote press during onboarding
+        // can't drop Sherri back to Smart Hub mid-flow. The Skip link in
+        // the wizard's header is the deliberate exit path.
+        if (state.showOnboarding) {
+          return true;
+        }
         // Nothing to dismiss — let the OS handle Back at the profile picker.
         return false;
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
     var profileId = profileStore.getActiveProfileId();
 
     if (!profileId) {
-      patchState({ loading: false, showProfilePicker: true });
+      // Fresh install (no household has used this TV) AND the user has never
+      // completed or skipped onboarding → show the wizard. Returning users
+      // who skipped previously still hit the bare ProfilePicker, as before.
+      if (!onboardingState.isOnboarded()) {
+        patchState({ loading: false, showOnboarding: true });
+      } else {
+        patchState({ loading: false, showProfilePicker: true });
+      }
       return;
     }
 
@@ -533,7 +557,17 @@ function App() {
       var isOnline = reachable;
 
       return api.getProfile(profileId).then(function(profile) {
-        var tvModel = profile.tv_model || state.tvModel;
+        // Wizard Step 2 persists the operator's explicit TV-model choice to
+        // `hermestv:tv_model`. We prefer that over the seeded profile.tv_model
+        // so Sherri's "QN85" answer (or Dave's "UN55") wins on the very first
+        // paint after onboarding, before any /api/profile PATCH catches up.
+        var storedTvModel = null;
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            storedTvModel = window.localStorage.getItem('hermestv:tv_model');
+          }
+        } catch (e) { /* silent */ }
+        var tvModel = storedTvModel || profile.tv_model || state.tvModel;
         var tier = resolveTier(tvModel);
         applyDocumentTheme(profile);
         applyTierClasses(tier);
@@ -771,6 +805,27 @@ function App() {
     applyTierClasses(resolveTier('QN85Q7FAAFXZA'));
   }
 
+  // Called when the wizard exits — either via Step 5 "Start watching" or via
+  // the Skip confirm prompt. Step 3 ("Profile") may have set profileStore via
+  // the embedded ProfilePicker, so we re-read the id and either boot normally
+  // or fall through to the standalone ProfilePicker.
+  function handleOnboardingComplete(/* { skipped } */) {
+    var profileId = profileStore.getActiveProfileId();
+    if (profileId) {
+      patchState({ showOnboarding: false });
+      bootWithProfileId(profileId);
+    } else {
+      patchState({ showOnboarding: false, showProfilePicker: true });
+    }
+  }
+
+  // Settings ▸ Replay onboarding — clears the persisted flag + per-step
+  // answers and re-shows the wizard. Useful for QA and accidental skips.
+  function handleReplayOnboarding() {
+    onboardingState.reset();
+    patchState({ showSettings: false, showOnboarding: true });
+  }
+
   function handleChatbotCommand(commandResult) {
     var action = commandResult.action;
     var params = commandResult.params || {};
@@ -812,6 +867,14 @@ function App() {
     if (layoutId) {
       applyThemeByName(layoutId);
     }
+  }
+
+  // ── First-launch onboarding wizard ──
+  // Owns the whole viewport while open. The wizard self-manages its keyboard
+  // model (Arrow nav + Esc → skip-confirm) and persists onboarded=true on
+  // every exit path, so the boot useEffect never re-prompts after.
+  if (state.showOnboarding) {
+    return <OnboardingWizard isOpen onComplete={handleOnboardingComplete} />;
   }
 
   // ── Profile picker ──
@@ -1467,6 +1530,7 @@ function App() {
                 }));
               }}
               onResetDefaults={handleResetDefaults}
+              onReplayOnboarding={handleReplayOnboarding}
               onThemeChange={function(themeName) {
                 applyThemeByName(themeName);
                 patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
