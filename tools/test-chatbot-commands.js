@@ -50,6 +50,10 @@ var VALID_COMMANDS = [
   { text: 'reset filters', expectedAction: 'reset_filters' },
   { text: 'clear filters', expectedAction: 'reset_filters' },
   { text: 'show everything', expectedAction: 'reset_filters' },
+  { text: 'search', expectedAction: 'open_search' },
+  { text: 'open search', expectedAction: 'open_search' },
+  { text: 'record this', expectedAction: 'schedule_recording' },
+  { text: 'schedule recording', expectedAction: 'schedule_recording' },
 ];
 
 // Commands that should return { valid: false }
