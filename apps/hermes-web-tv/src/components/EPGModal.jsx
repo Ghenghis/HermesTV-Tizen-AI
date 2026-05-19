@@ -17,12 +17,68 @@ import { fetchEPG } from '../api/epgClient.js';
 // Tizen 6.5 / Chrome 76 safe — no destructuring in params, no arrow funcs,
 // no optional chaining, no nullish coalescing.
 
+// ── Day tabs ──────────────────────────────────────────────────────────────
+// Three views, all backed by the same /api/epg endpoint:
+//   now      — 4-hour rolling window anchored at "now - 30min" (legacy)
+//   today    — from "now - 30min" to midnight, max 24h
+//   tomorrow — from tomorrow 00:00 local to tomorrow 23:59 local (24h)
+// The client converts the local midnight boundaries to ISO and passes them
+// as `start`. Hours = ceil((end - start) / 1h). The backend honours start
+// when supplied and caps `hours` at 48.
+var DAY_TABS = [
+  { id: 'now',      label: 'Now'      },
+  { id: 'today',    label: 'Today'    },
+  { id: 'tomorrow', label: 'Tomorrow' },
+];
+
+function _localMidnight(daysFromToday) {
+  var d = new Date();
+  d.setDate(d.getDate() + daysFromToday);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Resolve a tab id to { hours, startIso, windowStartMs, hoursForward }.
+// hours/startIso feed fetchEPG; windowStartMs/hoursForward feed EPGGrid.
+function _tabWindow(tabId) {
+  if (tabId === 'today') {
+    var nowMs = Date.now();
+    var anchorMs = nowMs - 30 * 60 * 1000;
+    var endMs = _localMidnight(1).getTime();
+    var hoursToEnd = Math.max(1, Math.ceil((endMs - anchorMs) / (60 * 60 * 1000)));
+    return {
+      hours: Math.min(48, hoursToEnd),
+      startIso: new Date(anchorMs).toISOString(),
+      windowStartMs: anchorMs,
+      hoursForward: Math.min(48, hoursToEnd),
+    };
+  }
+  if (tabId === 'tomorrow') {
+    var startMs = _localMidnight(1).getTime();
+    return {
+      hours: 24,
+      startIso: new Date(startMs).toISOString(),
+      windowStartMs: startMs,
+      hoursForward: 24,
+    };
+  }
+  // 'now' (default) — legacy 4-hour rolling window. Omit startIso so the
+  // backend uses its own `now - 30min` anchor.
+  return { hours: 4, startIso: '', windowStartMs: undefined, hoursForward: 4 };
+}
+
 function EPGModal(props) {
   var isOpen = props.isOpen;
   var providerFilter = props.providerFilter;
   var onClose = props.onClose;
   var onProgramSelect = props.onProgramSelect;
   var onChannelSelect = props.onChannelSelect;
+
+  // Active day tab — defaults to 'now' so opening the modal looks
+  // identical to before this PR.
+  var tabResult = React.useState('now');
+  var activeTab = tabResult[0];
+  var setActiveTab = tabResult[1];
 
   // Local fetch state — { status, channels, programs, errorMessage }.
   // status: 'idle' | 'loading' | 'ready' | 'error'.
@@ -44,15 +100,17 @@ function EPGModal(props) {
     return function() { document.removeEventListener('keydown', onKey); };
   }, [isOpen, onClose]);
 
-  // Re-fetch whenever the modal opens or the provider filter changes. The
-  // fetchEPG call already maps providerFilter='all' → empty string for the
-  // backend's "default provider" path.
+  // Re-fetch whenever the modal opens, the provider filter changes, or the
+  // user switches day tabs. fetchEPG maps providerFilter='all' → empty
+  // string for the backend's "default provider" path. The tab resolves to
+  // hours + an optional startIso anchor — see _tabWindow above.
   React.useEffect(function() {
     if (!isOpen) { return undefined; }
     var cancelled = false;
     setData({ status: 'loading', channels: [], programs: [], errorMessage: '' });
     var provider = providerFilter && providerFilter !== 'all' ? providerFilter : '';
-    fetchEPG(provider, 4).then(function(body) {
+    var win = _tabWindow(activeTab);
+    fetchEPG(provider, win.hours, win.startIso).then(function(body) {
       if (cancelled) { return; }
       setData({
         status: 'ready',
@@ -66,7 +124,7 @@ function EPGModal(props) {
       setData({ status: 'error', channels: [], programs: [], errorMessage: msg });
     });
     return function() { cancelled = true; };
-  }, [isOpen, providerFilter]);
+  }, [isOpen, providerFilter, activeTab]);
 
   if (!isOpen) { return null; }
 
@@ -145,6 +203,52 @@ function EPGModal(props) {
                 {data.channels.length} channels &middot; {data.programs.length} programs
               </span>
             )}
+
+            {/* Day tabs — Now / Today / Tomorrow. Switching re-fetches with
+                a different window anchor. Disabled while a fetch is in
+                flight so rapid clicks can't pile up requests. */}
+            <div
+              role="tablist"
+              aria-label="EPG day"
+              style={{ display: 'inline-flex', gap: '0.35rem', marginLeft: '0.5rem' }}
+            >
+              {DAY_TABS.map(function(t) {
+                var active = t.id === activeTab;
+                var loading = data.status === 'loading';
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    tabIndex={0}
+                    disabled={loading && !active}
+                    onClick={function() { if (!loading || active) { setActiveTab(t.id); } }}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      fontSize: 'calc(0.78rem * var(--font-scale, 1))',
+                      fontWeight: active ? 800 : 600,
+                      color: active ? 'var(--text, #e6edf3)' : 'var(--muted, #8b949e)',
+                      background: active ? 'rgba(31,111,235,0.18)' : 'transparent',
+                      border: '1px solid ' + (active ? 'var(--accent, #1f6feb)' : 'var(--border, #30363d)'),
+                      borderRadius: 'var(--radius-pill, 999px)',
+                      cursor: (loading && !active) ? 'wait' : 'pointer',
+                      letterSpacing: '0.03em',
+                      outline: 'none',
+                      transition: 'border-color 140ms ease, color 140ms ease, background-color 140ms ease',
+                      opacity: (loading && !active) ? 0.55 : 1,
+                    }}
+                    onFocus={function(e) {
+                      e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)';
+                      e.currentTarget.style.outlineOffset = '2px';
+                    }}
+                    onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <button
             type="button"
@@ -232,14 +336,19 @@ function EPGModal(props) {
             </div>
           )}
 
-          {data.status === 'ready' && (
-            <EPGGrid
-              channels={data.channels}
-              programs={data.programs}
-              onProgramSelect={onProgramSelect}
-              onChannelSelect={onChannelSelect}
-            />
-          )}
+          {data.status === 'ready' && (function() {
+            var win = _tabWindow(activeTab);
+            return (
+              <EPGGrid
+                channels={data.channels}
+                programs={data.programs}
+                onProgramSelect={onProgramSelect}
+                onChannelSelect={onChannelSelect}
+                windowStartMs={win.windowStartMs}
+                hoursForward={win.hoursForward}
+              />
+            );
+          })()}
         </div>
       </div>
     </div>

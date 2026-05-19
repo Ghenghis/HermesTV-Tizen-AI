@@ -71,11 +71,17 @@ function EPGGrid(props) {
   var onProgramSelect = props.onProgramSelect || null;
   var onChannelSelect = props.onChannelSelect || null;
 
-  // The grid window starts on the previous :00 / :30 boundary so the time
-  // header reads as a real EPG. We render 8 slots (4 hours) by default.
-  var defaultHours = 4;
-  var slotsToShow = (defaultHours * 60) / SLOT_MINUTES;
-  var gridStartMs = floorToSlot(nowMs);
+  // Window controls — when the caller (EPGModal) passes day-tab params we
+  // honour them; otherwise we default to the original "4 hours starting at
+  // the previous :00/:30 boundary from now" behaviour so existing callers
+  // are unchanged.
+  var hoursForward = (typeof props.hoursForward === 'number' && props.hoursForward > 0)
+    ? props.hoursForward
+    : 4;
+  var slotsToShow = (hoursForward * 60) / SLOT_MINUTES;
+  var gridStartMs = (typeof props.windowStartMs === 'number')
+    ? floorToSlot(props.windowStartMs)
+    : floorToSlot(nowMs);
   var gridEndMs = gridStartMs + (slotsToShow * SLOT_MINUTES * 60 * 1000);
 
   // Build the time-header slot list once per render.
