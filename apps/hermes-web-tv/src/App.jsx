@@ -96,12 +96,13 @@ function FilterBar(props) {
   var selectStyle = {
     backgroundColor: 'var(--surface-raised, #1c2128)',
     border: '1px solid var(--border, #30363d)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-md)',
     color: 'var(--text)',
     fontSize: 'calc(0.85rem * var(--font-scale, 1))',
     padding: '0.4rem 0.75rem',
     cursor: 'pointer',
     outline: 'none',
+    transition: 'border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out)',
   };
 
   return (
@@ -192,8 +193,8 @@ function ModelSelector(props) {
     fontSize: 'calc(0.65rem * var(--font-scale, 1))',
     fontWeight: '700',
     border: '1px solid',
-    borderRadius: '3px',
-    padding: '0.1rem 0.4rem',
+    borderRadius: 'var(--radius-pill)',
+    padding: '0.15rem 0.55rem',
     letterSpacing: '0.05em',
     marginLeft: '0.3rem',
     color: tier === 'enhanced' ? '#FFD700' : 'var(--muted)',
@@ -212,12 +213,13 @@ function ModelSelector(props) {
         style={{
           backgroundColor: 'var(--surface-raised, #1c2128)',
           border: '1px solid var(--border, #30363d)',
-          borderRadius: '5px',
+          borderRadius: 'var(--radius-md)',
           color: 'var(--text)',
           fontSize: 'calc(0.75rem * var(--font-scale, 1))',
-          padding: '0.25rem 0.5rem',
+          padding: '0.25rem 0.6rem',
           cursor: 'pointer',
           outline: 'none',
+          transition: 'border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out)',
         }}
       >
         <option value="QN85Q7FAAFXZA">QN85Q7FAAFXZA</option>
@@ -854,14 +856,16 @@ function App() {
             }}
             style={{
               padding: '0.6rem 1.5rem',
-              backgroundColor: '#1f6feb',
+              background: 'var(--gradient-accent, linear-gradient(135deg, #1f6feb, #6366f1))',
               border: '1px solid #1f6feb',
-              borderRadius: '8px',
+              borderRadius: 'var(--radius-md)',
               color: '#fff',
               fontWeight: '700',
               cursor: 'pointer',
               fontSize: '1rem',
               outline: 'none',
+              boxShadow: 'var(--shadow-md)',
+              transition: 'transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out)',
             }}
             onFocus={function(e) { e.currentTarget.style.outline = '3px solid #fff'; e.currentTarget.style.outlineOffset = '2px'; }}
             onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
@@ -878,11 +882,12 @@ function App() {
               padding: '0.6rem 1.5rem',
               backgroundColor: '#161b22',
               border: '1px solid #30363d',
-              borderRadius: '8px',
+              borderRadius: 'var(--radius-md)',
               color: '#e6edf3',
               cursor: 'pointer',
               fontSize: '1rem',
               outline: 'none',
+              transition: 'border-color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
             }}
             onFocus={function(e) { e.currentTarget.style.outline = '2px solid #1f6feb'; e.currentTarget.style.outlineOffset = '2px'; }}
             onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
@@ -965,15 +970,16 @@ function App() {
               }}
               aria-label={'Clear actor filter (' + state.actorFilter.name + ')'}
               style={{
-                padding: '0.3rem 0.8rem',
+                padding: '0.3rem 0.9rem',
                 backgroundColor: 'rgba(0,0,0,0.25)',
                 border: '1px solid rgba(255,255,255,0.4)',
-                borderRadius: '5px',
+                borderRadius: 'var(--radius-pill)',
                 color: '#ffffff',
                 fontSize: 'calc(0.75rem * var(--font-scale, 1))',
                 fontWeight: '700',
                 cursor: 'pointer',
                 outline: 'none',
+                transition: 'background-color 200ms var(--ease-out)',
               }}
               onFocus={function(e) {
                 e.currentTarget.style.outline = '2px solid #ffffff';
@@ -1016,11 +1022,13 @@ function App() {
                 style={{
                   fontSize: 'calc(0.65rem * var(--font-scale, 1))',
                   fontWeight: '700',
-                  color: 'var(--accent)',
-                  border: '1px solid var(--accent)',
-                  borderRadius: '3px',
-                  padding: '0.1rem 0.4rem',
-                  letterSpacing: '0.05em',
+                  color: '#fff',
+                  border: '1px solid transparent',
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '0.15rem 0.65rem',
+                  letterSpacing: '0.06em',
+                  background: 'var(--gradient-accent, linear-gradient(135deg, var(--accent), #6366f1))',
+                  boxShadow: 'var(--shadow-md)',
                 }}
               >
                 ENHANCED
@@ -1044,12 +1052,12 @@ function App() {
                 padding: '0.4rem 1rem',
                 backgroundColor: 'transparent',
                 border: '1px solid var(--border, #30363d)',
-                borderRadius: '6px',
+                borderRadius: 'var(--radius-md)',
                 color: 'var(--muted)',
                 fontSize: 'calc(0.8rem * var(--font-scale, 1))',
                 cursor: 'pointer',
                 outline: 'none',
-                transition: 'border-color 0.15s, color 0.15s',
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
               }}
               onFocus={function(e) {
                 e.currentTarget.style.borderColor = 'var(--accent)';
@@ -1103,15 +1111,16 @@ function App() {
               aria-label="Settings"
               aria-expanded={state.showSettings}
               style={{
-                padding: '0.35rem 0.6rem',
+                padding: '0.4rem 0.7rem',
                 backgroundColor: 'transparent',
                 border: '1px solid var(--border, #30363d)',
-                borderRadius: '6px',
+                borderRadius: 'var(--radius-pill)',
                 color: 'var(--muted)',
                 fontSize: '1.1rem',
                 cursor: 'pointer',
                 outline: 'none',
                 lineHeight: '1',
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), transform 200ms var(--ease-out)',
               }}
               onFocus={function(e) {
                 e.currentTarget.style.outline = '2px solid var(--accent)';
@@ -1130,17 +1139,19 @@ function App() {
               onClick={function() { patchState({ showLayoutSwitcher: true }); }}
               title="Change visual layout (Ctrl+L)"
               style={{
-                padding: '0.35rem 0.75rem',
-                backgroundColor: 'var(--accent)',
+                padding: '0.4rem 0.9rem',
+                background: 'var(--gradient-sunset, linear-gradient(135deg, #6366f1, #d946ef))',
                 border: 'none',
-                borderRadius: '6px',
-                color: '#000',
+                borderRadius: 'var(--radius-md)',
+                color: '#fff',
                 fontSize: 'calc(0.75rem * var(--font-scale, 1))',
                 fontWeight: '700',
                 cursor: 'pointer',
                 outline: 'none',
                 letterSpacing: '0.03em',
                 flexShrink: 0,
+                boxShadow: 'var(--shadow-md)',
+                transition: 'transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out)',
               }}
               onFocus={function(e) {
                 e.currentTarget.style.outline = '2px solid #fff';
