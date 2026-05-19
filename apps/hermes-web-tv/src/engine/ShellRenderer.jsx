@@ -1,6 +1,13 @@
 import React from 'react';
 import { getShell } from './layoutRegistry.js';
 
+// ShellRenderer is intentionally a thin pass-through. New shells (TiviMate,
+// Netflix, Plex, AppleTV, Samsung, MomMode, DavePower, Zero, LiveTV, plus the
+// in-flight NuvioShell / StremioShell / ExtremeInfiniTVShell parallel-agent
+// additions) are registered in `layoutRegistry.js` — this component never
+// needs to know about specific shell IDs. If you find yourself adding a
+// `switch` statement here, register the shell in the registry instead.
+
 function ShellRenderer(props) {
   var layout = props.layout;
   var catalog = props.catalog;
