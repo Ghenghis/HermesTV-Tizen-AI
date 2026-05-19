@@ -1,5 +1,5 @@
 import React from 'react';
-import { applyShellFilters } from './shellHelpers.js';
+import { applyShellFilters, useGridVirtualizer } from './shellHelpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TiviMateShell — HermesTV's IPTV / EPG-style layout.
@@ -63,6 +63,29 @@ function TiviMateShell(props) {
 
   var fontScale = (profile && profile.font_scale) || 1;
 
+  // Virtualize both the sidebar channel list and the EPG row list. Both
+  // surfaces render the same `channelList` so on a 500-channel M3U they
+  // each previously mounted ~500 buttons / rows. Tizen 6.5 RAM budget
+  // can't take that. Sidebar rows are roughly 44 px (compact button),
+  // EPG rows are a fixed 64 px (`height: 64px` below). Both short-circuit
+  // when channelList.length < threshold.
+  var sidebarScrollRef = React.useRef(null);
+  var sidebarVirt = useGridVirtualizer({
+    scrollRef: sidebarScrollRef,
+    itemCount: channelList.length,
+    columns: 1,
+    rowHeight: 44,
+    overscan: 3,
+  });
+  var epgScrollRef = React.useRef(null);
+  var virt = useGridVirtualizer({
+    scrollRef: epgScrollRef,
+    itemCount: channelList.length,
+    columns: 1,
+    rowHeight: 64,
+    overscan: 2,
+  });
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', height: '100%', background: '#0e1217', color: '#e6e9ef', fontFamily: "'Roboto', sans-serif", overflow: 'hidden' }}>
 
@@ -91,8 +114,14 @@ function TiviMateShell(props) {
           }}>TV</span>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {channelList.map(function(item, idx) {
+        <div ref={sidebarScrollRef} style={{ flex: 1, overflowY: 'auto' }}>
+          {/* Top spacer — preserves scrollbar geometry for unmounted rows.
+              height=0 when virtualization is off (channels < threshold). */}
+          {sidebarVirt.topSpacer > 0 && (
+            <div aria-hidden="true" style={{ height: sidebarVirt.topSpacer + 'px' }} />
+          )}
+          {channelList.slice(sidebarVirt.startIndex, sidebarVirt.endIndex).map(function(item, sliceIdx) {
+            var idx = sidebarVirt.startIndex + sliceIdx;
             var isActive = idx === activeIdx;
             return (
               <button
@@ -168,6 +197,11 @@ function TiviMateShell(props) {
               </button>
             );
           })}
+          {/* Bottom spacer — preserves scrollbar geometry for unmounted
+              trailing rows. height=0 when virtualization is off. */}
+          {sidebarVirt.bottomSpacer > 0 && (
+            <div aria-hidden="true" style={{ height: sidebarVirt.bottomSpacer + 'px' }} />
+          )}
         </div>
 
         {/* Bottom nav — gradient header band visually anchors the rail's foot */}
@@ -265,8 +299,14 @@ function TiviMateShell(props) {
         </div>
 
         {/* EPG rows */}
-        <div style={{ overflowY: 'auto' }}>
-          {channelList.map(function(item, idx) {
+        <div ref={epgScrollRef} style={{ overflowY: 'auto' }}>
+          {/* Top spacer — preserves scrollbar geometry for unmounted rows.
+              height=0 when virtualization is off (channels < threshold). */}
+          {virt.topSpacer > 0 && (
+            <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
+          )}
+          {channelList.slice(virt.startIndex, virt.endIndex).map(function(item, sliceIdx) {
+            var idx = virt.startIndex + sliceIdx;
             var prog1 = channelList[(idx + 1) % channelList.length];
             var prog2 = channelList[(idx + 2) % channelList.length];
             var prog3 = channelList[(idx + 3) % channelList.length];
@@ -351,6 +391,11 @@ function TiviMateShell(props) {
               </div>
             );
           })}
+          {/* Bottom spacer — preserves scrollbar geometry for unmounted
+              trailing rows. height=0 when virtualization is off. */}
+          {virt.bottomSpacer > 0 && (
+            <div aria-hidden="true" style={{ height: virt.bottomSpacer + 'px' }} />
+          )}
           {channelList.length === 0 && (
             <div style={{ padding: '40px', textAlign: 'center', color: '#8c95a5', fontSize: 'calc(14px * ' + fontScale + ')' }}>
               No channels match your current filters.

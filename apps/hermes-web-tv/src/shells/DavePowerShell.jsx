@@ -1,5 +1,6 @@
 import React from 'react';
-import { applyShellFilters, posterBg } from './shellHelpers.js';
+import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
+import { debounce } from '../utils/debounce.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DavePowerShell — Dave's preferred dense-info power-user layout.
@@ -47,9 +48,27 @@ function DavePowerShell(props) {
   var activeIconResult = React.useState(0);
   var activeIcon = activeIconResult[0];
   var setActiveIcon = activeIconResult[1];
+  // Two-state search: searchInput is the immediate textbox value (drives the
+  // controlled <input>), searchQuery is the debounced value that actually
+  // feeds the filter pass. 150 ms collapses bursty Tizen-remote typing into
+  // a single filter run while staying under the motor-to-visual threshold.
+  var searchInputResult = React.useState('');
+  var searchInput = searchInputResult[0];
+  var setSearchInput = searchInputResult[1];
   var searchResult = React.useState('');
   var searchQuery = searchResult[0];
   var setSearchQuery = searchResult[1];
+
+  // Build the debouncer once with useMemo so we don't re-create the timer
+  // on every render (which would defeat the whole point).
+  var debouncedSetSearchQuery = React.useMemo(function() {
+    return debounce(function(v) { setSearchQuery(v); }, 150);
+  }, []);
+  // Cancel any pending timer on unmount so a setState doesn't fire after
+  // React has dropped the shell from the tree.
+  React.useEffect(function() {
+    return function() { debouncedSetSearchQuery.cancel(); };
+  }, [debouncedSetSearchQuery]);
 
   React.useEffect(function() {
     var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
@@ -77,6 +96,19 @@ function DavePowerShell(props) {
     providerFilter !== 'all' ? providerFilter : 'All Providers',
     qualityFilter !== 'all' ? qualityFilter : 'Any Quality',
   ].join(' · ');
+
+  // Virtualize the dense Power-user grid. Card is 90 px image + ~40 px
+  // title block + 8 px gap = ~140 px per row. DavePower is the densest
+  // shell so this is where unbounded-grid cost bites first. Below the
+  // ~100-item threshold the helper short-circuits to a full render.
+  var gridScrollRef = React.useRef(null);
+  var virt = useGridVirtualizer({
+    scrollRef: gridScrollRef,
+    itemCount: displayItems.length,
+    columns: cols,
+    rowHeight: 140,
+    overscan: 1,
+  });
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr' + (tier === 'enhanced' ? ' 200px' : ''), height: '100%', background: '#0a0e1a', color: '#e0e8f0', overflow: 'hidden', fontFamily: "'Consolas', 'Courier New', monospace" }}>
@@ -152,8 +184,14 @@ function DavePowerShell(props) {
           }}>{filterLabel}</div>
           <input
             type="text"
-            value={searchQuery}
-            onChange={function(e) { setSearchQuery(e.target.value); }}
+            value={searchInput}
+            onChange={function(e) {
+              var v = e.target.value;
+              // Keep the controlled input instant — only debounce the
+              // filter pass, never the keystroke echo.
+              setSearchInput(v);
+              debouncedSetSearchQuery(v);
+            }}
             placeholder="Search..."
             aria-label="Search catalog"
             style={{
@@ -191,9 +229,15 @@ function DavePowerShell(props) {
         </div>
 
         {/* Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+        <div ref={gridScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+          {/* Top spacer — preserves scrollbar geometry for unmounted rows.
+              height=0 when virtualization is off (catalog < threshold). */}
+          {virt.topSpacer > 0 && (
+            <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', 1fr)', gap: '8px' }}>
-            {displayItems.map(function(item, idx) {
+            {displayItems.slice(virt.startIndex, virt.endIndex).map(function(item, sliceIdx) {
+              var idx = virt.startIndex + sliceIdx;
               return (
                 <div
                   key={item.id || idx}
@@ -252,6 +296,11 @@ function DavePowerShell(props) {
               );
             })}
           </div>
+          {/* Bottom spacer — preserves scrollbar geometry for unmounted
+              trailing rows. height=0 when virtualization is off. */}
+          {virt.bottomSpacer > 0 && (
+            <div aria-hidden="true" style={{ height: virt.bottomSpacer + 'px' }} />
+          )}
           {displayItems.length === 0 && (
             <div style={{ padding: '40px', textAlign: 'center', color: '#8a98ab', fontSize: 'calc(13px * ' + fontScale + ')' }}>
               No results{searchQuery ? ' for "' + searchQuery + '"' : ''}.

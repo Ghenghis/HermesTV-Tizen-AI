@@ -1,5 +1,5 @@
 import React from 'react';
-import { applyShellFilters, posterBg } from './shellHelpers.js';
+import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MomModeShell — Sherri's primary layout.
@@ -97,6 +97,20 @@ function MomModeShell(props) {
   // still sees the warm/spacious 2-up that's easy from the couch.
   var cols = tier === 'enhanced' && fontScale < 1.5 ? 3 : 2;
 
+  // Virtualize the poster grid when the catalog exceeds the threshold
+  // (~100 items). Mom Mode renders the largest cards in the whole shell set
+  // (260 px image + ~70 px title block + 20 px gap = ~360 px row), so the
+  // raw paint cost on a long catalog is the highest of any shell. Below the
+  // threshold the helper short-circuits to a full render with zero overhead.
+  var gridScrollRef = React.useRef(null);
+  var virt = useGridVirtualizer({
+    scrollRef: gridScrollRef,
+    itemCount: displayItems.length,
+    columns: cols,
+    rowHeight: 360,
+    overscan: 1,
+  });
+
   return (
     <div style={{ background: '#1a1a2e', color: '#f0e6ff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Georgia', 'Times New Roman', serif" }}>
 
@@ -163,14 +177,21 @@ function MomModeShell(props) {
       </div>
 
       {/* Content grid */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      <div ref={gridScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
         {displayItems.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', fontSize: 'calc(18px * ' + fontScale + ')', color: '#c8b8e8', lineHeight: 1.6 }}>
             Nothing here yet.<br />Try another category or ask Hermes!
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', 1fr)', gap: '20px' }}>
-            {displayItems.map(function(item, idx) {
+          <React.Fragment>
+            {/* Top spacer — preserves scrollbar geometry for unmounted rows.
+                height=0 when virtualization is off (catalog < threshold). */}
+            {virt.topSpacer > 0 && (
+              <div aria-hidden="true" style={{ height: virt.topSpacer + 'px' }} />
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', 1fr)', gap: '20px' }}>
+            {displayItems.slice(virt.startIndex, virt.endIndex).map(function(item, sliceIdx) {
+              var idx = virt.startIndex + sliceIdx;
               return (
                 <div
                   key={item.id || idx}
@@ -251,7 +272,13 @@ function MomModeShell(props) {
                 </div>
               );
             })}
-          </div>
+            </div>
+            {/* Bottom spacer — preserves scrollbar geometry for unmounted
+                trailing rows. height=0 when virtualization is off. */}
+            {virt.bottomSpacer > 0 && (
+              <div aria-hidden="true" style={{ height: virt.bottomSpacer + 'px' }} />
+            )}
+          </React.Fragment>
         )}
       </div>
 
