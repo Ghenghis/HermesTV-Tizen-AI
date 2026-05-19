@@ -246,6 +246,10 @@ function SettingsPanelTabbed(props) {
   // Fired when the user clicks "Replay onboarding". App.jsx clears the
   // onboardingState flag + per-step answers and re-mounts the wizard.
   var onReplayOnboarding = props.onReplayOnboarding;
+  // Fired when the user clicks "Manage profiles". App.jsx closes Settings
+  // and opens the full ProfileManagementModal (add / edit / delete + picker
+  // settings).
+  var onManageProfiles = props.onManageProfiles;
   var onThemeChange = props.onThemeChange;
   // onOpenPlaylistImport — fires when the user clicks the new "Import
   // playlist" button on the Playlists tab. App.jsx hosts the modal so the
@@ -388,6 +392,15 @@ function SettingsPanelTabbed(props) {
                 onFocus={zeroButtonFocus}
                 onBlur={zeroButtonBlur}
               >▶ Replay onboarding</button>
+            ) : null}
+            {onManageProfiles ? (
+              <button
+                tabIndex={0}
+                onClick={onManageProfiles}
+                style={zeroButtonStyle('outline')}
+                onFocus={zeroButtonFocus}
+                onBlur={zeroButtonBlur}
+              >👥 Manage profiles</button>
             ) : null}
           </div>
         </_Card>

@@ -32,6 +32,12 @@ import './i18n/index.js';
 // in" intent. The wizard itself lazy-loads PlaylistImport + QR internally.
 import OnboardingWizard from './components/OnboardingWizard.jsx';
 import * as onboardingState from './store/onboardingState.js';
+// ProfileManagementModal is already statically imported by ProfilePicker so
+// it always ships in the eager bundle — using a regular import here avoids
+// Vite's "static import shadows dynamic import" warning while keeping the
+// same render-time cost. App.jsx mounts it as a second entry point from
+// Settings ▸ Profile actions so the user doesn't have to log out to edit.
+import ProfileManagementModal from './components/ProfileManagementModal.jsx';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -377,6 +383,9 @@ var INITIAL_STATE = {
   // Global search overlay. Toggled by the header Search button, by "/" or
   // Ctrl+K, and by the chatbot `open_search` command (follow-up).
   showSearch: false,
+  // Profile management CRUD modal — opened from Settings ▸ Profile actions
+  // ▸ Manage profiles. Closes via Esc / Back / Close button.
+  showProfileManagement: false,
   showVoicePicker: false,
   // EPG modal — opened from the "Guide" button in the header. Fetches
   // /api/epg via epgClient.fetchEPG(providerFilter, 4) on open. Closes on
@@ -526,6 +535,10 @@ function App() {
           patchState({ showSearch: false });
           return true;
         }
+        if (state.showProfileManagement) {
+          patchState({ showProfileManagement: false });
+          return true;
+        }
         if (state.selectedItem) {
           patchState({ selectedItem: null, selectedProviderId: null });
           return true;
@@ -550,7 +563,7 @@ function App() {
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch, state.showProfileManagement]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {
@@ -865,6 +878,43 @@ function App() {
   function handleReplayOnboarding() {
     onboardingState.reset();
     patchState({ showSettings: false, showOnboarding: true });
+  }
+
+  // Fired by ProfileManagementModal after any Add / Edit / Delete. Three
+  // cases the parent has to handle:
+  //   1. The active profile was deleted → profileStore auto-clears the
+  //      active id, so getActiveProfileId() is now null. Drop into the
+  //      profile picker so the user can pick a remaining profile.
+  //   2. The active profile was edited → re-read the live record so the
+  //      new theme / font scale / mom_mode applies immediately without
+  //      a reload. Tier is re-evaluated from tv_model.
+  //   3. A non-active profile was added/edited/deleted → no-op; the
+  //      modal's own list re-renders from its local snapshot.
+  function handleProfilesChange() {
+    var activeId = profileStore.getActiveProfileId();
+    if (!activeId) {
+      // Active profile was deleted — fall back to the picker.
+      patchState({ showProfileManagement: false, showProfilePicker: true, profile: null });
+      return;
+    }
+    var current = state.profile && state.profile.profile_id;
+    if (current && activeId === current) {
+      var live = profileStore.getProfile(activeId);
+      if (live) {
+        // The local store uses `id` while the API/state uses `profile_id`.
+        // Merge both for consumers that read either shape.
+        var merged = Object.assign({}, state.profile, live, { profile_id: live.id });
+        applyDocumentTheme(merged);
+        var nextTier = resolveTier(merged.tv_model || state.tvModel);
+        applyTierClasses(nextTier);
+        patchState({ profile: merged, tier: nextTier, tvModel: merged.tv_model || state.tvModel });
+      }
+    }
+  }
+
+  // Settings ▸ Manage profiles — opens the CRUD modal.
+  function handleManageProfiles() {
+    patchState({ showSettings: false, showProfileManagement: true });
   }
 
   function handleChatbotCommand(commandResult) {
@@ -1603,6 +1653,7 @@ function App() {
               }}
               onResetDefaults={handleResetDefaults}
               onReplayOnboarding={handleReplayOnboarding}
+              onManageProfiles={handleManageProfiles}
               onThemeChange={function(themeName) {
                 applyThemeByName(themeName);
                 patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
@@ -1706,6 +1757,20 @@ function App() {
                 patchState({ showSearch: false });
                 handleItemClick(item);
               }}
+            />
+          )}
+
+          {/* Profile management — full CRUD over the local profileStore.
+              Opens from Settings ▸ Profile actions ▸ Manage profiles.
+              onProfilesChange refreshes state.profile in-place when the
+              active record changes, and falls back to the picker when
+              the active profile is deleted (profileStore auto-clears
+              the active id on delete). */}
+          {state.showProfileManagement && (
+            <ProfileManagementModal
+              isOpen={state.showProfileManagement}
+              onClose={function() { patchState({ showProfileManagement: false }); }}
+              onProfilesChange={handleProfilesChange}
             />
           )}
 
