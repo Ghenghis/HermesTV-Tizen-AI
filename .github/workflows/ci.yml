@@ -106,12 +106,12 @@ jobs:
   # -----------------------------------------------------------------------
   # 3) Chatbot integration — depends on schema-validation passing.
   # Boots the API in background, waits for /health, then runs every case in
-  # tools/test-chatbot-commands.js. We gate on "PASS >= 44, FAIL == 0" so
+  # tools/test-chatbot-commands.js. We gate on "PASS >= 46, FAIL == 0" so
   # adding new commands in future PRs doesn't break this job (same pattern
   # as the E2E layout-count probe in #108).
   # -----------------------------------------------------------------------
   chatbot-integration:
-    name: Chatbot integration (44+/all)
+    name: Chatbot integration (46+/all)
     runs-on: ubuntu-latest
     needs: schema-validation
     timeout-minutes: 10
@@ -158,9 +158,9 @@ jobs:
       - name: Run chatbot command suite
         run: node tools/test-chatbot-commands.js | tee chatbot.log
 
-      - name: Enforce PASS >= 44, FAIL == 0
+      - name: "Enforce PASS >= 46, FAIL == 0"
         run: |
-          # Extract "Results: N PASS, M FAIL" and gate on N>=44 + M==0.
+          # Extract "Results: N PASS, M FAIL" and gate on N>=46 + M==0.
           # Lower bound rather than exact so future command additions don't
           # require a CI-config bump — matches #108's flexible layout probe.
           line=$(grep -E 'Results:[[:space:]]+[0-9]+[[:space:]]+PASS,[[:space:]]+[0-9]+[[:space:]]+FAIL' chatbot.log | tail -n 1)
@@ -176,8 +176,8 @@ jobs:
             tail -n 30 chatbot.log
             exit 1
           fi
-          if [ "$pass" -lt 44 ]; then
-            echo "::error::Chatbot integration reported $pass PASS (expected >=44)"
+          if [ "$pass" -lt 46 ]; then
+            echo "::error::Chatbot integration reported $pass PASS (expected >=46)"
             tail -n 30 chatbot.log
             exit 1
           fi

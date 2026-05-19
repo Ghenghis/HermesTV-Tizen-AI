@@ -143,6 +143,15 @@ const COMMAND_TABLE = [
     action: 'schedule_recording',
     params: { target: 'current' },
   },
+  // --- Play focused item ---
+  // Symmetric with schedule_recording — when the user has an item on screen
+  // (catalog tile selected, MediaDetailPanel open), this routes to handlePlay.
+  // No-op when nothing is focused, same convention.
+  {
+    patterns: ['play this', 'play it', 'watch this', 'watch it'],
+    action: 'play_this',
+    params: { target: 'current' },
+  },
   // --- Reset ---
   {
     patterns: ['reset filters', 'clear filters', 'show everything'],

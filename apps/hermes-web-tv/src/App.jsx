@@ -1085,6 +1085,13 @@ function App() {
       if (target) {
         handleScheduleRecording(target);
       }
+    } else if (action === 'play_this') {
+      // Same target-picking rule as schedule_recording, but works on every
+      // content type — movies, series, live, all play through handlePlay.
+      // Skip silently when nothing is focused.
+      if (state.selectedItem) {
+        handlePlay(state.selectedItem, state.selectedProviderId || null);
+      }
     }
     // show_detail and find_similar_actor: no state mutation needed (chatbot response text handles UX)
   }
