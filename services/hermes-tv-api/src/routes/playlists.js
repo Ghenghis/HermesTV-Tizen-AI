@@ -5,21 +5,23 @@
  *
  * Mirrors the IPTV Player Zero "Add Playlist" flow (docs/USER_JOURNEYS.md §1,
  * docs/DATA_FLOW.md §"Playlist Import Data Flow") onto the HermesTV API.
+ * See docs/07_PROVIDER_CATALOG_AND_QR_ONBOARDING_CONTRACT.md and
+ * docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md for the operator contract.
  *
  * Endpoints:
  *
  *   POST   /api/playlists/preview
- *     body: { type: 'url'|'file'|'xtream'|'stalker', ...source-specific }
+ *     body: { type|kind: 'url'|'file'|'xtream'|'stalker', ...source-specific }
  *     200:  { channels_count, groups_count, sample_channels[], _meta }
  *     400:  validation_failed (URL scheme, file size, missing fields, bad name)
- *     501:  not_implemented (xtream / stalker stubs)
+ *     501:  not_implemented (stalker — phase 4)
  *     502:  upstream_unreachable (URL fetch failure)
  *
  *   POST   /api/playlists/save
  *     body: { name, provider_id, source: <same shape as /preview body> }
  *     200:  { id, name, provider_id, channels_count, created_at }
  *     400:  validation_failed
- *     501:  not_implemented (xtream / stalker)
+ *     501:  not_implemented (stalker only)
  *
  *   GET    /api/playlists
  *     200:  { playlists: [{id, name, provider_id, channels_count, created_at}] }
@@ -41,8 +43,12 @@
  *     playlist record (`_streams_by_local_id`, server-only). The /preview
  *     and /save responses NEVER expose raw stream URLs to TV clients —
  *     credentialGuard middleware blocks any leaked /get.php URL anyway.
- *   - xtream / stalker import returns 501 with `not_implemented` so the
- *     operator gets a clear "Xtream-Codes ingest lands in a follow-up"
+ *   - Xtream credentials (server_url, username, password) are persisted
+ *     server-side ONLY in the in-memory record's `_xtream_credentials`
+ *     field, never serialised to a TV-bound response. The /preview and
+ *     /save bodies surface only counts + sample + masked meta.
+ *   - Stalker portal ingest currently returns 501 (phase 4) with a useful
+ *     message + docs/19 pointer so the operator gets a clear "not yet"
  *     instead of a silent failure.
  *
  * STORE
@@ -50,7 +56,7 @@
  *     patterns in this service). A file-backed store can land in a follow-up
  *     once the operator confirms the import flow shape. Each saved record
  *     carries { id, name, provider_id, source_type, channels_count,
- *     created_at, _streams_by_local_id }.
+ *     created_at, _streams_by_local_id, _xtream_credentials? }.
  */
 
 const { Router } = require('express');
@@ -102,6 +108,49 @@ function _validateUrl(url) {
   var lower = url.toLowerCase();
   if (lower.indexOf('http://') !== 0 && lower.indexOf('https://') !== 0) {
     return { ok: false, error: 'url must use http:// or https:// (no file://, ftp://, etc.)' };
+  }
+  return { ok: true };
+}
+
+// Xtream server URL validator. Must be http:// or https:// with a host (and
+// optional port). Trailing slashes are tolerated. Rejects path components
+// — callers pass just the server root; we append `/get.php` and `/player_api.php`
+// ourselves so a hostile operator can't inject extra path segments.
+function _validateXtreamServerUrl(url) {
+  if (typeof url !== 'string' || url.length === 0) {
+    return { ok: false, error: 'server_url is required and must be a string' };
+  }
+  if (url.length > 512) {
+    return { ok: false, error: 'server_url is too long (max 512 chars)' };
+  }
+  var lower = url.toLowerCase();
+  if (lower.indexOf('http://') !== 0 && lower.indexOf('https://') !== 0) {
+    return { ok: false, error: 'server_url must use http:// or https://' };
+  }
+  // Pull the part after the scheme. Strip a trailing slash. Reject any
+  // remaining `/path` — the operator passes just the server root.
+  var rest = url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (rest.length === 0) {
+    return { ok: false, error: 'server_url is missing a host' };
+  }
+  // host[:port] only — no slashes, no query, no fragment.
+  if (/[\/?#]/.test(rest)) {
+    return { ok: false, error: 'server_url must be just the server root (no path)' };
+  }
+  // Permissive host check: letters, digits, hyphens, dots; optional :port.
+  if (!/^[A-Za-z0-9.\-]+(?::\d{1,5})?$/.test(rest)) {
+    return { ok: false, error: 'server_url has an invalid host[:port]' };
+  }
+  return { ok: true, normalised: url.replace(/\/+$/, '') };
+}
+
+// Stalker MAC validator. Format: xx:xx:xx:xx:xx:xx (hex, case-insensitive).
+function _validateMacAddress(mac) {
+  if (typeof mac !== 'string' || mac.length === 0) {
+    return { ok: false, error: 'mac_address is required and must be a string' };
+  }
+  if (!/^[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}$/.test(mac)) {
+    return { ok: false, error: 'mac_address must be in the form xx:xx:xx:xx:xx:xx' };
   }
   return { ok: true };
 }
@@ -234,6 +283,87 @@ function _fetchUrl(url) {
   });
 }
 
+// ── Xtream Codes helpers ──────────────────────────────────────────────────
+
+// Build the get.php URL for an Xtream account. NEVER returned to the client;
+// only used by the server-side fetch. Match the Xtream Codes API spec:
+//   ${server}/get.php?username=${u}&password=${p}&type=m3u_plus&output=ts
+function _buildXtreamM3uUrl(serverUrl, username, password) {
+  return serverUrl.replace(/\/+$/, '')
+    + '/get.php?username=' + encodeURIComponent(username)
+    + '&password=' + encodeURIComponent(password)
+    + '&type=m3u_plus&output=ts';
+}
+
+// Build the player_api.php URL for live/VOD/series counts. Same warning:
+// server-side only, never echoed back.
+function _buildXtreamApiUrl(serverUrl, username, password, action) {
+  var base = serverUrl.replace(/\/+$/, '')
+    + '/player_api.php?username=' + encodeURIComponent(username)
+    + '&password=' + encodeURIComponent(password);
+  if (action) { base += '&action=' + encodeURIComponent(action); }
+  return base;
+}
+
+// Fetch the player_api.php JSON for a given action ('get_live_streams',
+// 'get_vod_streams', 'get_series'). Returns the array length or null on
+// failure — we never throw out to the caller since counts are best-effort
+// (the M3U fetch is the source of truth for the channel count).
+function _fetchXtreamApiCount(serverUrl, username, password, action) {
+  return new Promise(function(resolve) {
+    var url = _buildXtreamApiUrl(serverUrl, username, password, action);
+    var ctrl = new AbortController();
+    var timer = setTimeout(function() { ctrl.abort(); }, FETCH_TIMEOUT_MS);
+    fetch(url, { method: 'GET', signal: ctrl.signal })
+      .then(function(res) {
+        clearTimeout(timer);
+        if (!res.ok) { return resolve(null); }
+        return res.json().then(function(json) {
+          resolve(Array.isArray(json) ? json.length : null);
+        }, function() { resolve(null); });
+      })
+      .catch(function(err) {
+        clearTimeout(timer);
+        console.warn('[playlists] xtream player_api ' + action + ' failed: '
+          + sanitizeForLog((err && err.message) || 'fetch_failed'));
+        resolve(null);
+      });
+  });
+}
+
+// Fetch + parse an Xtream M3U-plus playlist. Returns
+// { ok: true, parsed, counts: { live, vod, series }, last_fetched }
+// or { ok: false, status, error }.
+async function _fetchXtreamSource(serverUrl, username, password) {
+  var m3uUrl = _buildXtreamM3uUrl(serverUrl, username, password);
+  var fetched = await _fetchUrl(m3uUrl);
+  if (!fetched.ok) {
+    return {
+      ok: false,
+      status: fetched.status || 502,
+      // Never include the m3uUrl here — credentialGuard would block, and we
+      // don't want the operator's password echoed back even if it didn't.
+      error: 'Xtream server did not respond. ' + (fetched.error || ''),
+    };
+  }
+  var parsed = _parseM3U(fetched.text);
+
+  // Best-effort player_api counts. These don't block on failure — the M3U
+  // parse already gives us a working channel count and sample list.
+  var results = await Promise.all([
+    _fetchXtreamApiCount(serverUrl, username, password, 'get_live_streams'),
+    _fetchXtreamApiCount(serverUrl, username, password, 'get_vod_streams'),
+    _fetchXtreamApiCount(serverUrl, username, password, 'get_series'),
+  ]);
+
+  return {
+    ok: true,
+    parsed: parsed,
+    counts: { live: results[0], vod: results[1], series: results[2] },
+    last_fetched: new Date(_now()).toISOString(),
+  };
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────────
 
 // POST /api/playlists/preview
@@ -244,7 +374,8 @@ function _fetchUrl(url) {
 //   { type: 'stalker', portal_url, mac }              // 501
 async function handlePreview(req, res) {
   const body = req.body || {};
-  const type = body.type;
+  // Accept either `type` (legacy) or `kind` (task spec) as the source-kind field.
+  const type = body.type || body.kind;
 
   if (VALID_TYPES.indexOf(type) === -1) {
     return res.status(400).json({
@@ -254,17 +385,54 @@ async function handlePreview(req, res) {
   }
 
   if (type === 'xtream') {
-    return res.status(501).json({
-      error: 'not_implemented',
-      message: 'Xtream-Codes ingest lands in a follow-up.',
-      type: 'xtream',
-    });
+    const serverCheck = _validateXtreamServerUrl(body.server_url || body.host);
+    if (!serverCheck.ok) {
+      return res.status(400).json({ error: 'validation_failed', message: serverCheck.error });
+    }
+    if (typeof body.username !== 'string' || body.username.length === 0) {
+      return res.status(400).json({ error: 'validation_failed', message: 'username is required' });
+    }
+    if (typeof body.password !== 'string' || body.password.length === 0) {
+      return res.status(400).json({ error: 'validation_failed', message: 'password is required' });
+    }
+    const xtream = await _fetchXtreamSource(serverCheck.normalised, body.username, body.password);
+    if (!xtream.ok) {
+      return res.status(xtream.status === 413 ? 413 : 502).json({
+        error: xtream.status === 413 ? 'payload_too_large' : 'upstream_unreachable',
+        message: xtream.error,
+      });
+    }
+    if (xtream.parsed.length === 0) {
+      return res.status(200).json({
+        channels_count: 0,
+        groups_count: 0,
+        sample_channels: [],
+        live_count: xtream.counts.live,
+        vod_count: xtream.counts.vod,
+        series_count: xtream.counts.series,
+        last_fetched: xtream.last_fetched,
+        _meta: { source_type: 'xtream', warning: 'no_channels_parsed' },
+      });
+    }
+    const xtSummary = _summarise(xtream.parsed);
+    xtSummary.live_count = xtream.counts.live;
+    xtSummary.vod_count = xtream.counts.vod;
+    xtSummary.series_count = xtream.counts.series;
+    xtSummary.last_fetched = xtream.last_fetched;
+    // Limit the sample to 5 (task spec). Existing M3U preview returns 10, so
+    // we slice here for Xtream specifically. credentialGuard scans the whole
+    // body so we keep just channel names — no URLs, no tvg-logo strings.
+    xtSummary.sample_channels = xtSummary.sample_channels.slice(0, 5);
+    xtSummary._meta = { source_type: 'xtream' };
+    return res.status(200).json(xtSummary);
   }
   if (type === 'stalker') {
     return res.status(501).json({
       error: 'not_implemented',
-      message: 'Stalker portal ingest lands in a follow-up.',
+      message: 'Stalker portal ingest is preview-only. Full support lands in Phase 4 — see docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md.',
       type: 'stalker',
+      phase: 'phase4',
+      docs: 'docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md',
     });
   }
 
@@ -344,7 +512,8 @@ async function handleSave(req, res) {
       message: 'provider_id must be one of: ' + VALID_PROVIDER_IDS.join(', '),
     });
   }
-  const type = source.type;
+  // Accept either `type` (legacy) or `kind` (task spec) for the source kind.
+  const type = source.type || source.kind;
   if (VALID_TYPES.indexOf(type) === -1) {
     return res.status(400).json({
       error: 'validation_failed',
@@ -352,17 +521,18 @@ async function handleSave(req, res) {
     });
   }
 
-  if (type === 'xtream' || type === 'stalker') {
+  if (type === 'stalker') {
     return res.status(501).json({
       error: 'not_implemented',
-      message: type === 'xtream'
-        ? 'Xtream-Codes ingest lands in a follow-up.'
-        : 'Stalker portal ingest lands in a follow-up.',
-      type: type,
+      message: 'Stalker portal ingest is preview-only. Full support lands in Phase 4 — see docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md.',
+      type: 'stalker',
+      phase: 'phase4',
+      docs: 'docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md',
     });
   }
 
   var parsed = null;
+  var xtreamCreds = null;       // captured for server-side persistence only
   if (type === 'url') {
     const urlCheck = _validateUrl(source.url);
     if (!urlCheck.ok) {
@@ -376,6 +546,34 @@ async function handleSave(req, res) {
       });
     }
     parsed = _parseM3U(fetched.text);
+  } else if (type === 'xtream') {
+    const serverCheck = _validateXtreamServerUrl(source.server_url || source.host);
+    if (!serverCheck.ok) {
+      return res.status(400).json({ error: 'validation_failed', message: serverCheck.error });
+    }
+    if (typeof source.username !== 'string' || source.username.length === 0) {
+      return res.status(400).json({ error: 'validation_failed', message: 'username is required' });
+    }
+    if (typeof source.password !== 'string' || source.password.length === 0) {
+      return res.status(400).json({ error: 'validation_failed', message: 'password is required' });
+    }
+    const xtream = await _fetchXtreamSource(serverCheck.normalised, source.username, source.password);
+    if (!xtream.ok) {
+      return res.status(xtream.status === 413 ? 413 : 502).json({
+        error: xtream.status === 413 ? 'payload_too_large' : 'upstream_unreachable',
+        message: xtream.error,
+      });
+    }
+    parsed = xtream.parsed;
+    // Stash creds for server-only persistence. Per docs/07 §"Backend-only
+    // provider record" these MUST NOT leak to any TV-bound response —
+    // credentialGuard would catch a /get.php URL anyway, but we belt-and-
+    // suspender by never serialising xtreamCreds.
+    xtreamCreds = {
+      server_url: serverCheck.normalised,
+      username: source.username,
+      password: source.password,
+    };
   } else {
     // file
     if (typeof source.text !== 'string' || source.text.length === 0) {
@@ -411,6 +609,12 @@ async function handleSave(req, res) {
     created_at: new Date(_now()).toISOString(),
     _streams_by_local_id: _buildStreamMap(parsed),
   };
+  if (xtreamCreds) {
+    // Server-only. NEVER serialised below; see handleList for the TV-safe
+    // projection. If this field is ever leaked, credentialGuard will catch
+    // it before it leaves the process.
+    record._xtream_credentials = xtreamCreds;
+  }
   _playlists[id] = record;
   _playlistOrder.push(id);
   _trim();
@@ -461,8 +665,12 @@ router.delete('/api/playlists/:id', handleDelete);
 module.exports = router;
 module.exports._internal = {
   _validateUrl: _validateUrl,
+  _validateXtreamServerUrl: _validateXtreamServerUrl,
+  _validateMacAddress: _validateMacAddress,
   _sanitiseName: _sanitiseName,
   _parseM3U: _parseM3U,
   _summarise: _summarise,
+  _buildXtreamM3uUrl: _buildXtreamM3uUrl,
+  _buildXtreamApiUrl: _buildXtreamApiUrl,
   _clear: function() { _playlists = {}; _playlistOrder = []; },
 };

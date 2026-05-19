@@ -84,10 +84,28 @@ router.get('/api/profile/:id', (req, res) => {
   res.json(profileStore[id]);
 });
 
-// PATCH /api/profile/:id
-router.patch('/api/profile/:id', (req, res) => {
-  const { id } = req.params;
+// Fields the management modal is allowed to update via PATCH. Anything not in
+// this list is silently dropped before merge so a stray field from a future
+// client build can't corrupt the in-memory record. Kept centralized so the
+// /api/profile/:id and /api/profiles/:id handlers stay in lockstep.
+const PATCHABLE_FIELDS = [
+  'display_name',
+  'agent_name',
+  'preferred_voice_id',
+  'agent_voice',          // legacy alias used by dvr/tts callers
+  'font_scale',
+  'audio_feedback',
+  'reduced_motion',
+  'active_theme',
+  'active_layout',
+  'nickname',
+  'avatar_emoji',
+  'tier_override',
+  'display_size_inches',
+  'quality_preference',
+];
 
+function applyProfilePatch(id, updates, res) {
   if (!VALID_PROFILES.includes(id)) {
     return res.status(404).json({
       error: 'not_found',
@@ -95,7 +113,12 @@ router.patch('/api/profile/:id', (req, res) => {
     });
   }
 
-  const updates = req.body;
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({
+      error: 'validation_failed',
+      message: 'Request body must be a JSON object',
+    });
+  }
 
   // Validate Mom Mode font_scale floor
   if (id === 'mom_tv' && updates.font_scale !== undefined) {
@@ -114,6 +137,49 @@ router.patch('/api/profile/:id', (req, res) => {
     }
   }
 
+  // Validate display_name when present — non-empty trimmed string, <= 30 chars
+  if (updates.display_name !== undefined) {
+    if (typeof updates.display_name !== 'string') {
+      return res.status(400).json({
+        error: 'validation_failed',
+        message: 'display_name must be a string',
+      });
+    }
+    const trimmed = updates.display_name.trim();
+    if (trimmed.length === 0) {
+      return res.status(400).json({
+        error: 'validation_failed',
+        message: 'display_name cannot be empty',
+      });
+    }
+    if (trimmed.length > 30) {
+      return res.status(400).json({
+        error: 'validation_failed',
+        message: 'display_name must be 30 characters or fewer',
+      });
+    }
+    updates.display_name = trimmed;
+  }
+
+  // Validate agent_name when present — string, <= 30 chars. Empty falls back
+  // to default 'Hermes' on the server so the client stays simple.
+  if (updates.agent_name !== undefined) {
+    if (typeof updates.agent_name !== 'string') {
+      return res.status(400).json({
+        error: 'validation_failed',
+        message: 'agent_name must be a string',
+      });
+    }
+    const trimmedAgent = updates.agent_name.trim();
+    if (trimmedAgent.length > 30) {
+      return res.status(400).json({
+        error: 'validation_failed',
+        message: 'agent_name must be 30 characters or fewer',
+      });
+    }
+    updates.agent_name = trimmedAgent.length === 0 ? 'Hermes' : trimmedAgent;
+  }
+
   // Guard: never allow overwriting protected identity fields via PATCH
   const PROTECTED = ['profile_id', 'tv_model', 'tier', 'mom_mode'];
   for (const key of PROTECTED) {
@@ -125,10 +191,33 @@ router.patch('/api/profile/:id', (req, res) => {
     }
   }
 
-  // Apply partial update in-memory
-  profileStore[id] = { ...profileStore[id], ...updates };
+  // Drop anything not in the allowlist BEFORE merging so unknown fields can't
+  // pollute the in-memory record. This is a defense-in-depth check — the UI
+  // already sends only allowlisted keys, but a future client build or a
+  // hand-crafted curl shouldn't be able to slip arbitrary data through.
+  const filtered = {};
+  for (const key of Object.keys(updates)) {
+    if (PATCHABLE_FIELDS.indexOf(key) !== -1) {
+      filtered[key] = updates[key];
+    }
+  }
 
-  res.json(profileStore[id]);
+  // Apply partial update in-memory
+  profileStore[id] = { ...profileStore[id], ...filtered };
+
+  return res.json(profileStore[id]);
+}
+
+// PATCH /api/profile/:id — singular form, retained for v0 callers.
+router.patch('/api/profile/:id', (req, res) => {
+  return applyProfilePatch(req.params.id, req.body, res);
+});
+
+// PATCH /api/profiles/:id — plural form, used by ProfileManagementModal so
+// the URL matches GET /api/profiles. Behaviour is identical to the singular
+// route; both share the validation + merge logic above.
+router.patch('/api/profiles/:id', (req, res) => {
+  return applyProfilePatch(req.params.id, req.body, res);
 });
 
 module.exports = router;

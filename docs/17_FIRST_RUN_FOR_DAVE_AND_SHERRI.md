@@ -1,10 +1,10 @@
-# 17 — First Run Guide — Dave and Sherri
+# 17 — First Run Guide for DaveTV — Dave and Sherri
 
 Repo: `https://github.com/Ghenghis/HermesTV-Tizen-AI`
 Local: `G:\Github\HermesTV-Tizen-AI`
 Target TVs: Mom `QN85Q7FAAFXZA`; Dave `UN55CU8000BXZA`.
 
-This guide walks through the first-run experience for each profile. Follow `docs/16_TODAY_READY_SETUP_GUIDE.md` first to get the app running, then come back here.
+This guide walks through the first-run experience for each profile of **DaveTV**, the user-facing app name. Follow `docs/16_TODAY_READY_SETUP_GUIDE.md` first to get the app running, then come back here.
 
 ---
 
@@ -168,3 +168,5 @@ Settings changes you make in one profile do not affect the other profile.
 - `docs/18_REAL_TV_DEPLOYMENT_CHECKLIST.md` — push to the actual Samsung TV when ready.
 - `docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md` — add real Apollo Group or XtremeHD credentials safely.
 - `docs/proof/B2_USABLE_LOCAL_MOCK_RUNBOOK.md` — exact commands to verify mock mode is fully working.
+
+_(Rebranded HermesTV → DaveTV 2026-05-19 per user request; repo URL and local path are technical identifiers and remain unchanged.)_

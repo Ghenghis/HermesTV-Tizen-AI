@@ -68,6 +68,31 @@ function _providerDisplayName(pid) {
   return pid || 'unknown';
 }
 
+// Decide which extension to append to the stream_endpoint pointer so the
+// client-side hls.js path detection (which probes for `.m3u8` / `.mpd` in
+// the URL string) wires up the right engine. Returning an extension here
+// is *purely cosmetic* on the server — the actual bytes come from the
+// 302 target — but it makes the front end pick hls.js so the 302 to the
+// upstream CDN is followed transparently inside the player engine.
+//
+// Best-effort: peeks at the same resolver play-time path uses. If it
+// can't resolve (cold cache, missing item), returns '' — the bare
+// `/api/play/:ticket/stream` endpoint still works for fallback paths.
+function _streamExtFor(itemId) {
+  if (typeof itemId !== 'string' || itemId.length === 0) { return ''; }
+  try {
+    var resolved = streamResolver.resolveStreamUrl(itemId);
+    if (!resolved || !resolved.url) { return ''; }
+    // Don't expose hint for credential-bearing streams — those land at
+    // 503 anyway, never become a real stream URL the client can use.
+    if (resolved.credential_bearing) { return ''; }
+    var lower = String(resolved.url).toLowerCase();
+    if (lower.indexOf('.m3u8') !== -1) { return '.m3u8'; }
+    if (lower.indexOf('.mpd') !== -1)  { return '.mpd'; }
+  } catch (_) { /* fall through to bare endpoint */ }
+  return '';
+}
+
 /**
  * POST /api/play
  * Body: { item_id, profile_id, provider_id? }
@@ -145,6 +170,17 @@ router.post('/api/play', (req, res) => {
     _note: 'Stream URL is never returned to client. Call stream_endpoint to begin playback.',
   };
 
+  // Append .m3u8 / .mpd suffix to the stream_endpoint when the upstream is
+  // a public HLS / DASH manifest. The front-end PlayerModal probes the
+  // URL string for these extensions to decide whether to engage hls.js or
+  // wire a native <video src> — without the suffix, the proxy URL ends in
+  // ".../stream", PlayerModal picks the native path, and Chrome cannot
+  // play HLS natively → black screen + "playback don't work".
+  var ext = _streamExtFor(item.id);
+  if (ext) {
+    ticket.stream_endpoint = ticket.stream_endpoint + ext;
+  }
+
   tickets[ticketId] = { ticket: ticket, expires_at: now + TICKET_TTL_MS };
   return res.status(200).json(ticket);
 });
@@ -168,7 +204,13 @@ router.post('/api/play', (req, res) => {
  * 302 to threadfin's stream endpoint instead. That layer is in the
  * Phase 4 hardening checklist.
  */
-router.get('/api/play/:ticket/stream', (req, res) => {
+// The :ticket param matches the bare ticket id; the optional trailing
+// `.m3u8` / `.mpd` suffix on the path is captured by the wildcard so the
+// front-end's hls.js probe (urlLooksHls) lights up. Server logic is
+// identical regardless of suffix — it always 302s to the same upstream.
+router.get(/^\/api\/play\/([^\/]+)\/stream(?:\.m3u8|\.mpd)?$/, (req, res) => {
+  // Manual param mapping since this route uses a RegExp pattern.
+  req.params.ticket = req.params[0];
   const t = tickets[req.params.ticket];
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found', message: 'Ticket expired or invalid.' });

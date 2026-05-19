@@ -100,6 +100,7 @@ app.use('/', uiCommandRouter);
 app.use('/', upstreamAppsRouter);
 app.use('/', layoutsRouter);
 app.use('/', sourceHealthRouter);
+app.use('/', require('./routes/version'));
 app.use('/', playRouter);
 app.use('/', downloadsRouter);
 app.use('/', pairingRouter);

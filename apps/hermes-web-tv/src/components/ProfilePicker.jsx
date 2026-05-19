@@ -274,19 +274,40 @@ function ProfilePicker(props) {
       className={embedded ? '' : 'hermes-modal-overlay'}
       style={rootStyle}
     >
-      <h1
-        className="hermes-modal-panel"
+      <div
         style={{
-          color: '#e6edf3',
-          fontSize: '2.75rem',
-          fontWeight: '700',
-          margin: 0,
-          letterSpacing: '0.01em',
-          textAlign: 'center'
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.6rem'
         }}
       >
-        Who&apos;s watching?
-      </h1>
+        <span
+          style={{
+            color: '#e6edf3',
+            fontSize: '1rem',
+            fontWeight: '800',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            opacity: 0.85
+          }}
+        >
+          Dave<span style={{ color: '#1f6feb' }}>TV</span>
+        </span>
+        <h1
+          className="hermes-modal-panel"
+          style={{
+            color: '#e6edf3',
+            fontSize: '2.75rem',
+            fontWeight: '700',
+            margin: 0,
+            letterSpacing: '0.01em',
+            textAlign: 'center'
+          }}
+        >
+          Welcome back &mdash; who&apos;s watching?
+        </h1>
+      </div>
 
       <div
         className="hermes-modal-panel"

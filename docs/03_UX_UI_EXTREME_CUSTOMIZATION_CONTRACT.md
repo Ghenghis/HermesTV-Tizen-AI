@@ -6,7 +6,7 @@ Target TVs: Mom `QN85Q7FAAFXZA`; Dave `UN55CU8000BXZA`.
 
 ## UX mandate
 
-HermesTV must feel far beyond common IPTV apps. It must offer many selectable, changeable, user-tunable, and agent-tunable interfaces without becoming unstable.
+DaveTV must feel far beyond common IPTV apps. It must offer many selectable, changeable, user-tunable, and agent-tunable interfaces without becoming unstable.
 
 The UI engine must support at least:
 
@@ -80,3 +80,5 @@ Static presets first, deep custom editor second. The 12 layouts must be stable a
 - Dave TV performance proof
 - Mom TV enhanced-mode proof
 - rollback proof after agent UI command
+
+_(Rebranded HermesTV → DaveTV 2026-05-19 per user request; technical identifiers unchanged.)_

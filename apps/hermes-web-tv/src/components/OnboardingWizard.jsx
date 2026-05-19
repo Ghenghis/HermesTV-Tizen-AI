@@ -10,7 +10,7 @@ var PlaylistImportModal = React.lazy(function() { return import('./PlaylistImpor
 var QROnboarding = React.lazy(function() { return import('./QROnboarding.jsx'); });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OnboardingWizard — first-launch 5-step onboarding overlay for HermesTV.
+// OnboardingWizard — first-launch 5-step onboarding overlay for DaveTV.
 //
 //   Step 1  Welcome           — brand splash + "Get started" CTA + skip link
 //   Step 2  TV model          — auto-detect + manual selector → tv_model
@@ -82,7 +82,7 @@ var STEP_TOUR_CARDS = [
   {
     icon: '🏠', // 🏠
     headline: 'Press the Home button to switch layouts',
-    body: 'HermesTV ships with 14 visual styles — from TiviMate-style EPG grids to Netflix-style discovery rows. Try a few until one feels like home.',
+    body: 'DaveTV ships with 14 visual styles — from TiviMate-style EPG grids to Netflix-style discovery rows. Try a few until one feels like home.',
     accent: '#1f6feb',
   },
   {
@@ -512,7 +512,7 @@ function StepWelcome(props) {
           letterSpacing: '-0.04em',
         }}
       >
-        H
+        D
       </div>
 
       <h1
@@ -525,7 +525,7 @@ function StepWelcome(props) {
           lineHeight: 1.15,
         }}
       >
-        Welcome to Hermes<span style={{ color: 'var(--accent, #1f6feb)' }}>TV</span>
+        Welcome to Dave<span style={{ color: 'var(--accent, #1f6feb)' }}>TV</span>
       </h1>
       <p
         style={{
@@ -779,7 +779,7 @@ function StepProvider(props) {
             lineHeight: 1.55,
           }}
         >
-          HermesTV reads M3U / Xtream / iptv-org playlists. You can do this now, or any time from Settings &raquo; Playlists.
+          DaveTV reads M3U / Xtream / iptv-org playlists. You can do this now, or any time from Settings &raquo; Playlists.
         </p>
       </div>
 
@@ -1273,7 +1273,7 @@ function OnboardingWizard(props) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="HermesTV first-launch onboarding"
+      aria-label="DaveTV first-launch onboarding"
       className="hermes-modal-overlay"
       style={{
         position: 'fixed',
@@ -1308,7 +1308,7 @@ function OnboardingWizard(props) {
             letterSpacing: '0.04em',
           }}
         >
-          Hermes<span style={{ color: 'var(--accent, #1f6feb)' }}>TV</span>
+          Dave<span style={{ color: 'var(--accent, #1f6feb)' }}>TV</span>
         </span>
         <ProgressDots current={state.stepIndex} total={STEP_ORDER.length} />
         <button

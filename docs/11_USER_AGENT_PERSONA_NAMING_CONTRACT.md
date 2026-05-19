@@ -1,4 +1,4 @@
-# HermesTV — Doc 11: User & Agent Persona Naming Contract
+# DaveTV — Doc 11: User & Agent Persona Naming Contract
 
 **Version:** 1.1.0  
 **Branch:** research/sota-features-may2026  
@@ -333,3 +333,5 @@ These rules are additive to the profile isolation rules in section 10. Violating
 | PROFILE-GATE-14 | `mom_tv` font scale cannot be set below 1.25 via any agent command — router returns `rejected_policy`; proof: `proof/agent-commands/tests/mom-font-floor/*.json` |
 | PROFILE-GATE-15 | `mom_tv` `reduced_motion` and `audio_feedback` cannot be disabled without verbal confirm token — router rejects without it; proof: `proof/agent-commands/tests/mom-mode-lock/*.json` |
 | PROFILE-GATE-16 | QN non-limiting: no agent command can permanently downgrade `mom_tv` tier; each attempt returns `rejected_policy`; proof: `proof/agent-commands/tests/qn-non-limiting/*.json` |
+
+_(Rebranded HermesTV → DaveTV 2026-05-19 per user request; "Hermes" the default bot persona name is unchanged — it remains the agent character and stays per-profile renameable. Technical identifiers, localStorage keys, and Redis prefixes unchanged.)_

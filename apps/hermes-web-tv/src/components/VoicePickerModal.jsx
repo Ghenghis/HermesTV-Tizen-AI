@@ -39,6 +39,16 @@ function VoicePickerModal(props) {
   var statusMsg = statusResult[0];
   var setStatusMsg = statusResult[1];
 
+  // Roving-tabindex focus index for Tizen D-pad navigation across voice rows.
+  // -1 = no row focused (close button has autoFocus on open). Arrow keys
+  // advance focus between rows; OK / Enter activates "Use voice" on the
+  // focused row.
+  var focusIdxResult = React.useState(-1);
+  var focusIdx = focusIdxResult[0];
+  var setFocusIdx = focusIdxResult[1];
+
+  var rowRefsRef = React.useRef([]);
+
   React.useEffect(function() {
     if (!isOpen) return;
     setLoading(true);
@@ -58,6 +68,33 @@ function VoicePickerModal(props) {
       voiceClient.stopSpeaking();
     };
   }, [isOpen, onClose]);
+
+  // Move actual DOM focus when focusIdx changes so the visible focus ring
+  // (rendered via onFocus inline-style toggle) follows the D-pad.
+  React.useEffect(function() {
+    if (focusIdx < 0) return;
+    var row = rowRefsRef.current[focusIdx];
+    if (row && typeof row.focus === 'function') {
+      try { row.focus(); } catch (_) { /* ignore */ }
+    }
+  }, [focusIdx]);
+
+  function handleRowKeyDown(e, idx, voice, isCurrent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusIdx(Math.min(voices.length - 1, idx + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusIdx(Math.max(0, idx - 1));
+    } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      if (!isCurrent) handleSelect(voice);
+    } else if (e.key === 'ArrowRight' || e.key === 'MediaPlayPause') {
+      // Right arrow / play key triggers preview without leaving the row.
+      e.preventDefault();
+      handlePreview(voice);
+    }
+  }
 
   if (!isOpen) return null;
 
@@ -136,7 +173,7 @@ function VoicePickerModal(props) {
             }}
             onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
             onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
-            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent-color, var(--accent, #58a6ff))'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
             onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
           >&times;</button>
         </div>
@@ -158,11 +195,21 @@ function VoicePickerModal(props) {
           {!loading && voices.length === 0 && (
             <div style={{ padding: '40px', textAlign: 'center', color: '#8a8f9b', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>{t('voice.empty')}</div>
           )}
-          {voices.map(function(voice) {
+          {voices.map(function(voice, idx) {
             var isCurrent = voice.id === currentVoiceId;
             return (
               <div
                 key={voice.id}
+                ref={function(el) { rowRefsRef.current[idx] = el; }}
+                role="option"
+                aria-selected={isCurrent}
+                tabIndex={0}
+                onKeyDown={function(e) { handleRowKeyDown(e, idx, voice, isCurrent); }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid var(--accent-color, var(--accent, #58a6ff))';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '14px 16px', marginBottom: '10px',
@@ -171,19 +218,23 @@ function VoicePickerModal(props) {
                   border: isCurrent ? '1px solid #ff7eb3' : '1px solid #2a2b3a',
                   boxShadow: isCurrent ? '0 4px 14px rgba(255,126,179,0.16)' : 'inset 0 1px 0 rgba(255,255,255,0.02)',
                   transition: 'border-color 160ms ease, background-color 160ms ease',
+                  outline: 'none',
+                  minHeight: '56px',
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <span style={{ fontWeight: 700, fontSize: 'calc(0.95rem * var(--font-scale, 1))', color: '#e8edf5' }}>{voice.name}</span>
                     <span style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{voice.locale} · {voice.gender} · {voice.tone}</span>
-                    {isCurrent && <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 800, color: '#ff7eb3', border: '1px solid #ff7eb3', borderRadius: '999px', padding: '2px 8px', letterSpacing: '0.06em', background: 'rgba(255,126,179,0.08)' }}>{t('voice.current_badge')}</span>}
+                    {isCurrent && <span aria-label="Selected" style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 800, color: '#ff7eb3', border: '1px solid #ff7eb3', borderRadius: '999px', padding: '2px 9px', letterSpacing: '0.06em', background: 'rgba(255,126,179,0.08)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span aria-hidden="true">✓</span>{t('voice.current_badge')}</span>}
                   </div>
                   <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#9aa3b2', fontStyle: 'italic' }}>"{voice.sample}"</div>
                 </div>
                 <button
                   onClick={function() { handlePreview(voice); }}
                   disabled={previewing === voice.id}
+                  aria-label={t('voice.preview_aria')}
+                  title={t('voice.preview_aria')}
                   style={{
                     padding: '10px 14px', borderRadius: '10px',
                     background: '#22232f', border: '1px solid #2a2b3a',
@@ -194,7 +245,7 @@ function VoicePickerModal(props) {
                   }}
                   onMouseEnter={function(e) { if (previewing !== voice.id) { e.currentTarget.style.background = '#2a2b3a'; e.currentTarget.style.transform = 'scale(1.04)'; } }}
                   onMouseLeave={function(e) { e.currentTarget.style.background = '#22232f'; e.currentTarget.style.transform = 'scale(1)'; }}
-                  onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; }}
+                  onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent-color, var(--accent, #58a6ff))'; e.currentTarget.style.outlineOffset = '2px'; }}
                   onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
                 >{previewing === voice.id ? '…' : '🔊'}</button>
                 <button
@@ -214,7 +265,7 @@ function VoicePickerModal(props) {
                   }}
                   onMouseEnter={function(e) { if (!isCurrent) e.currentTarget.style.transform = 'scale(1.05)'; }}
                   onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
-                  onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #ff7eb3)'; e.currentTarget.style.outlineOffset = '2px'; if (!isCurrent) e.currentTarget.style.transform = 'scale(1.06)'; }}
+                  onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent-color, var(--accent, #58a6ff))'; e.currentTarget.style.outlineOffset = '2px'; if (!isCurrent) e.currentTarget.style.transform = 'scale(1.06)'; }}
                   onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
                 >{isCurrent ? t('voice.active') : (saving === voice.id ? t('voice.saving') : t('voice.use'))}</button>
               </div>

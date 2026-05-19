@@ -1,35 +1,50 @@
 'use strict';
 
-// Tizen TV remote key map. Codes come from Samsung's documented set:
+// Tizen TV remote key map — canonical reference for Samsung Tizen 6.5
+// (QN85/QN95 QLED is the design target; older UN-class TVs get graceful
+// degradation). Codes come from Samsung's documented set:
 //   https://developer.samsung.com/smarttv/develop/guides/user-interaction/remote-control.html
 //
-// The map covers everything an IPTV/streaming app realistically needs on a
-// Samsung remote: arrow nav + OK, Back/Exit, color buttons, transport
-// (play/pause/stop/ff/rewind), media meta (info/guide), and the channel /
-// volume / num-pad keys. Some keys (volume, mute, channel up/down) are
-// handled by the Tizen platform by default and only fire keydown events
-// for an app when they are explicitly registered via
-// `tizen.tvinputdevice.registerKey(...)` — see `registerTizenRemoteKeys`
-// below.
+// This module is the single source of truth for the raw keyCode → name map,
+// the registered-key list, and the boot-time registration helper. Shell-
+// specific overlays (Zero, TiviMate, etc.) compose on top of this — see
+// zeroTizenKeyMap.js for the canonical example.
 //
 // We intentionally keep this module in classic ES5 syntax (no `?.`, no
-// template literals, no `for...of`) because the Tizen 6.5 webview ships
-// Chromium 76 and we want the same source to work in dev AND on-TV without
-// a transpile pass for these tiny helpers.
+// template literals, no `for...of`, no arrow funcs) because the Tizen 6.5
+// webview ships Chromium 76 and we want the same source to work in dev AND
+// on-TV without a transpile pass for these tiny helpers.
+//
+// Developer reference: docs/45_TIZEN_REMOTE_KEYMAP.md
 
+// ─── Raw keyCode → key-name map ─────────────────────────────────────────────
+// Comprehensive coverage of every key a Samsung Tizen IPTV/streaming app
+// realistically needs. Names are stable strings; the route-dispatcher table
+// (see TIZEN_KEY_ROUTES below) maps each name to a logical handler kind.
 var TIZEN_KEY_CODES = {
-  // Directional + selection
-  38: 'up',
-  40: 'down',
+  // Directional D-pad — JS keyCodes match standard browser arrows.
+  // Tizen docs also note 4/5/6/7 as alternate codes on a few older remotes;
+  // we register both so spatial nav works regardless of remote firmware.
   37: 'left',
+  38: 'up',
   39: 'right',
+  40: 'down',
+  4:  'left',   // alternate (older Samsung remotes)
+  5:  'up',     // alternate
+  6:  'right',  // alternate
+  7:  'down',   // alternate
+
+  // Selection
   13: 'enter',
 
   // System navigation
   10009: 'back',
   10182: 'exit',
-  10135: 'smart_hub',
-  10073: 'home',
+  10071: 'smart_hub',
+  10072: 'source',
+  10135: 'tools',
+  10073: 'channel_list',
+  10190: 'previous_channel',
 
   // Color buttons (often used as colored shortcuts on Samsung remotes)
   403: 'red',
@@ -38,22 +53,20 @@ var TIZEN_KEY_CODES = {
   406: 'blue',
 
   // Transport / media keys (require registerKey on Tizen)
-  415: 'play',
-  19:  'pause',
+  415:   'play',
+  19:    'pause',
   10252: 'play_pause',
-  413: 'stop',
-  417: 'fast_forward',
-  412: 'rewind',
-  10233: 'channel_list',
+  413:   'stop',
+  417:   'fast_forward',
+  412:   'rewind',
 
   // EPG / info / guide
-  457: 'info',
+  457:   'info',
   10232: 'guide',
 
   // Channel up/down (require registerKey)
   427: 'channel_up',
   428: 'channel_down',
-  10190: 'previous_channel',
 
   // Volume / mute (Tizen TVs usually handle these in HW; registerKey
   // surfaces them to the app so we can sync UI state)
@@ -74,13 +87,64 @@ var TIZEN_KEY_CODES = {
   57: 'num_9'
 };
 
+// Alias the canonical map under the simpler TIZEN_KEYS export name the caller
+// asked for. Both names refer to the same object — pure aliasing, never
+// reassigned. The longer original name stays for backwards compat with the
+// existing zeroTizenKeyMap.js import.
+var TIZEN_KEYS = TIZEN_KEY_CODES;
+
+// ─── Logical-route table ────────────────────────────────────────────────────
+// Maps each keyCode → a "route kind" that consumers switch on. Lets the
+// dispatchToRoute helper stay tiny: it looks up the route once, then calls
+// the handler the caller registered for that route. Routes are intentionally
+// coarse — fine-grained behavior (e.g. "Red toggles favorites HERE but
+// deletes recording THERE") lives in the per-shell overlay map.
+var TIZEN_KEY_ROUTES = {
+  // Navigation
+  37: 'nav',     38: 'nav',     39: 'nav',     40: 'nav',
+  4:  'nav',     5:  'nav',     6:  'nav',     7:  'nav',
+  13: 'select',
+
+  // System
+  10009: 'back',
+  10182: 'exit',
+  10071: 'smart_hub',
+  10072: 'source',
+  10135: 'tools',
+  10073: 'channel_list',
+  10190: 'previous_channel',
+
+  // Colors
+  403: 'color',  404: 'color',  405: 'color',  406: 'color',
+
+  // Transport
+  415:   'transport',  19:    'transport',  10252: 'transport',
+  413:   'transport',  417:   'transport',  412:   'transport',
+
+  // EPG / info
+  457:   'info',
+  10232: 'guide',
+
+  // Channel
+  427: 'channel',
+  428: 'channel',
+
+  // Volume
+  447: 'volume',  448: 'volume',  449: 'volume',
+
+  // Numeric
+  48: 'numeric', 49: 'numeric', 50: 'numeric', 51: 'numeric', 52: 'numeric',
+  53: 'numeric', 54: 'numeric', 55: 'numeric', 56: 'numeric', 57: 'numeric'
+};
+
 // Subset of TIZEN_KEY_CODES that maps to a chatbot command. Pressing these
 // shortcuts the user straight into a layout / filter command without
 // opening the chat panel. Channel/volume/transport keys are intentionally
 // NOT mapped to chatbot commands — they pass through to the dedicated
 // handlers in App.jsx (or are reserved for future PlayerModal binding).
 var KEY_TO_COMMAND = {
-  10135: 'toggle layout switcher', // Smart Hub
+  10135: 'toggle layout switcher', // Tools
+  10071: 'toggle layout switcher', // Smart Hub
   10232: 'show live',               // Guide
   403:   'change layout to tivimate', // Red
   404:   'show live',                 // Green
@@ -131,8 +195,19 @@ function getKeyName(keyCode) {
   return TIZEN_KEY_CODES[keyCode] || null;
 }
 
+function getKeyRoute(keyCode) {
+  return TIZEN_KEY_ROUTES[keyCode] || null;
+}
+
 function getKeyCommand(keyCode) {
   return KEY_TO_COMMAND[keyCode] || null;
+}
+
+// Backwards-compatible alias the caller asked for. Same semantics as
+// registerTizenRemoteKeys() — keep BOTH exports so existing consumers
+// (zeroTizenKeyMap.js, App.jsx wiring) don't break.
+function registerTizenKeys() {
+  return registerTizenRemoteKeys();
 }
 
 // Register the full remote-key set with the Tizen platform so the app
@@ -185,6 +260,42 @@ function registerTizenRemoteKeys() {
   return count;
 }
 
+// dispatchToRoute — given a raw keydown event and a `routes` object whose
+// keys are route kinds ('nav','select','back','exit','smart_hub','tools',
+// 'source','color','transport','info','guide','channel','volume','numeric',
+// 'channel_list','previous_channel'), look up the route for the event's
+// keyCode and invoke the matching handler with a tiny payload describing
+// the press.
+//
+// Returns whatever the matched handler returned, or null if no route
+// matched. Truthy handler returns are treated as "I handled this" by most
+// callers — they then preventDefault to stop the key bubbling to the
+// platform.
+//
+// The handler signature is:
+//   handler({ keyCode, name, route, event })
+// where `event` is the original KeyboardEvent so the handler can call
+// preventDefault / stopPropagation itself.
+//
+// This stays pure — no document-level listeners, no global state. The
+// caller wires it up inside their own keydown listener (which already
+// exists in App.jsx and ZeroShell.jsx).
+function dispatchToRoute(keyEvent, routes) {
+  if (!keyEvent || !routes) { return null; }
+  var code = keyEvent.keyCode;
+  var route = TIZEN_KEY_ROUTES[code];
+  if (!route) { return null; }
+  var handler = routes[route];
+  if (typeof handler !== 'function') { return null; }
+  var payload = {
+    keyCode: code,
+    name: TIZEN_KEY_CODES[code] || null,
+    route: route,
+    event: keyEvent
+  };
+  return handler(payload);
+}
+
 // installTizenKeyHandler — global Tizen remote handler.
 // onCommand: invoked for color/Smart-Hub/Guide keys that map to chatbot commands.
 // onBack: invoked for the Back (10009) / Exit (10182) keys. If the handler
@@ -227,11 +338,16 @@ function installTizenKeyHandler(onCommand, onBack) {
 }
 
 export {
+  TIZEN_KEYS,
   TIZEN_KEY_CODES,
+  TIZEN_KEY_ROUTES,
   KEY_TO_COMMAND,
   TIZEN_REGISTERED_KEYS,
   getKeyName,
+  getKeyRoute,
   getKeyCommand,
+  registerTizenKeys,
   registerTizenRemoteKeys,
+  dispatchToRoute,
   installTizenKeyHandler
 };

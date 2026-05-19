@@ -2,6 +2,11 @@ import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import ZeroHero from '../components/zero/ZeroHero.jsx';
+import ZeroNowNext from '../components/zero/ZeroNowNext.jsx';
+import ZeroFocusRing from '../components/zero/ZeroFocusRing.jsx';
+import ZeroChannelStrip from '../components/zero/ZeroChannelStrip.jsx';
+import { installZeroShellTizenHandler } from '../utils/zeroTizenKeyMap.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZeroShell — HermesTV's clone of the IPTV Player Zero look (8th layout).
@@ -13,9 +18,18 @@ import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 //   - Top bar: stylised Z logo centred, time + Pro chip + bell + gear on
 //     the right, "All playlists / N playlists" toggle.
 //   - Top nav: Live TV / Catch-up / Movies / Series tabs.
+//   - Hero panel above the grid that reflects focusedItem (Zero's
+//     FRONTEND_COMPONENTS.md §Live preview pattern, ported to all tabs).
 //   - Main grid: poster cards 2:3 ratio with a yellow star-rating chip
 //     top-right and a circular heart favourite bottom-right.
-//   - Cyan-blue gradient accent across the Z logo and primary buttons.
+//   - Cyan-blue gradient accent across the Z logo and primary buttons
+//     (same #77a7ff → #56d2f1 stops as the Zero preboot card).
+//   - Featured-channel strip on Live tab (Zero's FavoriteChannelBar).
+//   - Tizen-remote first: color buttons map to tabs / favorites; Smart Hub
+//     opens the layout switcher; Back is captured so Tizen doesn't hard-exit.
+//   - Mom-mode aware: larger fonts, simplified sidebar (Mom only ever sees
+//     Live / Movies / Series — Trakt / Downloads / Categories are hidden so
+//     the rail isn't overwhelming).
 //
 // All copy is HermesTV branding — never reference "IPTV Player Zero" in
 // user-visible strings. The visual language is inspired by the public
@@ -47,13 +61,29 @@ function _formatStar(rating) {
 // ─── Sidebar inventory ────────────────────────────────────────────────────────
 // Sections mirror the Zero-style rail. Counts come from the actual catalog
 // when available so Sherri/Dave see real numbers, not stubs.
-function _buildSidebarSections(catalog) {
+//
+// momMode trims the rail to just the three things Mom touches — Live TV,
+// Movies, Series. Trakt sync, downloads, and "categories search" are power-
+// user features that overwhelmed Sherri in the May audit, so we hide them
+// behind the mom_mode profile flag. The chatbot still surfaces them by
+// command for anyone who wants them.
+function _buildSidebarSections(catalog, momMode) {
   var counts = { live: 0, movies: 0, series: 0 };
   (catalog || []).forEach(function(it) {
     if (it.type === 'live') { counts.live++; }
     else if (it.type === 'movies' || it.type === 'movie') { counts.movies++; }
     else if (it.type === 'series') { counts.series++; }
   });
+  if (momMode) {
+    // Three rails, one icon each, big counts. No Trakt, no downloads, no
+    // search-by-category. Mirrors the MomModeShell sidebar.
+    return [
+      { id: 'all_live', icon: '📡', label: 'Live TV', count: counts.live, group: 'browse' },
+      { id: 'all_movies', icon: '🎬', label: 'Movies', count: counts.movies, group: 'browse' },
+      { id: 'all_series', icon: '📺', label: 'Series', count: counts.series, group: 'browse' },
+      { id: 'continue_watching', icon: '⟲', label: 'Continue Watching', count: 0, group: 'sync' },
+    ];
+  }
   return [
     { id: 'favorite_movies', icon: '★', label: 'Favorite Movies', count: 0, group: 'pinned' },
     { id: 'trakt', icon: '◉', label: 'Trakt', count: 0, group: 'sync', children: [
@@ -77,11 +107,22 @@ function ZeroShell(props) {
   var tier = props.tier;
   var providers = props.providers;
   var onItemSelect = props.onItemSelect;
+  // onItemFocus + focusedItem drive the hero panel. We also keep an internal
+  // fallback so the shell works correctly when used standalone (e.g. via
+  // /layout/zero with no App.jsx orchestrator above it).
+  var onItemFocus = props.onItemFocus;
+  var focusedItemFromProps = props.focusedItem;
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
 
-  var fontScale = (profile && profile.font_scale) || 1.0;
+  // Mom-mode is the asymmetric simplification flag from MEMORY.md:
+  // - profile.mom_mode = true (set explicitly by Sherri's profile, or pushed
+  //   by the parent App.jsx based on profile_id === 'mom_tv').
+  // - profile.simplified_ui = true (alternate naming used by older code).
+  // Either flag activates the simplified sidebar and 4-tab layout.
+  var momMode = !!(profile && (profile.mom_mode || profile.simplified_ui));
+  var fontScale = (profile && profile.font_scale) || (momMode ? 1.2 : 1.0);
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
 
   var pinnedResult = React.useState(true); // "Pin top section" toggle (default on)
@@ -108,6 +149,21 @@ function ZeroShell(props) {
   var now = nowResult[0];
   var setNow = nowResult[1];
 
+  // Internal focus state for the hero panel. If the parent App.jsx wired
+  // onItemFocus, we forward; if not, we still track focus locally so the
+  // hero updates as the user moves over posters. The "live" value is
+  // prop-first so the shell stays a controlled-component when parented.
+  var localFocusResult = React.useState(null);
+  var localFocusedItem = localFocusResult[0];
+  var setLocalFocusedItem = localFocusResult[1];
+  var focusedItem = (typeof focusedItemFromProps !== 'undefined' && focusedItemFromProps !== null)
+    ? focusedItemFromProps
+    : localFocusedItem;
+  function _publishFocus(item) {
+    setLocalFocusedItem(item);
+    if (typeof onItemFocus === 'function') { onItemFocus(item); }
+  }
+
   // Build the debouncer once with useMemo so we don't re-create the timer
   // on every render (which would defeat the whole point).
   var debouncedSetSearch = React.useMemo(function() {
@@ -132,6 +188,51 @@ function ZeroShell(props) {
     if (el && typeof el.focus === 'function') {
       try { el.focus(); } catch (_) {}
     }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Tizen remote handler ──────────────────────────────────────────────
+  // Bind the Zero-flavored Tizen handler while this shell is mounted. The
+  // base tizenKeyMap.js installer is still kept by App.jsx for the global
+  // chatbot commands; this shell-scoped installer adds three extras:
+  //   - Color buttons swap tabs (Green=Live, Yellow=Movies, Blue=Catch-up).
+  //   - Red toggles favorites filter on the active tab.
+  //   - Tools key (10133) focuses the search input.
+  // The handler is composable: returning truthy from a callback swallows
+  // the keypress so the global chatbot bus doesn't ALSO fire on it.
+  React.useEffect(function() {
+    var unmount = installZeroShellTizenHandler({
+      onTabSwitch: function(tabId) {
+        // Only switch when the target tab is part of our 4-tab Zero rail.
+        if (tabId === 'live' || tabId === 'movies' || tabId === 'catchup') {
+          setActiveTab(tabId);
+          return true; // suppress chatbot fallback
+        }
+        return false;
+      },
+      onFavoritesKey: function() {
+        // Toggle the search input to look for favorites — we don't have a
+        // proper "favorites filter" prop here, so we put the user in the
+        // closest equivalent: a focused search input. Returning true
+        // prevents the chatbot from also opening.
+        var inp = document.querySelector('.zero-shell input[type="search"]');
+        if (inp && typeof inp.focus === 'function') {
+          try { inp.focus(); } catch (_) {}
+        }
+        return true;
+      },
+      onSearchOpen: function() {
+        var inp = document.querySelector('.zero-shell input[type="search"]');
+        if (inp && typeof inp.focus === 'function') {
+          try { inp.focus(); } catch (_) {}
+          return true;
+        }
+        return false;
+      },
+      // We leave onCommand and onBack unbound here on purpose — App.jsx
+      // already owns the global Back-key cascade (modal close, then exit).
+      // Adding our own would double-fire.
+    });
+    return unmount;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   var displayItems = filtered;
@@ -188,33 +289,66 @@ function ZeroShell(props) {
     overscan: 1,
   });
 
-  var tabs = [
-    { id: 'live', icon: '📡', label: 'Live TV' },
-    { id: 'catchup', icon: '⟲', label: 'Catch-up' },
-    { id: 'movies', icon: '🎬', label: 'Movies' },
-    { id: 'series', icon: '📺', label: 'Series' },
-  ];
+  // Mom-mode trims the tab bar from 4 to 3 — Catch-up is power-user surface.
+  // The chatbot still surfaces catch-up by command for anyone who wants it.
+  var tabs = momMode
+    ? [
+      { id: 'live', icon: '📡', label: 'Live TV' },
+      { id: 'movies', icon: '🎬', label: 'Movies' },
+      { id: 'series', icon: '📺', label: 'Series' },
+    ]
+    : [
+      { id: 'live', icon: '📡', label: 'Live TV' },
+      { id: 'catchup', icon: '⟲', label: 'Catch-up' },
+      { id: 'movies', icon: '🎬', label: 'Movies' },
+      { id: 'series', icon: '📺', label: 'Series' },
+    ];
 
-  var sidebarSections = _buildSidebarSections(catalog);
+  var sidebarSections = _buildSidebarSections(catalog, momMode);
   var playlistCount = (providers && providers.length) || 0;
   var clockLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   var dateLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+  // Live channels list — fed to the ZeroChannelStrip when on the Live tab.
+  var liveChannels = filtered.filter(function(i) { return i.type === 'live'; });
+  // Now/next placeholder — when the API surfaces EPG-window per channel
+  // we'll feed those programs in; for now we render the empty-state row so
+  // the layout reserves the right vertical space.
+  var nowProgram = null;
+  var nextProgram = null;
+  if (focusedItem && focusedItem.type === 'live') {
+    nowProgram = (focusedItem.epg && focusedItem.epg.now) || null;
+    nextProgram = (focusedItem.epg && focusedItem.epg.next) || null;
+  }
 
   return (
     <div
       className="zero-shell"
       style={{
         display: 'grid',
-        gridTemplateColumns: pinned ? '240px 1fr' : '0 1fr',
+        // Mom-mode collapses to a single-column main area when the sidebar
+        // is pinned-off; in Mom-mode the sidebar is pinned-on by default so
+        // Sherri always sees Live/Movies/Series labels (no hidden chrome).
+        gridTemplateColumns: pinned ? (momMode ? '280px 1fr' : '240px 1fr') : '0 1fr',
         gridTemplateRows: '64px 1fr',
         height: '100%',
-        background: 'var(--bg, #0a0e1a)',
+        // Radial background recipe from frontend_src_clean/index.html line
+        // 18–22: top-left blue glow, bottom-right cyan glow, near-black
+        // base. Sits behind the grid + sidebar so the shell feels lit even
+        // before any artwork loads.
+        background:
+          'radial-gradient(circle at top left, rgba(90, 130, 255, 0.16), transparent 36%),'
+          + ' radial-gradient(circle at bottom right, rgba(65, 190, 220, 0.14), transparent 42%),'
+          + ' linear-gradient(180deg, var(--bg, #0a0e1a) 0%, #0f1218 100%)',
         color: 'var(--text, #e6edf3)',
         overflow: 'hidden',
         fontFamily: '"Inter", "Segoe UI", system-ui, -apple-system, sans-serif',
         transition: 'grid-template-columns 200ms ease',
+        '--font-scale': fontScale,
       }}
     >
+      {/* Mount the focus-ring stylesheet once — idempotent on remount. */}
+      <ZeroFocusRing />
       {/* ─── Top bar (spans both columns visually) ─────────────────────────── */}
       <div
         style={{
@@ -467,6 +601,47 @@ function ZeroShell(props) {
           })}
         </div>
 
+        {/* Cinematic hero — mirrors the Zero preboot card aesthetic. Reads
+            focusedItem (either prop or local fallback) and adapts the
+            artwork, type chip, rating, and CTAs. When nothing is focused,
+            shows a friendly greeting using the profile nickname. */}
+        <ZeroHero
+          focusedItem={focusedItem}
+          profile={profile}
+          tier={tier}
+          onPlay={function(item) { if (typeof onItemSelect === 'function') { onItemSelect(item); } }}
+          onMoreInfo={function(item) { if (typeof onItemSelect === 'function') { onItemSelect(item); } }}
+        />
+
+        {/* Now/Next strip — only meaningful when the focused item is a live
+            channel. We keep it mounted (no SSR layout shift) but render
+            null when not on a live focus. */}
+        {focusedItem && focusedItem.type === 'live' && (
+          <div style={{ padding: '0 16px' }}>
+            <ZeroNowNext
+              nowProgram={nowProgram}
+              nextProgram={nextProgram}
+              fontScale={fontScale}
+              tier={tier}
+            />
+          </div>
+        )}
+
+        {/* Featured live-channel strip — Zero's FavoriteChannelBar pattern.
+            Only shown on the Live tab so VOD-grid users don't lose vertical
+            real estate. */}
+        {activeTab === 'live' && (
+          <ZeroChannelStrip
+            channels={liveChannels}
+            limit={momMode ? 8 : 12}
+            onItemFocus={_publishFocus}
+            onItemSelect={onItemSelect}
+            focusedItemId={focusedItem && focusedItem.id}
+            fontScale={fontScale}
+            tier={tier}
+          />
+        )}
+
         {/* Continue Watching rail — sits above the main grid, after the
             top tabs. Returns null when the profile has no history, so the
             shell collapses gracefully for fresh installs. */}
@@ -597,7 +772,14 @@ function ZeroShell(props) {
                       textAlign: 'left',
                       outline: 'none',
                     }}
-                    onFocus={function(e) { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.zIndex = '2'; }}
+                    onFocus={function(e) {
+                      // Publish focus to the hero panel — this is what makes
+                      // moving the remote actually change the preview.
+                      _publishFocus(item);
+                      e.currentTarget.style.transform = 'scale(1.04)';
+                      e.currentTarget.style.zIndex = '2';
+                    }}
+                    onMouseEnter={function() { _publishFocus(item); }}
                     onBlur={function(e) { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.zIndex = '1'; }}
                   >
                     <div

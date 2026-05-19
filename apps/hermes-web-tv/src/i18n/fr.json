@@ -1,0 +1,59 @@
+{
+  "common.close": "Fermer",
+  "common.cancel": "Annuler",
+  "common.save": "Enregistrer",
+  "common.retry": "Réessayer",
+  "common.you": "Vous",
+  "common.offline": "HORS LIGNE",
+  "common.untitled": "Sans titre",
+  "common.loading": "Chargement…",
+  "common.search": "Rechercher",
+  "common.back": "Retour",
+
+  "settings.title": "Paramètres",
+  "settings.tabs.general": "Général",
+  "settings.tabs.appearance": "Apparence",
+  "settings.tabs.features": "Fonctionnalités",
+  "settings.tabs.about": "À propos",
+  "settings.tabs.recordings": "Enregistrements",
+  "settings.tabs.voice": "Voix",
+
+  "settings.language.header": "Langue",
+  "settings.language.english": "English",
+  "settings.language.spanish": "Español",
+  "settings.language.french": "Français",
+  "settings.language.german": "Deutsch",
+
+  "settings.about.header": "DaveTV",
+  "settings.about.credit": "Conçu pour Sherri (Mode Maman) et Dave. Style inspiré d'IPTV Player Zero — aucun élément copié.",
+
+  "favorites.header": "Vos favoris",
+  "favorites.empty": "Aucun favori pour le moment.",
+  "recent.header": "Vus récemment",
+  "recent.empty": "Rien vu récemment.",
+  "continue.header": "Reprendre",
+
+  "recordings.title": "Mes enregistrements",
+  "recordings.empty": "Aucun enregistrement",
+  "recordings.tab_scheduled": "Programmés",
+  "recordings.tab_recording": "En cours",
+  "recordings.tab_completed": "Terminés",
+
+  "watchlist.header": "Liste à voir",
+  "categories.header": "Catégories",
+  "categories.all": "Toutes",
+  "categories.live": "TV en direct",
+  "categories.movies": "Films",
+  "categories.series": "Séries",
+  "categories.sports": "Sports",
+  "categories.news": "Actualités",
+  "categories.kids": "Enfants",
+
+  "timeshift.live": "EN DIRECT",
+  "timeshift.back_to_live": "Retour au direct",
+  "catchup.tab": "Rattrapage",
+  "catchup.header": "Rattrapage",
+
+  "settings.sleep.header": "Minuteur de veille",
+  "settings.sleep.off": "Désactivé"
+}

@@ -1,12 +1,13 @@
-# 00 — HermesTV Tizen AI Master Contract for Claude 20+ Agent Swarm
+# 00 — DaveTV Tizen AI Master Contract for Claude 20+ Agent Swarm
 
-Project: `HermesTV-Tizen-AI`
+Product (user-facing name): **DaveTV**
+Project repo (technical identifier, unchanged): `HermesTV-Tizen-AI`
 
 Local path: `G:\Github\HermesTV-Tizen-AI`
 
 GitHub: `https://github.com/Ghenghis/HermesTV-Tizen-AI`
 
-Mission: build a private-household Samsung Tizen IPTV/AI experience for Dave and Mom, powered by a thin Tizen TV app and a VPS/workstation backend brain.
+Mission: build DaveTV — a private-household Samsung Tizen IPTV/AI experience for Dave and Mom, powered by a thin Tizen TV app and a VPS/workstation backend brain.
 
 ## Non-negotiable architecture
 
@@ -125,3 +126,5 @@ Integrate only lawful user-owned sources through local secrets, provider ingest 
 ## Acceptance rule
 
 Claude agents are not done until they produce proof, not claims: screenshots, focus traversal proof, player tests, TV model diagnostics, secret scan proof, no public endpoint proof, schema validation proof, and performance proof.
+
+_(Rebranded HermesTV → DaveTV 2026-05-19 per user request; technical identifiers unchanged.)_

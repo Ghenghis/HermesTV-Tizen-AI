@@ -28,6 +28,7 @@
 //   tier_override:  string  — 'auto' | 'enhanced' | 'degraded'
 //   agent_name:     string  — what the user calls the agent (default 'Hermes')
 //   audio_feedback: boolean — Azure TTS greeting on boot
+//   preferred_voice_id: string — Azure voice id, mirrors voicePrefStore record
 //   tv_model:       string  — TV model string (Tizen detection seed)
 //
 // Tizen 6.5 / Chrome 76 safe: no optional chaining, no nullish coalescing,
@@ -91,8 +92,9 @@ var PROFILE_DEFAULTS = {
   reduced_motion: false,
   mom_mode:       false,
   tier_override:  'auto',
-  agent_name:     'Hermes',
-  audio_feedback: false,
+  agent_name:         'Hermes',
+  audio_feedback:     false,
+  preferred_voice_id: '',
   tv_model:       'QN85Q7FAAFXZA'
 };
 
@@ -142,6 +144,15 @@ function _normaliseProfile(raw) {
   if (out.tier_override !== 'auto' && out.tier_override !== 'enhanced' && out.tier_override !== 'degraded') {
     out.tier_override = 'auto';
   }
+  // agent_name: clamp empty / non-string back to default 'Hermes', max 30 chars
+  if (typeof out.agent_name !== 'string' || out.agent_name.trim().length === 0) {
+    out.agent_name = 'Hermes';
+  } else if (out.agent_name.length > 30) {
+    out.agent_name = out.agent_name.substring(0, 30);
+  }
+  // preferred_voice_id is free-form (Azure voice ids vary) — only coerce type.
+  if (typeof out.preferred_voice_id !== 'string') { out.preferred_voice_id = ''; }
+  out.audio_feedback = !!out.audio_feedback;
   return out;
 }
 
