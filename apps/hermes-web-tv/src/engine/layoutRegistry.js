@@ -9,7 +9,12 @@ import ZeroShell from '../shells/ZeroShell.jsx';
 import NuvioShell from '../shells/NuvioShell.jsx';
 import ExtremeInfiniTVShell from '../shells/ExtremeInfiniTVShell.jsx';
 import StremioShell from '../shells/StremioShell.jsx';
+import LiveTVShell from '../shells/LiveTVShell.jsx';
 
+// NOTE: Three parallel agents are landing NuvioShell / StremioShell /
+// ExtremeInfiniTVShell at the same time as LiveTVShell. When merging
+// branches, keep all four entries — they're independent shells with no
+// shared module state, so the registry order is the only conflict point.
 var SHELL_REGISTRY = {
   'tivimate': TiviMateShell,
   'netflix': NetflixShell,
@@ -22,6 +27,7 @@ var SHELL_REGISTRY = {
   'nuvio': NuvioShell,
   'extreme-infinitv': ExtremeInfiniTVShell,
   'stremio': StremioShell,
+  'live-tv': LiveTVShell,
 };
 
 var LAYOUT_IDS = Object.keys(SHELL_REGISTRY);
