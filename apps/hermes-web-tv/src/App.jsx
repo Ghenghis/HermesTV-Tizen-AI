@@ -1069,6 +1069,22 @@ function App() {
       }
     } else if (action === 'reset_filters') {
       patchState({ providerFilter: 'all', contentFilter: 'all', qualityFilter: 'all', actorFilter: null });
+    } else if (action === 'open_search') {
+      patchState({ showSearch: true });
+    } else if (action === 'schedule_recording') {
+      // Pick a target item: focused MediaDetailPanel item first, then the
+      // currently-playing PlayerModal ticket. Skip silently when nothing
+      // live is on screen — chatbot text response handles the "nothing to
+      // record right now" hint.
+      var target = null;
+      if (state.selectedItem && state.selectedItem.type === 'live') {
+        target = state.selectedItem;
+      } else if (state.showPlayer && state.playerTicket && state.playerTicket.item && state.playerTicket.item.type === 'live') {
+        target = state.playerTicket.item;
+      }
+      if (target) {
+        handleScheduleRecording(target);
+      }
     }
     // show_detail and find_similar_actor: no state mutation needed (chatbot response text handles UX)
   }
