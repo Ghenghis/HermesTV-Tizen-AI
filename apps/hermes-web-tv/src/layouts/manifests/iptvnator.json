@@ -1,0 +1,16 @@
+{
+  "id": "iptvnator",
+  "name": "Classic 3-pane",
+  "cat": "Classic Players",
+  "description": "Material 3-column with playlist navigator + currently-playing strip",
+  "accent": "#26a69a",
+  "nav_style": "left-rail",
+  "hero_style": "side-preview",
+  "grid_style": "channel-list",
+  "tier_required": "any",
+  "tier_floor": "degraded",
+  "best_for": ["live", "epg"],
+  "tizen_safe": true,
+  "mom_friendly": false,
+  "dave_power": true
+}
