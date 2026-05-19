@@ -62,6 +62,19 @@ function FloatingChatbot(props) {
   var showHelp = helpResult[0];
   var setShowHelp = helpResult[1];
 
+  // Send-button ripple — toggled true for ~240ms when a message dispatches
+  // (handleSend / handleChipSend), then auto-cleared so the CSS animation
+  // re-fires on the next send. Pure CSS animation via .hermes-send-pulse —
+  // no JS animation lib, no per-frame work. The .motion-reduced rule in
+  // index.css strips the animation when the profile opts out of motion.
+  var pulseResult = React.useState(false);
+  var sendPulsing = pulseResult[0];
+  var setSendPulsing = pulseResult[1];
+  function triggerSendPulse() {
+    setSendPulsing(true);
+    setTimeout(function() { setSendPulsing(false); }, 240);
+  }
+
   function handleMinimizedKey(e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -101,6 +114,8 @@ function FloatingChatbot(props) {
     // Add user message immediately
     setHistory(function(prev) { return prev.concat([{ role: 'user', text: text }]); });
     setInputText('');
+    // Tactile confirmation that the send landed — quick CSS scale pulse.
+    triggerSendPulse();
 
     // ── Client-side greeting fast-path ─────────────────────────────────
     // "hello", "hi", "help", "thanks", etc. don't match the 22-pattern
@@ -180,6 +195,8 @@ function FloatingChatbot(props) {
     setErrorText('');
     setHistory(function(prev) { return prev.concat([{ role: 'user', text: commandText }]); });
     setSubmitting(true);
+    // Same pulse as the typed Send path — chip taps feel just as confirming.
+    triggerSendPulse();
 
     var validatePromise = online
       ? hermesApi.validateCommand({ command_text: commandText, profile_id: profileId })
@@ -305,6 +322,7 @@ function FloatingChatbot(props) {
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             <button
               tabIndex={0}
+              className="hermes-focusable hermes-press"
               onClick={function() { setChatState(STATES.expanded); }}
               style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0.2rem 0.4rem' }}
               aria-label="Expand chat"
@@ -313,6 +331,7 @@ function FloatingChatbot(props) {
             </button>
             <button
               tabIndex={0}
+              className="hermes-focusable hermes-press"
               onClick={function() { setChatState(STATES.minimized); }}
               style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
               aria-label="Minimize chat"
@@ -478,6 +497,7 @@ function FloatingChatbot(props) {
         <div style={{ display: 'flex', gap: '0.3rem' }}>
           <button
             tabIndex={0}
+            className="hermes-focusable hermes-press"
             onClick={function() { setShowHelp(true); }}
             title="Command help"
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
@@ -487,6 +507,7 @@ function FloatingChatbot(props) {
           </button>
           <button
             tabIndex={0}
+            className="hermes-focusable hermes-press"
             onClick={function() { setChatState(STATES.walkie); }}
             title="Walkie-talkie mode"
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
@@ -496,6 +517,7 @@ function FloatingChatbot(props) {
           </button>
           <button
             tabIndex={0}
+            className="hermes-focusable hermes-press"
             onClick={function() { setChatState(STATES.compact); }}
             title="Compact view"
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0.2rem 0.4rem' }}
@@ -505,6 +527,7 @@ function FloatingChatbot(props) {
           </button>
           <button
             tabIndex={0}
+            className="hermes-focusable hermes-press"
             onClick={function() { setChatState(STATES.minimized); }}
             title="Minimize"
             style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.4rem' }}
@@ -651,6 +674,12 @@ function FloatingChatbot(props) {
         />
         <button
           tabIndex={0}
+          // .hermes-send-pulse animation runs for ~220ms then sendPulsing
+          // flips back to false so the class re-applies cleanly next send.
+          // Note: keep the existing onFocus/onBlur transform handlers — they
+          // intentionally drive hover scaling that the .hermes-focusable
+          // class would otherwise wipe via its transition reset.
+          className={sendPulsing ? 'hermes-send-pulse' : undefined}
           onClick={handleSend}
           disabled={submitting || !inputText.trim()}
           style={{

@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── :focus-visible support note ──
+   `:focus-visible` is supported natively from Chromium 86; Tizen 6.5 ships
+   Chrome ~76 which lacks it (https://caniuse.com/css-focus-visible). On
+   those builds, `*:focus-visible` selectors below silently fail and the
+   parent `:focus` rules win — which is the desired graceful degradation
+   for TV remotes (remote-driven focus = always "visible"). No polyfill
+   needed: we keep both `:focus` AND `:focus-visible` declarations so
+   newer engines pick the more precise rule and older ones fall through. */
+
 /* ── Design tokens — radius scale, easing curves, shadows, gradients ──
    Mirrors RADII in src/design/tokens.js so JS-styled components and CSS
    classes stay in lockstep. Bumps every boxy/sharp-corner element to
@@ -479,6 +488,54 @@ textarea {
   will-change: transform, opacity;
 }
 
+/* ── .hermes-focusable: standardised focus + press affordance ──
+   Drop-in class for any clickable that today falls through to the browser
+   default outline. Opting in gets:
+     • Smooth 120ms scale transition (transform — 60fps safe)
+     • 180ms box-shadow transition (focus event is stateful, NOT per-frame
+       — the budget warning about shadow at 60fps doesn't apply here)
+     • Native outline suppressed; --shadow-focus halo takes over via
+       :focus-visible so keyboard/remote focus is unmistakable
+     • Subtle 0.97 scale-down on :active for tactile click feedback
+   Tizen 6.5 (Chrome 76): :focus-visible is unsupported, so the
+   ::-webkit-details-marker quirk and global :focus rules higher in this
+   file already give the user a fallback ring. No degradation needed. */
+.hermes-focusable {
+  transition: transform 120ms var(--ease-out), box-shadow 180ms var(--ease-out);
+  outline: none;
+}
+.hermes-focusable:focus-visible {
+  box-shadow: var(--shadow-focus);
+}
+.hermes-focusable:active {
+  transform: scale(0.97);
+}
+
+/* ── .hermes-press: subtle squish on click/Enter ──
+   For buttons that should feel like a physical key press. Pair with
+   .hermes-focusable on primary CTAs to combine the focus halo with the
+   click squish; use standalone on icon buttons that already manage their
+   own focus styling but lack press feedback. */
+.hermes-press:active {
+  transform: scale(0.96);
+  transition-duration: 80ms;
+}
+
+/* ── FloatingChatbot send-button ripple ──
+   Plays exactly once when a message is dispatched (the component toggles
+   the class for ~220ms via setTimeout). Pure transform pulse — no shadow,
+   no opacity flicker — so it stays inside the QN85 animation budget.
+   Spring easing gives the button a "boop" that confirms the send landed. */
+@keyframes hermes-send-pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.hermes-send-pulse {
+  animation: hermes-send-pulse 220ms var(--ease-spring) both;
+  will-change: transform;
+}
+
 /* Honour reduced-motion — the existing .motion-reduced rule already
    slashes durations, but we also drop the entrance opacity so the
    overlay doesn't flash. Belt + braces. */
@@ -489,6 +546,18 @@ textarea {
   opacity: 1 !important;
   transform: none !important;
 }
+/* .hermes-focusable / .hermes-press / .hermes-send-pulse animate transform.
+   When the profile sets reduced_motion=true, body gets .motion-reduced —
+   strip the transitions and any active-state scaling so motion-sensitive
+   users see no movement at all. The focus halo (box-shadow) is preserved
+   because it's a stateful indicator, not motion. */
+.motion-reduced .hermes-focusable,
+.motion-reduced .hermes-press,
+.motion-reduced .hermes-send-pulse {
+  transition: none !important;
+  transform: none !important;
+  animation: none !important;
+}
 @media (prefers-reduced-motion: reduce) {
   .hermes-modal-overlay,
   .hermes-modal-panel,
@@ -496,5 +565,12 @@ textarea {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+  .hermes-focusable,
+  .hermes-press,
+  .hermes-send-pulse {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
   }
 }
