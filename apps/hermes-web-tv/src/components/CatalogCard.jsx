@@ -1,6 +1,7 @@
 import React from 'react';
 import QualityBadge from './QualityBadge.jsx';
 import ProviderBadge from './ProviderBadge.jsx';
+import * as watchHistoryStore from '../store/watchHistoryStore.js';
 
 var CONTENT_TYPE_LABELS = {
   live: 'LIVE',
@@ -18,6 +19,36 @@ function CatalogCard(props) {
   var item = props.item || {};
   var profile = props.profile || {};
   var tier = props.tier || 'degraded';
+
+  // Continue Watching badge — thin progress bar at the bottom of the card
+  // when watchHistoryStore has a non-zero position for (profile, item).
+  // We resolve profileId from props.profile.profile_id, falling back to
+  // 'mom_tv' for unauthenticated dev sessions. The IDB read is per-card
+  // but cheap: indexedDB.get on a synthetic key is O(1), and the parent
+  // grid memoises CatalogCard via its key prop so cards don't refetch
+  // on every render of the grid.
+  var profileId = (profile && profile.profile_id) || 'mom_tv';
+  var progressState = React.useState(0);
+  var progressPct = progressState[0];
+  var setProgressPct = progressState[1];
+  React.useEffect(function() {
+    if (!item || !item.id) { return undefined; }
+    var cancelled = false;
+    watchHistoryStore.getProgress(profileId, item.id).then(function(row) {
+      if (cancelled) { return; }
+      if (row && typeof row.percent_complete === 'number' && row.percent_complete > 0) {
+        // Clamp to a thin visible minimum so the bar never disappears for
+        // tiny progress values (a 0.3% sliver would otherwise look broken).
+        var pct = row.percent_complete;
+        if (pct > 0 && pct < 2) { pct = 2; }
+        if (pct > 100) { pct = 100; }
+        setProgressPct(pct);
+      } else {
+        setProgressPct(0);
+      }
+    });
+    return function() { cancelled = true; };
+  }, [profileId, item.id]);
 
   var title = item.title || 'Untitled';
   var contentType = item.content_type || item.type || 'live';
@@ -268,6 +299,40 @@ function CatalogCard(props) {
           <ProviderBadge providerTags={providerTags} />
         </div>
       </div>
+
+      {/* Continue Watching progress bar — only rendered when the user has
+          previously watched some of this title. Sits absolutely at the
+          bottom edge of the card so it doesn't push the content above
+          out of layout. The thin 3px track is intentional — the parallel
+          agent's Continue Watching rail is the primary surface; this is
+          just a peripheral signal so the user spots in-progress titles
+          anywhere they appear in the catalog. */}
+      {progressPct > 0 && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: '3px',
+            backgroundColor: 'rgba(255,255,255,0.08)',
+            borderBottomLeftRadius: '6px',
+            borderBottomRightRadius: '6px',
+            overflow: 'hidden',
+            zIndex: 2,
+          }}
+        >
+          <div
+            style={{
+              width: progressPct + '%',
+              height: '100%',
+              background: 'var(--gradient-accent, linear-gradient(90deg, #1f6feb, #6366f1))',
+              boxShadow: '0 0 6px rgba(31,111,235,0.55)',
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

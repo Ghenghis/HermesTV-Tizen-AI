@@ -1,5 +1,7 @@
 import React from 'react';
 import { SkeletonBlock } from './Skeleton.jsx';
+import ChromecastButton from './ChromecastButton.jsx';
+import useWatchProgress from '../hooks/useWatchProgress.js';
 
 // PlayerModal — shown after /api/play returns a ticket. Renders the item
 // title, provider chip, resolution badge, source-health dot, and a video
@@ -7,8 +9,27 @@ import { SkeletonBlock } from './Skeleton.jsx';
 // `stream_endpoint` and either get bytes (Phase 4) or a 503 explaining
 // that the operator hasn't wired the streaming proxy yet.
 //
+// Wired surfaces:
+//   - ChromecastButton in the header toolbar. Auto-hides on Tizen (no
+//     window.chrome.cast) via its internal availability check.
+//   - "Multi" button (live channels only) — opens MultiviewModal so the
+//     user can flip from single-stream into 2-4 simultaneous tiles.
+//   - useWatchProgress — every 5s of playback the current position is
+//     persisted to watchHistoryStore so the Continue Watching rail (built
+//     by the parallel agent) and the CatalogCard progress bar can render.
+//
 // Chrome 76 / Tizen 6.5 safety: no `?.`, no `??`, no template literals
 // for anything you couldn't write as `+` concat (React JSX exception OK).
+
+// Media type from URL — feeds the Chromecast receiver so the right
+// HLS / progressive pipeline is selected on the cast device.
+function mediaTypeFromUrl(url) {
+  if (!url || typeof url !== 'string') { return 'video/mp4'; }
+  var lower = url.toLowerCase();
+  if (lower.indexOf('.m3u8') !== -1) { return 'application/vnd.apple.mpegurl'; }
+  if (lower.indexOf('.mpd') !== -1) { return 'application/dash+xml'; }
+  return 'video/mp4';
+}
 
 function fmtExpiresIn(expiresAtIso) {
   if (!expiresAtIso) { return '—'; }
@@ -33,6 +54,14 @@ function PlayerModal(props) {
   var ticket = props.ticket;
   var error = props.error;
   var onClose = props.onClose;
+  // Optional — App.jsx passes profile.profile_id so useWatchProgress can
+  // key watch_history rows per-profile. Falls back to 'shared' so the hook
+  // still records something for unauthenticated dev sessions.
+  var profileId = props.profileId || 'shared';
+  // Optional — App.jsx passes a callback that opens MultiviewModal. We
+  // hide the Multiview button when this prop is missing so older callers
+  // don't show a broken button.
+  var onOpenMultiview = props.onOpenMultiview;
 
   // Live "expires in M:SS" tick — re-renders every 5s.
   var tickResult = React.useState(0);
@@ -102,6 +131,39 @@ function PlayerModal(props) {
   var provider = (ticket && ticket.provider) || {};
   var pid = provider.provider_id || '';
   var pColor = providerColor(pid);
+
+  // Watch progress — every 5s the throttled recordTick persists the
+  // current video.currentTime to watchHistoryStore. The hook flushes the
+  // last position on unmount so the Continue Watching rail always sees
+  // the user's true exit point even when they close via Tizen Back.
+  var watchDurationState = React.useState(0);
+  var watchDuration = watchDurationState[0];
+  var setWatchDuration = watchDurationState[1];
+  var watchHook = useWatchProgress({
+    profileId: profileId,
+    item: item && item.id ? { id: item.id, type: item.type || item.item_type || 'movies', title: item.title || '' } : null,
+    durationSec: watchDuration,
+  });
+  var recordTick = watchHook.recordTick;
+
+  // Ref to the <video> element so the onTimeUpdate handler below can read
+  // currentTime + duration. We don't use a controlled component because
+  // Chrome 76 doesn't react reliably to React's currentTime prop changes.
+  var videoRef = React.useRef(null);
+
+  // onTimeUpdate fires ~4 times/sec on every browser; the hook throttles
+  // to one IDB write every 5s so we don't thrash the flash.
+  function handleTimeUpdate() {
+    var v = videoRef.current;
+    if (!v) { return; }
+    if (typeof v.duration === 'number' && v.duration > 0 && v.duration !== watchDuration) {
+      setWatchDuration(v.duration);
+    }
+    if (typeof v.currentTime === 'number') {
+      recordTick(v.currentTime);
+    }
+  }
+
   var healthDot = '#888';
   var healthStatus = (provider.source_health && provider.source_health.status) || 'unknown';
   if (healthStatus === 'ok') { healthDot = '#22c55e'; }
@@ -178,35 +240,84 @@ function PlayerModal(props) {
               </span>
             )}
           </div>
-          <button
-            tabIndex={0}
-            autoFocus
-            onClick={onClose}
-            aria-label="Close player"
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid var(--border, #30363d)',
-              color: 'var(--text, #e6edf3)',
-              fontSize: '1.2rem',
-              cursor: 'pointer',
-              padding: 0,
-              outline: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
-              lineHeight: 1,
-            }}
-            onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
-            onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
-            onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
-            onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
-          >
-            &times;
-          </button>
+          {/* Toolbar — Cast button (auto-hides on Tizen), Multiview entry
+              for live channels, and the close button. Kept compact so the
+              header stays single-row on narrow shells. */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Multiview entry — live channels only. Hidden when the
+                parent didn't wire onOpenMultiview, so legacy callsites
+                don't show a dead button. */}
+            {onOpenMultiview && item && item.type === 'live' && (
+              <button
+                type="button"
+                tabIndex={0}
+                onClick={function() { onOpenMultiview(item); }}
+                aria-label="Open Multiview"
+                title="Multiview — watch this with up to 3 more channels"
+                style={{
+                  height: '36px',
+                  padding: '0 0.85rem',
+                  borderRadius: 'var(--radius-md, 12px)',
+                  border: '1px solid var(--border, #30363d)',
+                  background: 'transparent',
+                  color: 'var(--text, #e6edf3)',
+                  fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                  fontWeight: 700,
+                  letterSpacing: '0.03em',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  transition: 'transform 160ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)), background-color 160ms ease',
+                }}
+                onFocus={function(e) {
+                  e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+              >
+                &#x25A6; Multi
+              </button>
+            )}
+
+            {/* Cast button — internal availability check hides this on
+                Tizen (no window.chrome.cast). mediaType derived from the
+                stream URL extension. */}
+            <ChromecastButton
+              mediaUrl={(ticket && ticket.stream_endpoint) || ''}
+              mediaTitle={item && item.title ? item.title : ''}
+              mediaType={mediaTypeFromUrl(ticket && ticket.stream_endpoint)}
+              posterUrl={item && (item.poster_url || (item.metadata && item.metadata.poster_url)) || ''}
+            />
+
+            <button
+              tabIndex={0}
+              autoFocus
+              onClick={onClose}
+              aria-label="Close player"
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid var(--border, #30363d)',
+                color: 'var(--text, #e6edf3)',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                padding: 0,
+                outline: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms ease',
+                lineHeight: 1,
+              }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'scale(1)'; }}
+              onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #1f6feb)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'scale(1.06)'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              &times;
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -220,8 +331,11 @@ function PlayerModal(props) {
           )}
           {!error && streamState.status === 'streaming' && (
             <video
+              ref={videoRef}
               controls
               autoPlay
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleTimeUpdate}
               style={{ width: '100%', maxHeight: '72vh', borderRadius: '14px', background: '#000', boxShadow: '0 12px 32px rgba(0,0,0,0.55)' }}
               src={ticket && ticket.stream_endpoint}
             />
