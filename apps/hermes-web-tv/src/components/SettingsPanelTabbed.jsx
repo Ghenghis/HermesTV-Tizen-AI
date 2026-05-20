@@ -1,4 +1,7 @@
 import React from 'react';
+import VoiceSettings from './settings/VoiceSettings.jsx';
+import KeyboardHelpModal from './KeyboardHelpModal.jsx';
+import SkipIntroToggle from './SkipIntroToggle.jsx';
 
 // Lazy-loaded deep-settings sections — code-split so the Settings
 // modal's initial render stays light. Each section file lives in
@@ -47,6 +50,7 @@ var TABS = [
   { id: 'hotkeys',     label: 'Hotkeys',     icon: '⌨' },
   { id: 'diagnostics', label: 'Diagnostics', icon: '⚕' },
   { id: 'about',       label: 'About',       icon: 'ⓘ' },
+  { id: 'voice',       label: 'Voice',       icon: '◉' },
 ];
 
 // Themes mirror index.css. The first 6 are the legacy palettes; the next 6
@@ -261,6 +265,11 @@ function SettingsPanelTabbed(props) {
   var activeTab = activeTabResult[0];
   var setActiveTab = activeTabResult[1];
 
+  // Keyboard help modal — opened via the small "?" button in the header.
+  var helpOpenResult = React.useState(false);
+  var helpOpen = helpOpenResult[0];
+  var setHelpOpen = helpOpenResult[1];
+
   // Feature toggle state — initialised from localStorage so flips persist
   // across reload like the Zero player. State is mirrored to localStorage
   // on every change via _writeFeatureFlag.
@@ -428,9 +437,16 @@ function SettingsPanelTabbed(props) {
     return (
       <React.Suspense fallback={<_Card icon="▶" header="Playback"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
         <PlaybackSettings />
+        <_Card icon="⏭" header="Auto-skip intro" tagline="Skip intro music / recaps automatically when detected.">
+          <SkipIntroToggle profile={profile} />
+        </_Card>
         <RecordingsSection profile={profile} />
       </React.Suspense>
     );
+  }
+
+  function renderVoice() {
+    return <VoiceSettings profile={profile} />;
   }
 
   function renderParental() {
@@ -608,6 +624,7 @@ function SettingsPanelTabbed(props) {
       case 'hotkeys':     return renderHotkeys();
       case 'diagnostics': return renderDiagnostics();
       case 'about':       return renderAbout();
+      case 'voice':       return renderVoice();
       default:            return renderGeneral();
     }
   }
@@ -691,6 +708,32 @@ function SettingsPanelTabbed(props) {
             >♔ Pro</span>
             <button
               tabIndex={0}
+              onClick={function() { setHelpOpen(true); }}
+              onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHelpOpen(true); } }}
+              aria-label="Open keyboard shortcuts help"
+              title="Keyboard shortcuts (?)"
+              style={{
+                width: '38px', height: '38px',
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid var(--border, #30363d)',
+                color: 'var(--text, #e6edf3)',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 800,
+                outline: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+              }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+              onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent, #00d4ff)'; e.currentTarget.style.outlineOffset = '2px'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >?</button>
+            <button
+              tabIndex={0}
               autoFocus
               onClick={onClose}
               aria-label="Close settings"
@@ -771,6 +814,8 @@ function SettingsPanelTabbed(props) {
           {renderBody()}
         </div>
       </div>
+      {/* Keyboard shortcut help overlay — driven by the header "?" button. */}
+      <KeyboardHelpModal isOpen={helpOpen} onClose={function() { setHelpOpen(false); }} profile={profile} />
     </div>
   );
 }

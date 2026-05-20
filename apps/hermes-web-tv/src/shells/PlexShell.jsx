@@ -1,8 +1,10 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import FavoritesRail from '../components/FavoritesRail.jsx';
 import RecentlyWatchedRail from '../components/RecentlyWatchedRail.jsx';
+import WatchlistRail from '../components/WatchlistRail.jsx';
 import useFavorites from '../hooks/useFavorites.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -207,9 +209,9 @@ function PlexShell(props) {
 
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
   var featured = filtered[0] || null;
-  var liveItems = filtered.filter(function(i) { return i.type === 'live'; });
-  var movies = filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
-  var series = filtered.filter(function(i) { return i.type === 'series'; });
+  var liveItems = filtered.filter(function(i) { return isLive(i); });
+  var movies = filtered.filter(function(i) { return isMovie(i); });
+  var series = filtered.filter(function(i) { return isSeries(i); });
   var fontScale = (profile && profile.font_scale) || 1;
   var allowMotion = !(profile && profile.reduced_motion);
 
@@ -411,6 +413,7 @@ function PlexShell(props) {
           fontScale={fontScale}
           catalog={filtered}
         />
+        <WatchlistRail profile={profile} items={filtered} onItemSelect={onItemSelect} fontScale={fontScale} />
         <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
         <RecentlyWatchedRail
           profileId={profile && (profile.profile_id || profile.id)}

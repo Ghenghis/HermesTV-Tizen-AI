@@ -1,8 +1,10 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import FavoritesRail from '../components/FavoritesRail.jsx';
 import RecentlyWatchedRail from '../components/RecentlyWatchedRail.jsx';
+import WatchlistRail from '../components/WatchlistRail.jsx';
 import useFavorites from '../hooks/useFavorites.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,9 +63,9 @@ function CardRow(props) {
           // (180 * 1.5 = 270 ≈ 280 * 9/16 = ~158, so 280px wide live ≈ 158
           // tall; 180px wide VOD ≈ 270 tall — still slightly mismatched but
           // far better than stretching a square logo into a 2:3 box).
-          var isLive = (item.type === 'live');
-          var cardWidth = isLive ? '280px' : '180px';
-          var posterAspect = isLive ? '16 / 9' : '2 / 3';
+          var isLiveCard = isLive(item);
+          var cardWidth = isLiveCard ? '280px' : '180px';
+          var posterAspect = isLiveCard ? '16 / 9' : '2 / 3';
           return (
             <div
               key={item.id || idx}
@@ -187,8 +189,8 @@ function NetflixShell(props) {
 
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
   var featured = filtered[0] || null;
-  var liveItems = filtered.filter(function(i) { return i.type === 'live'; });
-  var movies = filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
+  var liveItems = filtered.filter(function(i) { return isLive(i); });
+  var movies = filtered.filter(function(i) { return isMovie(i); });
   var fontScale = (profile && profile.font_scale) || 1;
   // Hero CTAs only lift when motion is allowed. We compute it once so the
   // markup stays declarative.
@@ -390,6 +392,7 @@ function NetflixShell(props) {
             fontScale={fontScale}
             catalog={filtered}
           />
+          <WatchlistRail profile={profile} items={filtered} onItemSelect={onItemSelect} fontScale={fontScale} />
           <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
           <RecentlyWatchedRail
             profileId={profile && (profile.profile_id || profile.id)}

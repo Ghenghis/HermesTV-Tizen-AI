@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,9 +41,9 @@ var TABS = [
 // singular type used by some seed entries; everything else is exact-match.
 function _byTab(items, tab) {
   if (tab === 'all') { return items; }
-  if (tab === 'live') { return items.filter(function(i) { return i.type === 'live'; }); }
-  if (tab === 'movies') { return items.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; }); }
-  if (tab === 'series') { return items.filter(function(i) { return i.type === 'series'; }); }
+  if (tab === 'live') { return items.filter(function(i) { return isLive(i); }); }
+  if (tab === 'movies') { return items.filter(function(i) { return isMovie(i); }); }
+  if (tab === 'series') { return items.filter(function(i) { return isSeries(i); }); }
   return items;
 }
 
@@ -89,7 +90,7 @@ function _nowProgram(item) {
     if (item.metadata.epg_now) { return item.metadata.epg_now; }
     if (item.metadata.program) { return item.metadata.program; }
   }
-  if (item && item.type === 'live') { return 'Live programming'; }
+  if (isLive(item)) { return 'Live programming'; }
   if (item && item.title) { return item.title; }
   return '—';
 }
@@ -763,7 +764,7 @@ function PreviewPane(props) {
   var allowPreview = props.allowPreview;
   var fontScale = props.fontScale;
 
-  var isLive = item && item.type === 'live';
+  var isLiveItem = isLive(item);
   var meta = _technicalMeta(item);
   var bg = posterBg(item, 0);
   var streamUrl = (item && item.stream_url) || (item && item.metadata && item.metadata.stream_url) || '';
@@ -773,7 +774,7 @@ function PreviewPane(props) {
   // some of these, but to stay safe we only attempt autoplay when the URL
   // ends in .mp4 / .webm / .m3u8 AND tier allows preview. For everything
   // else we fall back to the still poster.
-  var canAutoplay = allowPreview && isLive && streamUrl && (
+  var canAutoplay = allowPreview && isLiveItem && streamUrl && (
     /\.(mp4|webm|m3u8)(\?|$)/i.test(streamUrl)
   );
 
@@ -829,12 +830,12 @@ function PreviewPane(props) {
                 fontWeight: 800,
                 letterSpacing: '0.1em',
                 color: '#0d1117',
-                background: isLive ? '#ef4444' : 'var(--accent, #00d4aa)',
+                background: isLiveItem ? '#ef4444' : 'var(--accent, #00d4aa)',
                 padding: '0.15rem 0.4rem',
                 borderRadius: 'var(--radius-xs, 4px)',
               }}
             >
-              {isLive ? 'LIVE' : 'VOD'}
+              {isLiveItem ? 'LIVE' : 'VOD'}
             </span>
           </div>
         )}
@@ -860,7 +861,7 @@ function PreviewPane(props) {
             overflow: 'hidden',
           }}
         >
-          {(item.metadata && item.metadata.synopsis) || item.description || (isLive ? 'Live channel — currently broadcasting.' : 'No synopsis available for this title.')}
+          {(item.metadata && item.metadata.synopsis) || item.description || (isLiveItem ? 'Live channel — currently broadcasting.' : 'No synopsis available for this title.')}
         </div>
       </div>
 

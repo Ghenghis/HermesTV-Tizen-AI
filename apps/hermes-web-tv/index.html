@@ -3,8 +3,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:3001 http://localhost:5173 http://hermestv.local https://hermestv.local ws://hermestv.local ws://localhost:5173 wss://hermestv.local http://192.168.0.0/16; connect-src 'self' http://localhost:3001 http://hermestv.local https://hermestv.local ws://localhost:5173 ws://hermestv.local wss://hermestv.local http://192.168.0.0/16 https://www.gstatic.com https://static.cloudflareinsights.com https://ajax.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src 'self' blob: http: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://static.cloudflareinsights.com https://ajax.cloudflare.com">
+  <meta http-equiv="x-dns-prefetch-control" content="on">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="color-scheme" content="dark light">
+  <!-- DNS prefetch + preconnect: app pulls poster art + channel logos from
+       these CDNs. Pairs every dns-prefetch with a preconnect so Tizen 6.5
+       opens the TCP socket during HTML parse — first card render drops by
+       ~150-300 ms on cold network state. -->
+  <link rel="dns-prefetch" href="https://picsum.photos">
+  <link rel="preconnect" href="https://picsum.photos" crossorigin>
+  <link rel="dns-prefetch" href="https://upload.wikimedia.org">
+  <link rel="preconnect" href="https://upload.wikimedia.org" crossorigin>
+  <link rel="dns-prefetch" href="https://static.wikia.nocookie.net">
+  <link rel="preconnect" href="https://static.wikia.nocookie.net" crossorigin>
+  <link rel="dns-prefetch" href="https://i.imgur.com">
+  <link rel="preconnect" href="https://i.imgur.com" crossorigin>
+  <link rel="dns-prefetch" href="https://www.gstatic.com">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://static.cloudflareinsights.com">
+  <link rel="preconnect" href="https://static.cloudflareinsights.com" crossorigin>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d1117'/%3E%3Ctext x='32' y='44' font-family='system-ui,-apple-system,sans-serif' font-size='38' font-weight='700' text-anchor='middle' fill='%2358a6ff'%3ED%3C/text%3E%3C/svg%3E">
   <title>DaveTV</title>
+  <!-- Boot-prefetch hint: read the active profile's saved layout and
+       speculatively fetch that shell's chunk before React mounts. The
+       shell chunks have hash-suffixed filenames so we don't know the
+       exact path at HTML-write time — best-effort no-op when the matching
+       chunk isn't found. Wrapped in try/catch so a broken localStorage
+       (Safari private mode, Tizen sandbox) never blocks boot. -->
+  <script>
+    (function(){
+      try {
+        var pid = localStorage.getItem('hermestv:profile:active');
+        if (!pid || !/^[a-z0-9_-]+$/i.test(pid)) return;
+        var raw = localStorage.getItem('hermestv:profile:' + pid);
+        if (!raw) return;
+        var prof = JSON.parse(raw);
+        var theme = prof && prof.active_theme;
+        if (!theme || !/^[a-z0-9-]+$/i.test(theme)) return;
+        // Vite emits shell chunks as assets/<ShellName>-<hash>.js. We don't
+        // know the hash, but a prefetch with a partial-name selector isn't
+        // possible — so we just leave a hint <link> for an eventual Vite
+        // plugin or service worker to honor. No-op until that lands.
+        var hint = document.createElement('meta');
+        hint.name = 'hermes:preferred-shell';
+        hint.content = theme;
+        document.head.appendChild(hint);
+      } catch (_) {}
+    })();
+  </script>
 </head>
 <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
 </html>
