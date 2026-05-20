@@ -21,6 +21,7 @@
 
 import React from 'react';
 import { getChannelArt } from '../utils/channelArt.js';
+import { itemMatchesProviderFilter } from '../utils/providerIdentity.js';
 
 // Eight-color fallback palette. Kept identical to the historical inline copy
 // so callers that fell through to a gradient render the same color they did
@@ -40,10 +41,26 @@ export var GRADIENT_PALETTE = [
 // together: content type, provider id, and a coarse quality tier.
 export function applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter) {
   return (catalog || []).filter(function (item) {
-    if (contentFilter !== 'all' && item.type !== contentFilter) { return false; }
-    if (providerFilter !== 'all' && item.provider_id !== providerFilter) { return false; }
+    var type = (item && (item.type || item.content_type)) || '';
+    if (contentFilter !== 'all') {
+      if (contentFilter === 'movies') {
+        if (type !== 'movie' && type !== 'movies' && type !== 'vod') { return false; }
+      } else if (contentFilter === 'series') {
+        if (type !== 'series' && type !== 'show') { return false; }
+      } else if (type !== contentFilter) {
+        return false;
+      }
+    }
+    if (!itemMatchesProviderFilter(item, providerFilter)) { return false; }
     if (qualityFilter !== 'all') {
-      var q = (item.quality || '').toUpperCase();
+      var rawQuality = item.quality || '';
+      if (rawQuality && typeof rawQuality === 'object') {
+        rawQuality = rawQuality.resolution || rawQuality.label || rawQuality.quality || '';
+      }
+      if (!rawQuality && item.metadata) {
+        rawQuality = item.metadata.resolution || item.metadata.quality || '';
+      }
+      var q = String(rawQuality || '').toUpperCase();
       if (qualityFilter === '4K' && q.indexOf('4K') === -1 && q.indexOf('2160') === -1) { return false; }
       if (qualityFilter === '1080p+' && q.indexOf('1080') === -1 && q.indexOf('4K') === -1 && q.indexOf('2160') === -1) { return false; }
       if (qualityFilter === '720p+' && q.indexOf('720') === -1 && q.indexOf('1080') === -1 && q.indexOf('4K') === -1) { return false; }

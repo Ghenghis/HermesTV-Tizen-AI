@@ -296,11 +296,15 @@ router.post(['/setup/provider/submit', '/api/setup/provider/submit'], express.ur
   var SANITIZE = require('../lib/sanitizeLog').sanitizeForLog;
   var body = req.body || {};
   var code = String(body.pairing_code || '').trim().toUpperCase();
-  if (code) {
-    var ready = pairingRouter._validateCompletable(code);
-    if (ready.status !== 200) {
-      return res.status(ready.status).json(ready.body);
-    }
+  if (!code) {
+    return res.status(400).json({
+      error: 'pairing_code_required',
+      message: 'Provider setup requires a current DaveTV pairing code.',
+    });
+  }
+  var ready = pairingRouter._validateCompletable(code);
+  if (ready.status !== 200) {
+    return res.status(ready.status).json(ready.body);
   }
   providerStore.add({
     type: body.type,

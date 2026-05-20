@@ -173,7 +173,7 @@ function DavePowerShell(props) {
         {/* Top bar — gentle gradient lift, pill-shaped filter chip */}
         <div style={{ background: 'linear-gradient(180deg, #11162a, #0d1120)', borderBottom: '1px solid #1a2030', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 'calc(15px * ' + fontScale + ')', color: '#e0e8f0' }}>
-            Hermes<span style={{ color: DAVE_ACCENT }}>TV</span>
+            Dave<span style={{ color: DAVE_ACCENT }}>TV</span>
           </div>
           {/* Status-pill — surfaces current filter set at a glance */}
           <div style={{

@@ -142,7 +142,7 @@ function TiviMateShell(props) {
           // modal in the app.
           background: 'linear-gradient(180deg, #131720, #0a0d12)',
         }}>
-          Hermes<span style={{
+          Dave<span style={{
             // Wordmark accent gets a gradient fill so the "TV" stop reads
             // as part of the shared --gradient-accent family.
             backgroundImage: 'linear-gradient(135deg, ' + TM_ACCENT + ', #f59e0b)',

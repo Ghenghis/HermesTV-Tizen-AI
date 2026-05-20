@@ -12,7 +12,7 @@
                      package="HermesTVap"
                      required_version="6.5"/>
 
-  <name>HermesTV</name>
+  <name>DaveTV</name>
   <icon src="icon.png"/>
   <content src="index.html"/>
 

@@ -781,7 +781,7 @@ function ProfileForm(props) {
           <option value="enhanced">Enhanced (QN-class palette)</option>
           <option value="degraded">Degraded (UN-class palette)</option>
         </select>
-        <div style={_hintStyle()}>Auto is recommended &mdash; HermesTV detects your TV model and picks the right tier.</div>
+        <div style={_hintStyle()}>Auto is recommended &mdash; DaveTV detects your TV model and picks the right tier.</div>
       </div>
 
       {/* Inline status banner — surfaces "Profile saved", validation errors,

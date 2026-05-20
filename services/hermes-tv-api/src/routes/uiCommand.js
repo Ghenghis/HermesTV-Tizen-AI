@@ -5,7 +5,7 @@ const llmFallback = require('../lib/llmFallback');
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// Command table — 22 safe mock commands, no real provider calls.
+// Command table — safe UI commands only, no provider/network side effects.
 // Each entry: { patterns: string[], action: string, params: object }
 // Matching is case-insensitive, input is trimmed before comparison.
 // ---------------------------------------------------------------------------
@@ -20,6 +20,11 @@ const COMMAND_TABLE = [
     patterns: ['show xtremehd', 'show extreme'],
     action: 'filter_provider',
     params: { provider_id: 'xtremehd' },
+  },
+  {
+    patterns: ['show iptv-org', 'show iptv org', 'show public channels'],
+    action: 'filter_provider',
+    params: { provider_id: 'iptv-org' },
   },
   {
     patterns: ['show all providers', 'show all'],

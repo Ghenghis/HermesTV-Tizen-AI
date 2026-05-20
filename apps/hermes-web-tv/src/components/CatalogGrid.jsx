@@ -105,7 +105,6 @@ var ROW_HEIGHT_PX = 450;
 
 function CatalogGrid(props) {
   var items = props.items || [];
-  var activeTab = props.activeTab || 'all';
   var profile = props.profile || {};
   var tier = props.tier || 'degraded';
   var onItemClick = props.onItemClick || null;
@@ -147,12 +146,11 @@ function CatalogGrid(props) {
     _writeGroupPref(profileId, next);
   }
 
-  // Filter by provider tab
-  var filtered = items.filter(function(item) {
-    if (activeTab === 'all') { return true; }
-    var tags = item.provider_tags || [];
-    return tags.indexOf(activeTab) !== -1;
-  });
+  // Provider filtering is already applied in App.jsx against sources[],
+  // providers[], provider_id, provider and provider_tags. Do not re-filter
+  // here with the old single-tab/provider_tags path or merged real-provider
+  // rows disappear incorrectly.
+  var filtered = items.slice();
 
   // Filter by profile access
   filtered = filtered.filter(function(item) {
@@ -338,8 +336,13 @@ function CatalogGrid(props) {
       // the wrapper (tabIndex={0}). Pick the first focusable descendant.
       var inner = wrapper.querySelector('[tabindex="0"], [tabindex="-1"]');
       if (inner && typeof inner.focus === 'function') {
-        try { inner.focus({ preventScroll: false }); } catch (_e) {
+        try { inner.focus({ preventScroll: true }); } catch (_e) {
           try { inner.focus(); } catch (_e2) {}
+        }
+        if (typeof inner.scrollIntoView === 'function') {
+          try { inner.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_e3) {
+            try { inner.scrollIntoView(false); } catch (_e4) {}
+          }
         }
       }
     }

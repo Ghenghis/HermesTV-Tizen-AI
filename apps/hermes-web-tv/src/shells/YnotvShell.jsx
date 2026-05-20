@@ -329,7 +329,7 @@ function YnotvShell(props) {
     : activeTab === 'series' ? 'Series'
     : activeTab === 'watchlist' ? 'Watchlist'
     : activeTab === 'calendar' ? 'Calendar'
-    : 'HermesTV';
+    : 'DaveTV';
 
   // Watchlist count for the header chip.
   var watchlistCount = 0;

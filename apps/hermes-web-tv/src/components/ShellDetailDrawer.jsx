@@ -157,7 +157,7 @@ function ShellDetailDrawer(props) {
           )}
           {!item.description && item.genre && (
             <p style={{ color: '#c9d0db', lineHeight: 1.6, fontSize: '0.9rem', margin: '0 0 16px' }}>
-              {item.genre} content available on HermesTV.
+              {item.genre} content available on DaveTV.
             </p>
           )}
 

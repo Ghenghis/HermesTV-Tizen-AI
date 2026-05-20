@@ -53,7 +53,7 @@ function _heroSubtitle(item) {
   if (item.genre) { meta.push(String(item.genre)); }
   if (item.quality) { meta.push(String(item.quality)); }
   if (meta.length > 0) { return meta.join(' · '); }
-  return 'Featured on HermesTV';
+  return 'Featured on DaveTV';
 }
 
 // Find the first item that has any sort of poster artwork. The hero looks
@@ -480,7 +480,7 @@ function NuvioShell(props) {
             color: 'transparent',
           }}
         >
-          HermesTV
+          DaveTV
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -488,7 +488,7 @@ function NuvioShell(props) {
             type="search"
             value={searchInput}
             onChange={function(e) { setSearchInput(e.target.value); }}
-            placeholder="Search HermesTV"
+            placeholder="Search DaveTV"
             aria-label="Search catalog"
             style={{
               width: '320px',

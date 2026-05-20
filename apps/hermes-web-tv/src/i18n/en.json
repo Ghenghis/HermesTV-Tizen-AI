@@ -27,7 +27,7 @@
   "common.weeks_ago": "{count}w ago",
 
   "settings.title": "Settings",
-  "settings.subtitle": "Theme, layout, playlists, downloads, and feature toggles.",
+  "settings.subtitle": "Theme, Views, playlists, downloads, and feature toggles.",
   "settings.close_aria": "Close settings",
   "settings.pro_badge": "Pro",
   "settings.tabs_aria": "Settings sections",
@@ -76,7 +76,7 @@
   "settings.profile_actions.reset_defaults": "Reset to defaults",
 
   "settings.backups.header": "Backups",
-  "settings.backups.body": "Per-profile settings (voice preference, theme, layout) persist to localStorage automatically. Catalog and watch history are stored server-side per profile.",
+  "settings.backups.body": "Per-profile settings (voice preference, theme, View) persist to localStorage automatically. Catalog and watch history are stored server-side per profile.",
   "settings.backups.export_note": "Export / import a portable backup file lands in W4 Phase 2 alongside the settings store API.",
 
   "settings.theme.header": "Theme",
@@ -94,9 +94,9 @@
   "settings.theme.luna": "Luna",
   "settings.theme.hula": "Hula",
 
-  "settings.layout.header": "Layout",
-  "settings.layout.tagline": "Switch between the 8 layout shells (TiviMate, Netflix, Plex, Apple TV, Samsung, Mom Mode, Dave Power, Zero).",
-  "settings.layout.open_switcher": "Open layout switcher",
+  "settings.layout.header": "Views",
+  "settings.layout.tagline": "Switch between TV Views such as TiviMate, Netflix, Plex, Apple TV, Samsung, Mom Mode, Dave Power, and Zero.",
+  "settings.layout.open_switcher": "Open View picker",
 
   "settings.features.catchup": "Catch-up",
   "settings.features.catchup_tagline": "Show the Catch-up tab (for playlists/providers that support TV archive).",
@@ -130,7 +130,7 @@
   "settings.hotkeys.arrows": "Move focus across the catalog grid",
   "settings.hotkeys.tab": "Move focus through interactive controls",
   "settings.hotkeys.back": "Cascade close: player → detail → modal → grid",
-  "settings.hotkeys.smarthub": "Open the layout switcher",
+  "settings.hotkeys.smarthub": "Open the View picker",
 
   "settings.about.header": "DaveTV",
   "settings.about.web_build": "Web build",
@@ -185,7 +185,7 @@
 
   "voice.title": "Choose {name}'s Voice",
   "voice.subtitle": "Tap to hear a voice, then tap Use to keep it",
-  "voice.azure_warning": "Azure Speech is not configured on the server yet. Previews and save will return stubs until the operator wires up the subscription credentials.",
+  "voice.azure_warning": "Azure Speech is not configured on the server yet. Previews and save are unavailable until the operator wires up the subscription credentials.",
   "voice.loading": "Loading voices…",
   "voice.empty": "No voices available.",
   "voice.current_badge": "CURRENT",

@@ -22,6 +22,7 @@ function LayoutShell(props) {
   return (
     <div
       className={layoutClass}
+      data-hermes-app-root="true"
       style={{
         height: '100%',
         overflow: 'hidden',

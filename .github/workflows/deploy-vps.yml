@@ -57,10 +57,10 @@ jobs:
       REPO_DIR: /home/operator/hermestv
       API_CONTAINER: hermestv-vps-api
       WEB_CONTAINER: hermestv-vps-web
-      # Active HermesTV public domain. tv.daveai.tech currently resolves to a
-      # different DaveAI service; keep it as fallback until DNS/nginx is fixed.
-      PRIMARY_HOST: hermestv.daveai.tech
-      FALLBACK_HOST: tv.daveai.tech
+      # Active HermesTV public domain. tv.daveai.tech is canonical; the older
+      # hermestv.daveai.tech host remains as a compatibility fallback.
+      PRIMARY_HOST: tv.daveai.tech
+      FALLBACK_HOST: hermestv.daveai.tech
 
     steps:
       # ---------------------------------------------------------------------
@@ -221,8 +221,8 @@ jobs:
       # 5) Smoke probes against the public HTTPS edge (Cloudflare → nginx →
       # container). Mirrors the five probes in tools/redeploy-vps.sh lines
       # 162-249 byte-for-byte; the only addition is `tv.daveai.tech` as
-      # primary host. tv.daveai.tech remains a fallback only while its
-      # DNS/nginx route is corrected to point at HermesTV.
+      # primary host. hermestv.daveai.tech remains a compatibility fallback
+      # while external links and older QR codes migrate to tv.daveai.tech.
       #
       # NOTE: continue-on-error is true because Cloudflare returns 403 to
       # GitHub Actions runner CIDR ranges, so this step structurally cannot

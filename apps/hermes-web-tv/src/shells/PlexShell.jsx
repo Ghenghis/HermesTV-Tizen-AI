@@ -246,7 +246,7 @@ function PlexShell(props) {
           WebkitBackgroundClip: 'text',
           color: 'transparent',
           letterSpacing: '0.04em',
-        }}>HermesTV</div>
+        }}>DaveTV</div>
 
         <div style={{ overflowY: 'auto', flex: 1 }}>
           <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Library</div>

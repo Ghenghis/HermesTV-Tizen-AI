@@ -22,6 +22,14 @@ import { isValidLayout } from './engine/layoutRegistry.js';
 // modal opens, so lazy-loading it would defeat the purpose.
 import { SkeletonCard } from './components/Skeleton.jsx';
 import { installTizenKeyHandler } from './utils/tizenKeyMap.js';
+import { installSpatialNav } from './utils/tizenSpatialNav.js';
+import {
+  buildProviderFilterOptions,
+  providerFilterToIds,
+  providerIdsToFilter,
+  itemMatchesProviderFilter,
+  getItemProviderIds,
+} from './utils/providerIdentity.js';
 // Side-effect import: initialises the i18n module so the persisted locale
 // is read from localStorage on first paint. Components import the hook /
 // `t` directly from `./i18n/...`; this top-level import just guarantees
@@ -161,6 +169,7 @@ function applyThemeByName(themeName) {
 // A horizontal row of dropdowns for provider, content type, and quality.
 function FilterBar(props) {
   var providerFilter = props.providerFilter;
+  var providers = props.providers || [];
   var contentFilter = props.contentFilter;
   var qualityFilter = props.qualityFilter;
   var onProviderChange = props.onProviderChange;
@@ -178,6 +187,52 @@ function FilterBar(props) {
     outline: 'none',
     transition: 'border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out)',
   };
+  var providerOptions = buildProviderFilterOptions(providers);
+  var selectedProviders = providerFilterToIds(providerFilter);
+  var allProviders = selectedProviders.length === 0;
+
+  function isProviderSelected(id) {
+    if (allProviders) { return false; }
+    return selectedProviders.indexOf(id) !== -1;
+  }
+
+  function setProviders(ids) {
+    if (onProviderChange) {
+      onProviderChange(providerIdsToFilter(ids));
+    }
+  }
+
+  function toggleProvider(id) {
+    var next;
+    if (allProviders) {
+      next = [id];
+    } else {
+      next = selectedProviders.slice();
+      var idx = next.indexOf(id);
+      if (idx === -1) { next.push(id); }
+      else { next.splice(idx, 1); }
+    }
+    setProviders(next);
+  }
+
+  function chipStyle(active, accent) {
+    return {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '34px',
+      padding: '0.34rem 0.75rem',
+      borderRadius: '999px',
+      border: '1px solid ' + (active ? (accent || 'var(--accent, #58a6ff)') : 'var(--border, #30363d)'),
+      backgroundColor: active ? 'rgba(88,166,255,0.18)' : 'var(--surface-raised, #1c2128)',
+      color: active ? 'var(--text, #e6edf3)' : 'var(--muted)',
+      fontSize: 'calc(0.78rem * var(--font-scale, 1))',
+      fontWeight: active ? 800 : 650,
+      cursor: 'pointer',
+      outline: 'none',
+      whiteSpace: 'nowrap',
+    };
+  }
 
   return (
     <div
@@ -205,20 +260,37 @@ function FilterBar(props) {
       </span>
 
       {/* Provider filter */}
-      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: 'var(--muted)' }}>
-          Provider
+          Providers
         </span>
-        <select
-          value={providerFilter}
-          onChange={function(e) { onProviderChange(e.target.value); }}
-          style={selectStyle}
+        <button
+          type="button"
+          aria-pressed={allProviders}
+          onClick={function() { setProviders([]); }}
+          style={chipStyle(allProviders)}
+          onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent)'; e.currentTarget.style.outlineOffset = '2px'; }}
+          onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
         >
-          <option value="all">All</option>
-          <option value="apollo_group">Apollo Group</option>
-          <option value="xtremehd">XtremeHD</option>
-        </select>
-      </label>
+          All
+        </button>
+        {providerOptions.map(function(p) {
+          var active = isProviderSelected(p.id);
+          return (
+            <button
+              type="button"
+              key={p.id}
+              aria-pressed={active}
+              onClick={function() { toggleProvider(p.id); }}
+              style={chipStyle(active)}
+              onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent)'; e.currentTarget.style.outlineOffset = '2px'; }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Content type filter */}
       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -306,25 +378,7 @@ function ModelSelector(props) {
 
 // ── Filter logic helpers ──────────────────────────────────────────────────────
 function matchesProviderFilter(item, providerFilter) {
-  if (providerFilter === 'all') { return true; }
-  // Rich format: item.providers is an array of objects
-  if (Array.isArray(item.providers)) {
-    for (var i = 0; i < item.providers.length; i++) {
-      if (item.providers[i].provider_id === providerFilter) { return true; }
-    }
-    return false;
-  }
-  // Old flat format: item.provider is a string, or item.provider_tags is an array
-  if (typeof item.provider === 'string') {
-    return item.provider === providerFilter;
-  }
-  if (Array.isArray(item.provider_tags)) {
-    // Map filter values to the provider_tags used in mock (apollo_group → apollo)
-    var tagAlias = providerFilter === 'apollo_group' ? 'apollo' : providerFilter;
-    return item.provider_tags.indexOf(tagAlias) !== -1 ||
-           item.provider_tags.indexOf(providerFilter) !== -1;
-  }
-  return false;
+  return itemMatchesProviderFilter(item, providerFilter);
 }
 
 function matchesContentFilter(item, contentFilter) {
@@ -434,7 +488,6 @@ var INITIAL_STATE = {
   providers: [],
   catalog: [],
   actors: [],
-  activeTab: 'all',
   tier: 'degraded',
   tvModel: 'QN85Q7FAAFXZA',
   online: true,
@@ -630,7 +683,7 @@ function App() {
         (t.isContentEditable === true)
       );
 
-      // Ctrl+L → layout switcher (existing)
+      // Ctrl+L -> View switcher.
       if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
         patchState(function(prev) { return Object.assign({}, prev, { showLayoutSwitcher: !prev.showLayoutSwitcher }); });
@@ -822,9 +875,9 @@ function App() {
   }, [state.showPlayer]);
 
   // Wave-14 W14-DIRECTPLAY — Info key opens MediaDetailPanel for the
-  // focused item. handleItemClick now sends live items straight to the
-  // player; this is the explicit gesture for "actually I want the synopsis
-  // first". Three triggers:
+  // focused item. handleItemClick now sends playable cards straight to the
+  // player; Info is the explicit gesture for "actually I want details first".
+  // Three triggers:
   //   - Samsung TV INFO remote key (keyCode 457 in the Tizen keymap)
   //   - Keyboard 'i' / 'I' (matches the Plex / Stremio convention)
   //   - The focused-card info-icon button (passes through handleOpenDetail
@@ -859,6 +912,74 @@ function App() {
     return function() { window.removeEventListener('keydown', onInfoKey); };
   }, [state.focusedItem, state.selectedItem, state.showPlayer, state.showSettings, state.showSearch, state.showEPG, state.showMultiview, state.showLayoutSwitcher, state.showVoicePicker, state.showProfileManagement, state.showPlaylistImport, state.showOnboarding, state.showScheduleRecording]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  React.useEffect(function() {
+    function isEditableTarget(t) {
+      if (!t) { return false; }
+      var tag = (t.tagName || '').toUpperCase();
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
+    }
+
+    function findScrollContainer(start) {
+      if (typeof document === 'undefined') { return null; }
+      var node = start;
+      while (node && node !== document.body && node !== document.documentElement) {
+        if (node.getAttribute && node.getAttribute('data-hermes-scroll-root')) { return node; }
+        var cs = null;
+        try { cs = window.getComputedStyle(node); } catch (_e) { cs = null; }
+        if (cs) {
+          var oy = cs.overflowY;
+          var ox = cs.overflowX;
+          if (oy === 'auto' || oy === 'scroll' || oy === 'overlay' ||
+              ox === 'auto' || ox === 'scroll' || ox === 'overlay') {
+            return node;
+          }
+        }
+        node = node.parentElement;
+      }
+      return document.querySelector('[data-hermes-scroll-root]') || document.scrollingElement || document.documentElement;
+    }
+
+    function scrollOnEdge(dir) {
+      var active = document.activeElement || null;
+      var scroller = findScrollContainer(active);
+      if (!scroller) { return false; }
+      var vertical = dir === 'up' || dir === 'down';
+      var amount = vertical
+        ? Math.max(180, Math.floor((scroller.clientHeight || window.innerHeight || 600) * 0.72))
+        : Math.max(180, Math.floor((scroller.clientWidth || window.innerWidth || 900) * 0.72));
+      if (dir === 'up' || dir === 'left') { amount = -amount; }
+      if (vertical) { scroller.scrollTop = (scroller.scrollTop || 0) + amount; }
+      else { scroller.scrollLeft = (scroller.scrollLeft || 0) + amount; }
+      return true;
+    }
+
+    function scrollMovedFocusIntoView(next) {
+      if (!next || typeof next.scrollIntoView !== 'function') { return; }
+      try { next.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+      catch (_e) {
+        try { next.scrollIntoView(false); } catch (_e2) {}
+      }
+    }
+
+    var modalOpen = state.selectedItem || state.showPlayer || state.showSettings ||
+      state.showSearch || state.showEPG || state.showMultiview ||
+      state.showLayoutSwitcher || state.showVoicePicker ||
+      state.showProfileManagement || state.showPlaylistImport ||
+      state.showOnboarding || state.showScheduleRecording || sleepTimerOpen;
+
+    if (modalOpen) { return undefined; }
+
+    return installSpatialNav({
+      rootSelector: '[data-hermes-app-root="true"]',
+      preventScroll: true,
+      onMove: scrollMovedFocusIntoView,
+      onEdge: scrollOnEdge,
+      keyFilter: function(e) {
+        return !isEditableTarget(e && e.target);
+      },
+    });
+  }, [state.selectedItem, state.showPlayer, state.showSettings, state.showSearch, state.showEPG, state.showMultiview, state.showLayoutSwitcher, state.showVoicePicker, state.showProfileManagement, state.showPlaylistImport, state.showOnboarding, state.showScheduleRecording, sleepTimerOpen]);
+
   // Phone-as-remote SSE listener. Mints a pairing code on profile load,
   // stores it in state, opens an EventSource to /api/remote/events, and
   // dispatches every incoming remote keypress as a synthetic KeyboardEvent
@@ -868,6 +989,17 @@ function App() {
     if (!state.profile || !state.online) { return; }
     var aborted = false;
     var es = null;
+
+    function keyCodeForRemoteKey(key) {
+      if (key === 'ArrowLeft') { return 37; }
+      if (key === 'ArrowUp') { return 38; }
+      if (key === 'ArrowRight') { return 39; }
+      if (key === 'ArrowDown') { return 40; }
+      if (key === 'Enter' || key === 'OK') { return 13; }
+      if (key === 'Backspace' || key === 'Back') { return 10009; }
+      if (key === 'Escape') { return 27; }
+      return 0;
+    }
 
     function attach(code) {
       if (aborted) { return; }
@@ -879,13 +1011,22 @@ function App() {
             var payload = JSON.parse(evt.data);
             if (!payload || !payload.key) { return; }
             var key = payload.key;
+            if (key === 'OK') { key = 'Enter'; }
+            var keyCode = keyCodeForRemoteKey(key);
             var ke = new KeyboardEvent('keydown', {
               key: key,
               code: key,
               bubbles: true,
               cancelable: true,
             });
-            document.dispatchEvent(ke);
+            if (keyCode) {
+              try { Object.defineProperty(ke, 'keyCode', { get: function() { return keyCode; } }); } catch (_e) {}
+              try { Object.defineProperty(ke, 'which', { get: function() { return keyCode; } }); } catch (_e2) {}
+            }
+            var target = (document.activeElement && document.activeElement !== document.body)
+              ? document.activeElement
+              : document;
+            target.dispatchEvent(ke);
           } catch (_) { /* malformed event — ignore */ }
         };
         es.onerror = function() { /* EventSource auto-reconnects */ };
@@ -1059,8 +1200,21 @@ function App() {
     bootWithProfileId(profileId);
   }
 
-  function handleTabChange(tabId) {
-    patchState({ activeTab: tabId });
+  function getDefaultProviderForItem(item) {
+    var ids = getItemProviderIds(item);
+    if (ids.length > 0) { return ids[0]; }
+    return null;
+  }
+
+  function isInstantPlayableItem(item) {
+    if (!item) { return false; }
+    var itemType = item.type || item.content_type || '';
+    return itemType === 'live' ||
+      itemType === 'vod' ||
+      itemType === 'movie' ||
+      itemType === 'movies' ||
+      itemType === 'series' ||
+      itemType === 'show';
   }
 
   function handleOpenQR() {
@@ -1079,33 +1233,18 @@ function App() {
 
   function handleItemClick(item) {
     if (!item) { return; }
-    // Pick the first available provider as default
-    var defaultProvider = null;
-    if (Array.isArray(item.providers) && item.providers.length > 0) {
-      defaultProvider = item.providers[0].provider_id;
-    } else if (typeof item.preferred_source === 'string') {
-      defaultProvider = item.preferred_source;
-    } else if (Array.isArray(item.provider_tags) && item.provider_tags.length > 0) {
-      defaultProvider = item.provider_tags[0];
-    }
-    // Wave-14 W14-DIRECTPLAY — live channels jump straight to PlayerModal.
-    // Mainstream IPTV apps (TiviMate / IPTV Smarters / Plex) one-click-play
-    // live channels — the synopsis-then-play flow that's right for movies is
-    // pure friction for channel surfing. VOD and series keep the detail-
-    // then-play flow because a synopsis genuinely helps the user decide
-    // before they commit to a 90-minute movie. Mom-rule respected: this is
-    // a strict UX improvement applied equally to both profiles, not a
-    // Mom-only simplification.
-    var itemType = item.type || item.content_type || '';
-    if (itemType === 'live') {
-      // Keep the focused-item state coherent so the hero panel stays in
-      // sync if the user closes the player and returns to the grid.
+    var defaultProvider = getDefaultProviderForItem(item);
+
+    // Instant playback is the default interaction. OK/click plays the chosen
+    // card; the Info key and explicit info buttons remain the details path.
+    if (isInstantPlayableItem(item)) {
       patchState({ focusedItem: item, selectedProviderId: defaultProvider });
       handlePlay(item, defaultProvider);
       return;
     }
-    // VOD / series / unknown → original detail-first flow.
-    // Selecting also focuses so the hero stays in sync if the modal is dismissed.
+
+    // Unknown/unplayable content still gets a details panel so the user can
+    // inspect source metadata without hitting a dead player.
     patchState({ selectedItem: item, selectedProviderId: defaultProvider, focusedItem: item });
   }
 
@@ -1117,14 +1256,7 @@ function App() {
   // 'i' keydown after the 500 ms threshold (see tizenKeyMap touch shim).
   function handleOpenDetail(item) {
     if (!item) { return; }
-    var defaultProvider = null;
-    if (Array.isArray(item.providers) && item.providers.length > 0) {
-      defaultProvider = item.providers[0].provider_id;
-    } else if (typeof item.preferred_source === 'string') {
-      defaultProvider = item.preferred_source;
-    } else if (Array.isArray(item.provider_tags) && item.provider_tags.length > 0) {
-      defaultProvider = item.provider_tags[0];
-    }
+    var defaultProvider = getDefaultProviderForItem(item);
     patchState({ selectedItem: item, selectedProviderId: defaultProvider, focusedItem: item });
   }
 
@@ -1485,7 +1617,7 @@ function App() {
       // chip. Opens the EPGGrid modal; no server command exists for this.
       patchState({ showEPG: true });
     } else if (action === 'open_layout_switcher') {
-      // Client-only action dispatched by the FloatingChatbot "Change look" chip.
+      // Client-only action dispatched by the FloatingChatbot "Change View" chip.
       // Opens the LayoutSwitcher; no server command exists for this.
       patchState({ showLayoutSwitcher: true });
     }
@@ -1702,7 +1834,7 @@ function App() {
             }}
           >
             <span aria-hidden="true">&#x26A0;</span>
-            Offline mode — showing cached content. Backend at hermestv.local is unreachable.
+            Offline mode — showing cached content. The DaveTV server is unreachable.
           </div>
         )}
 
@@ -2000,7 +2132,7 @@ function App() {
             <button
               tabIndex={0}
               onClick={function() { patchState({ showLayoutSwitcher: true }); }}
-              title="Change visual layout (Ctrl+L)"
+              title="Change View (Ctrl+L)"
               style={{
                 padding: '0.4rem 0.9rem',
                 background: 'var(--gradient-sunset, linear-gradient(135deg, #6366f1, #d946ef))',
@@ -2024,7 +2156,7 @@ function App() {
                 e.currentTarget.style.outline = 'none';
               }}
             >
-              &#x1F3A8; Look
+              &#x25EB; View
             </button>
 
             {/* Sleep timer button (wave-8) — opens the SleepTimer modal where
@@ -2121,6 +2253,7 @@ function App() {
           <React.Fragment>
             {/* Filter bar */}
             <FilterBar
+              providers={state.providers}
               providerFilter={state.providerFilter}
               contentFilter={state.contentFilter}
               qualityFilter={state.qualityFilter}
@@ -2131,12 +2264,14 @@ function App() {
 
             {/* Provider filter tabs */}
             <ProviderFilter
-              activeTab={state.activeTab}
-              onTabChange={handleTabChange}
+              providers={state.providers}
+              providerFilter={state.providerFilter}
+              onProviderChange={function(v) { patchState({ providerFilter: v }); }}
             />
 
             {/* Catalog grid — scrollable main content area */}
             <main
+              data-hermes-scroll-root="catalog"
               style={{
                 flex: 1,
                 overflowY: 'auto',
@@ -2145,10 +2280,10 @@ function App() {
             >
               <CatalogGrid
                 items={filteredCatalog}
-                activeTab={state.activeTab}
+                activeTab="all"
                 profile={profile}
                 tier={state.tier}
-                columns={state.activeTab === 'discovery' ? (state.tier === 'enhanced' ? 8 : 4) : (state.tier === 'enhanced' ? 5 : 3)}
+                columns={state.tier === 'enhanced' ? 5 : 3}
                 onItemClick={handleItemClick}
                 onOpenSettings={function() { patchState({ showSettings: true }); }}
               />

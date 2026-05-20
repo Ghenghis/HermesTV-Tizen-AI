@@ -75,7 +75,7 @@ function scrubOutbound(text) {
 // imports) so the LLM contract stays explicit.
 // ---------------------------------------------------------------------------
 var ALLOWED_ACTIONS = {
-  filter_provider:    { provider_id: ['apollo_group', 'xtremehd', 'all'] },
+  filter_provider:    { provider_id: ['apollo_group', 'xtremehd', 'iptv-org', 'all'] },
   filter_content:     { content_type: ['movies', 'series', 'live', 'sports', 'action', 'family', 'mysteries', 'hallmark'] },
   filter_quality:     { quality: ['4K'] },
   switch_profile:     { profile_id: ['dave_tv', 'mom_tv'] },

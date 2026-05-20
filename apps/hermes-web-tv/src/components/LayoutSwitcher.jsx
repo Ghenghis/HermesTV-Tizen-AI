@@ -18,6 +18,102 @@ var ID_SUBTITLE_OVERRIDES = {
   'extreme-infinitv': 'extreme-infinitv'
 };
 
+function ViewPreview(props) {
+  var layout = props.layout || {};
+  var accent = props.accent || layout.accent || '#1f6feb';
+  var rgb = hexToRgb(accent);
+  var id = layout.id || 'grid-standard';
+  var nav = layout.nav_style || '';
+  var hero = layout.hero_style || '';
+  var grid = layout.grid_style || '';
+  var hasSidebar = nav === 'sidebar' || id === 'tivimate' || id === 'iptvnator' || id === 'dave-power';
+  var hasHero = hero !== 'none' && hero !== '';
+  var isGuide = hero.indexOf('epg') !== -1 || grid.indexOf('guide') !== -1 || id === 'live-tv' || id === 'tivimate';
+  var isStreaming = id === 'netflix' || id === 'plex' || id === 'stremio' || id === 'apple-tv';
+  var isSimple = id === 'mom-mode' || id === 'ynotv';
+  var cols = isSimple ? 3 : (isGuide ? 4 : 5);
+  var cells = [];
+  for (var i = 0; i < (isSimple ? 6 : 10); i++) {
+    cells.push(
+      <span
+        key={i}
+        style={{
+          display: 'block',
+          minHeight: isSimple ? '18px' : '14px',
+          borderRadius: isGuide ? '4px' : '6px',
+          background: i === 0
+            ? 'rgba(' + rgb + ',0.95)'
+            : 'rgba(232,237,245,' + (0.18 + ((i % 3) * 0.08)) + ')',
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: '100%',
+        aspectRatio: '16 / 9',
+        borderRadius: '10px',
+        border: '1px solid rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+        background: '#090d14',
+        display: 'flex',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+      }}
+    >
+      {hasSidebar && (
+        <div
+          style={{
+            width: '18%',
+            minWidth: '18%',
+            background: 'rgba(' + rgb + ',0.18)',
+            borderRight: '1px solid rgba(255,255,255,0.07)',
+            padding: '7px 5px',
+            display: 'grid',
+            gridTemplateRows: 'repeat(5, 1fr)',
+            gap: '5px',
+          }}
+        >
+          {[0, 1, 2, 3, 4].map(function(n) {
+            return (
+              <span
+                key={n}
+                style={{
+                  display: 'block',
+                  borderRadius: '3px',
+                  background: n === 0 ? 'rgba(' + rgb + ',0.95)' : 'rgba(255,255,255,0.16)',
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+      <div style={{ flex: 1, padding: '7px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {hasHero && (
+          <div
+            style={{
+              flex: isStreaming ? '0 0 43%' : '0 0 34%',
+              borderRadius: '7px',
+              background: 'linear-gradient(135deg, rgba(' + rgb + ',0.85), rgba(232,237,245,0.12))',
+            }}
+          />
+        )}
+        {isGuide ? (
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.1fr repeat(3, 1fr)', gap: '4px' }}>
+            {cells.slice(0, 8).map(function(cell) { return cell; })}
+          </div>
+        ) : (
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', 1fr)', gap: '5px' }}>
+            {cells}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function groupBycat(layouts) {
   var groups = {};
   for (var i = 0; i < layouts.length; i++) {
@@ -87,7 +183,7 @@ function LayoutSwitcher(props) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="look-modal-title"
+      aria-labelledby="view-modal-title"
       onClick={function(e) { if (e.target === e.currentTarget) onClose(); }}
       className="hermes-modal-overlay"
       style={{
@@ -127,8 +223,8 @@ function LayoutSwitcher(props) {
           background: 'linear-gradient(180deg, #1c1c28, #15151d)',
         }}>
           <div>
-            <div id="look-modal-title" style={{ fontSize: 'calc(1.2rem * var(--font-scale, 1))', fontWeight: 800, color: '#e8edf5', letterSpacing: '0.01em' }}>Choose Your Look</div>
-            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#8a8f9b', marginTop: '2px' }}>Pick any style — you can change it anytime</div>
+            <div id="view-modal-title" style={{ fontSize: 'calc(1.2rem * var(--font-scale, 1))', fontWeight: 800, color: '#e8edf5', letterSpacing: '0.01em' }}>Choose Your View</div>
+            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#8a8f9b', marginTop: '2px' }}>Pick a View — you can change it anytime</div>
           </div>
           <button
             onClick={onClose}
@@ -192,6 +288,9 @@ function LayoutSwitcher(props) {
                         disabled={isDisabled}
                         style={{
                           textAlign: 'left',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
                           padding: cardPadding,
                           minHeight: cardMinHeight,
                           borderRadius: '14px',
@@ -235,6 +334,7 @@ function LayoutSwitcher(props) {
                           if (!isActive) e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
+                        <ViewPreview layout={layout} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                           <span style={{ fontWeight: 700, fontSize: 'calc(0.9rem * var(--font-scale, 1))', color: isActive ? layout.accent : '#c8d0db' }}>
                             {layout.name}
@@ -273,6 +373,9 @@ function LayoutSwitcher(props) {
               }}
               style={{
                 textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
                 padding: cardPadding,
                 minHeight: cardMinHeight,
                 borderRadius: '14px',
@@ -304,6 +407,7 @@ function LayoutSwitcher(props) {
               onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent-color, #1f6feb)'; e.currentTarget.style.outlineOffset = '2px'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onBlur={function(e) { e.currentTarget.style.outline = 'none'; if (activeLayout && activeLayout !== '') e.currentTarget.style.transform = 'translateY(0)'; }}
             >
+              <ViewPreview layout={{ id: 'grid-standard', accent: '#1f6feb', nav_style: 'topbar', hero_style: 'none', grid_style: 'poster-grid' }} accent="#1f6feb" />
               <div style={{ fontWeight: 700, fontSize: 'calc(0.9rem * var(--font-scale, 1))', color: (!activeLayout || activeLayout === '') ? '#1f6feb' : '#c8d0db', marginBottom: '4px' }}>
                 Standard Grid {(!activeLayout || activeLayout === '') ? <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 800, border: '1px solid #1f6feb', borderRadius: '999px', padding: '2px 9px', marginLeft: '8px', letterSpacing: '0.08em', background: 'rgba(31,111,235,0.1)' }}>ACTIVE</span> : ''}
               </div>
@@ -315,7 +419,7 @@ function LayoutSwitcher(props) {
         {/* Footer */}
         <div style={{ padding: '12px 24px 16px', borderTop: '1px solid #2a2b3a', flexShrink: 0 }}>
           <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#8a8f9b', textAlign: 'center' }}>
-            💬 Tip: Ask Hermes to change your layout anytime — try &quot;switch to Netflix look&quot;
+            Tip: Ask Hermes to change your View anytime — try &quot;switch to Netflix view&quot;
           </div>
         </div>
       </div>

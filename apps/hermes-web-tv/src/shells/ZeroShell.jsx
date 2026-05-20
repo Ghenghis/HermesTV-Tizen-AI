@@ -388,7 +388,7 @@ function ZeroShell(props) {
         {/* Centre: Z logo wordmark — placeholder gradient text, no asset */}
         <button
           tabIndex={0}
-          aria-label="HermesTV — Zero look"
+          aria-label="DaveTV Zero look"
           onClick={function() { setActiveTab('movies'); }}
           style={{
             background: 'transparent',

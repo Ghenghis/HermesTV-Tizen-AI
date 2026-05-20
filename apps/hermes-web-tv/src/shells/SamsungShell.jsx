@@ -140,7 +140,7 @@ function SamsungShell(props) {
       {/* Top bar — gentle gradient lift (surface-raised → surface) */}
       <header style={{ background: 'linear-gradient(180deg, #1a1a1a, #111)', height: '56px', display: 'flex', alignItems: 'center', padding: '0 24px', gap: '24px', flexShrink: 0, borderBottom: '1px solid #222' }}>
         <div style={{ fontWeight: 700, fontSize: 'calc(18px * ' + fontScale + ')', color: '#fff' }}>
-          Hermes<span style={{ color: SAMSUNG_ACCENT }}>TV</span>
+          Dave<span style={{ color: SAMSUNG_ACCENT }}>TV</span>
         </div>
         <nav style={{ display: 'flex', gap: '4px' }}>
           {SAMSUNG_TABS.map(function(tab, i) {

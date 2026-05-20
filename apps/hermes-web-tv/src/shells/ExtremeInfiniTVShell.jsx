@@ -288,7 +288,7 @@ function ExtremeInfiniTVShell(props) {
         >
           <span aria-hidden="true" style={{ color: 'var(--accent, #00d4aa)', fontFamily: '"Consolas", "Courier New", monospace', fontWeight: 800 }}>$_</span>
           <span style={{ fontWeight: 800, letterSpacing: '0.04em', fontSize: 'calc(0.9rem * ' + fontScale + ')' }}>
-            Hermes<span style={{ color: 'var(--accent, #00d4aa)' }}>TV</span>
+            Dave<span style={{ color: 'var(--accent, #00d4aa)' }}>TV</span>
           </span>
           <span
             style={{

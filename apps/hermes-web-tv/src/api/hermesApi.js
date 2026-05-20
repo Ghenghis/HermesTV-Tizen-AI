@@ -50,13 +50,156 @@ function fetchWithTimeout(url, options, timeoutMs) {
       reject(makeNetworkError('Request timed out: ' + url));
     }, timeout);
 
-    fetch(url, options || {}).then(function(response) {
+    var finalOptions = Object.assign({ credentials: 'include' }, options || {});
+    fetch(url, finalOptions).then(function(response) {
       clearTimeout(timer);
       resolve(response);
     }).catch(function(err) {
       clearTimeout(timer);
       var networkErr = makeNetworkError('Network error: ' + (err.message || 'unknown'));
       reject(networkErr);
+    });
+  });
+}
+
+function getAuthMe() {
+  return fetchWithTimeout(BASE_URL + '/api/auth/me', { method: 'GET' }, HEALTH_TIMEOUT).then(function(response) {
+    if (!response.ok) {
+      throw makeNetworkError('Auth status failed: HTTP ' + response.status);
+    }
+    return response.json();
+  });
+}
+
+function login(email, password) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Login failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function logout() {
+  return fetchWithTimeout(BASE_URL + '/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  }).then(function(response) {
+    if (!response.ok) { throw makeNetworkError('Logout failed: HTTP ' + response.status); }
+    return response.json();
+  });
+}
+
+function registerWithToken(token, password) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Registration failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function requestPasswordReset(email) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/password/forgot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Reset request failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function resetPassword(token, password) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/password/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Password reset failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function getAdminUsers() {
+  return fetchWithTimeout(BASE_URL + '/api/admin/users').then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Admin users failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function createInvite(args) {
+  return fetchWithTimeout(BASE_URL + '/api/admin/invites', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {}),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Invite failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function adminSetPassword(userId, password) {
+  return fetchWithTimeout(BASE_URL + '/api/admin/users/' + encodeURIComponent(userId) + '/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Password update failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
     });
   });
 }
@@ -217,7 +360,7 @@ function getCatalog() {
     return response.json().then(function(body) {
       // Surface the response header on the returned object so the UI can
       // render an honest "data source" badge (Live providers / Jellyfin /
-      // iptv-org / Mock seed). Tizen 6.5 / Chrome 76 safe — no spread.
+      // iptv-org / empty). Tizen 6.5 / Chrome 76 safe — no spread.
       body._source_header = sourceHeader;
       return body;
     });
@@ -366,6 +509,8 @@ export {
   startDownload, listDownloads, cancelDownload,
   createPairing, getPairingStatus,
   getApiBaseUrl, buildApiUrl,
+  getAuthMe, login, logout, registerWithToken, requestPasswordReset, resetPassword,
+  getAdminUsers, createInvite, adminSetPassword,
   // Wave-20 multi-provider CRUD
   listProviders, addProvider, updateProvider, removeProvider, testProvider, parseQrText,
 };

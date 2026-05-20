@@ -41,7 +41,7 @@ function buildNoMatchReply(userText, t) {
 
 // Local-only chip commands that bypass the server validator and dispatch a
 // synthetic command directly through props.onCommand. Used for the new
-// "Tonight's lineup" + "Change look" suggestion chips which don't have a
+// "Tonight's lineup" + "Change View" suggestion chips which don't have a
 // server-side pattern entry. Returning a result keeps the call-site uniform
 // with the validator path: `{ valid, action, params, responseText }`.
 function resolveLocalChip(commandText) {
@@ -49,8 +49,8 @@ function resolveLocalChip(commandText) {
   if (n === 'tonight' || n === "tonight's lineup" || n === 'tonights lineup' || n === 'show epg' || n === 'open epg') {
     return { valid: true, action: 'open_epg', params: {}, responseText: 'Opening tonight’s lineup.' };
   }
-  if (n === 'change look' || n === 'change layout' || n === 'switch look' || n === 'pick a layout' || n === 'change shell') {
-    return { valid: true, action: 'open_layout_switcher', params: {}, responseText: 'Opening the layout picker.' };
+  if (n === 'change view' || n === 'change look' || n === 'change layout' || n === 'switch view' || n === 'switch look' || n === 'pick a view' || n === 'pick a layout' || n === 'change shell') {
+    return { valid: true, action: 'open_layout_switcher', params: {}, responseText: 'Opening the View picker.' };
   }
   return null;
 }
@@ -260,7 +260,7 @@ function FloatingChatbot(props) {
     triggerSendPulse();
 
     // ── Client-side local-chip fast-path ─────────────────────────────────
-    // "tonight" / "change look" chips dispatch synthetic commands that the
+  // "tonight" / "change view" chips dispatch synthetic commands that the
     // server-side validator does not know about. Resolve them locally and
     // dispatch through props.onCommand so the App reducer opens the EPG /
     // LayoutSwitcher modal directly.
@@ -346,7 +346,7 @@ function FloatingChatbot(props) {
 
   function handleChipSend(commandText) {
     // Suggestion chips route through the same send path so local-chip
-    // resolution (e.g. "tonight", "change look") and greeting matching
+    // resolution (e.g. "tonight", "change view") and greeting matching
     // both apply identically.
     setInputText(commandText);
     handleSendText(commandText);

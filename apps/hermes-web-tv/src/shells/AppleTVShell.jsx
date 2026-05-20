@@ -186,7 +186,7 @@ function AppleTVShell(props) {
       {/* Nav */}
       <header style={navStyle}>
         <div style={{ fontWeight: 700, fontSize: 'calc(18px * ' + fontScale + ')', letterSpacing: '-0.02em' }}>
-          ▶ Hermes<span style={{ color: '#0071e3' }}>TV</span>
+          ▶ Dave<span style={{ color: '#0071e3' }}>TV</span>
         </div>
         <nav style={{ display: 'flex', gap: '4px' }}>
           {APPLE_TABS.map(function(tab, i) {
@@ -370,7 +370,7 @@ function AppleTVShell(props) {
           <HScrollRow title="Live Channels" items={liveItems.length > 0 ? liveItems : filtered.slice(1)} onItemSelect={onItemSelect} cardW={240} cardH={135} fontScale={fontScale} profile={profile} tier={tier} />
         </div>
 
-        <footer style={{ textAlign: 'center', padding: '24px', fontSize: 'calc(11px * ' + fontScale + ')', color: '#9fa0a6' }}>HermesTV</footer>
+        <footer style={{ textAlign: 'center', padding: '24px', fontSize: 'calc(11px * ' + fontScale + ')', color: '#9fa0a6' }}>DaveTV</footer>
       </div>
     </div>
   );
