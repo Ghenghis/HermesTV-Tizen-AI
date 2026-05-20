@@ -101,6 +101,50 @@ function isUnplayableSeedLive(item) {
   return true;
 }
 
+// Wave-14: same logic but for VOD / series seed items.
+//
+// Seed `vod-NNN` items (vod-200..vod-2NN, see seedCatalog.js vodItem()) and
+// `ser-NNN` items (ser-300..ser-3NN, see seriesItem()) advertise providers
+// = [apollo_group, xtremehd] but their source_ids are synthetic strings
+// like "apo-vod-top-gun-maverick" / "xtr-ser-stranger-things" that no real
+// provider lib returns. streamResolver.js has no `vod-*` or `ser-*` branch,
+// so clicking these items returns 503 stream_unresolved — exactly the
+// "website dont play movies" complaint.
+//
+// A "pure-seed-placeholder" VOD/series is one whose providers[].source_id
+// values *all* match the seed mock prefix pattern. If wave-13's title-based
+// catalog merge enriches one with a real `m3u-*` source_id (operator paid
+// providers) or an `iptv-vod-*` source_id (some future free CDN), we keep
+// the item — at least one real upstream can play it.
+//
+// We only filter when at least one real provider's content actually arrived
+// (m3u or iptv-org). If both fetches yielded zero items, we leave the seed
+// VODs in so the catalog still has movie titles visible during a provider
+// outage — same conservative posture as the wave-11 live-NNN dedupe.
+var SEED_VOD_SOURCE_RE = /^(apo|xtr)-(vod|ser)-/;
+
+function isUnplayableSeedVodOrSeries(item) {
+  if (!item || typeof item.id !== 'string') { return false; }
+  if (item.type !== 'vod' && item.type !== 'series') { return false; }
+  // Only act on the deterministic seed IDs we generate (vod-NNN, ser-NNN).
+  // Anything else (jellyfin-*, m3u-*, iptv-vod-*) is left alone.
+  if (item.id.indexOf('vod-') !== 0 && item.id.indexOf('ser-') !== 0) {
+    return false;
+  }
+  var sources = Array.isArray(item.providers) ? item.providers : [];
+  if (sources.length === 0) { return true; } // no provider → can't play
+  // If ANY source escapes the seed prefix pattern, a real provider has
+  // claimed this title (via title-based merge or direct add) — keep it.
+  for (var si = 0; si < sources.length; si++) {
+    var src = sources[si];
+    var sid = src && typeof src.source_id === 'string' ? src.source_id : '';
+    if (sid && !SEED_VOD_SOURCE_RE.test(sid)) {
+      return false; // real source attached — keep
+    }
+  }
+  return true; // every source_id was a seed mock — drop
+}
+
 // Resolution sort order for quality-aware sorting (higher index = higher quality)
 const RESOLUTION_ORDER = {
   '4K': 4,
@@ -275,11 +319,11 @@ async function resolveCatalog() {
   // blank shelf during a provider outage.
   var realProviderCount = m3uCount + iptvOrgCount;
   var seedDeduped = 0;
+  var seedVodDeduped = 0;
   if (realProviderCount > 0) {
-    var before = mergedItems.length;
+    var beforeLive = mergedItems.length;
     mergedItems = mergedItems.filter(function(it) {
       if (!isUnplayableSeedLive(it)) { return true; }
-      // It's a seed-rooted item; keep only if sources contains a non-seed entry.
       if (Array.isArray(it.sources)) {
         for (var s = 0; s < it.sources.length; s++) {
           if (it.sources[s] && it.sources[s].is_seed_placeholder === false) { return true; }
@@ -287,7 +331,27 @@ async function resolveCatalog() {
       }
       return false;
     });
-    seedDeduped = before - mergedItems.length;
+    seedDeduped = beforeLive - mergedItems.length;
+
+    // Wave-14: also strip unplayable seed VOD / series so "click Top Gun → 503"
+    // stops happening. Same conservative posture: only when real providers
+    // delivered items; if every provider is down we keep the seed VODs so
+    // the catalog still shows movie titles (better an unplayable card during
+    // an outage than a blank Movies shelf).
+    var beforeVod = mergedItems.length;
+    mergedItems = mergedItems.filter(function(it) {
+      if (!isUnplayableSeedVodOrSeries(it)) { return true; }
+      if (Array.isArray(it.sources)) {
+        for (var sv = 0; sv < it.sources.length; sv++) {
+          if (it.sources[sv] && it.sources[sv].is_seed_placeholder === false) { return true; }
+        }
+      }
+      return false;
+    });
+    seedVodDeduped = beforeVod - mergedItems.length;
+    if (seedVodDeduped > 0) {
+      console.log('[catalog] hid ' + seedVodDeduped + ' unplayable seed VOD/series items');
+    }
   }
 
   return {
@@ -298,6 +362,7 @@ async function resolveCatalog() {
     m3u_count: m3uCount,
     m3u_providers: m3uProviders,
     seed_deduped: seedDeduped,
+    seed_vod_deduped: seedVodDeduped,
     merged_duplicates: mergedItemCount,
   };
 }
