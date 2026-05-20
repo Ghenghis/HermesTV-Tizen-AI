@@ -48,9 +48,9 @@
 
 const { Router } = require('express');
 const router = Router();
-const { SEED_CATALOG } = require('../data/seedCatalog');
 const m3uClient = require('../lib/m3uClient');
 const iptvOrg = require('../lib/iptvOrg');
+const catalogMerge = require('../lib/catalogMerge');
 const streamResolver = require('../lib/streamResolver');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
@@ -65,19 +65,26 @@ function _makeJobId() {
   return 'dl-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+// W17-PURGE: seed catalog is gone. Walk the per-provider caches +
+// merged-catalog snapshot only. Cold caches return null and the caller
+// surfaces an honest 404.
 function _findItem(itemId) {
-  for (var i = 0; i < SEED_CATALOG.length; i++) {
-    if (SEED_CATALOG[i].id === itemId) { return SEED_CATALOG[i]; }
+  if (typeof itemId !== 'string') { return null; }
+  if (itemId.indexOf('m3u-') === 0) {
+    var m = m3uClient.getCachedItemById(itemId);
+    if (m) { return m; }
+  } else if (itemId.indexOf('iptv-') === 0) {
+    var o = iptvOrg.getCachedItemById(itemId);
+    if (o) { return o; }
   }
-  if (typeof itemId === 'string') {
-    if (itemId.indexOf('m3u-') === 0) {
-      var m = m3uClient.getCachedItemById(itemId);
-      if (m) { return m; }
-    } else if (itemId.indexOf('iptv-') === 0) {
-      var o = iptvOrg.getCachedItemById(itemId);
-      if (o) { return o; }
+  try {
+    var snap = catalogMerge.getLastMerged && catalogMerge.getLastMerged();
+    if (Array.isArray(snap)) {
+      for (var i = 0; i < snap.length; i++) {
+        if (snap[i] && snap[i].id === itemId) { return snap[i]; }
+      }
     }
-  }
+  } catch (_) {}
   return null;
 }
 

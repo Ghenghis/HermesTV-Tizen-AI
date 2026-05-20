@@ -30,11 +30,15 @@ var STEP_SOURCE = 'source';
 var STEP_PREVIEW = 'preview';
 var STEP_CONFIRM = 'confirm';
 
+// Wave-17/19: Stalker portal removed (UI for an unimplemented backend = stub
+// content, which violates the no-fakes rule in feedback_no_mocks_no_stubs.md).
+// Xtream-Codes login is REAL — the server backs it via lib/xtreamClient.js
+// (wired into resolveCatalog as of wave-19). When a Stalker adapter exists,
+// re-add that option with a working backend at the same time.
 var SOURCE_OPTIONS = [
-  { id: 'url',     label: 'URL',                    hint: 'Paste a public M3U or XMLTV URL.' },
-  { id: 'file',    label: 'Upload file',            hint: 'Choose a local .m3u or .m3u8 file. 10 MB max.' },
-  { id: 'xtream',  label: 'Xtream-Codes login',     hint: 'Host + username + password.', stub: true },
-  { id: 'stalker', label: 'Stalker portal',         hint: 'Portal URL + MAC address.',   stub: true },
+  { id: 'url',     label: 'URL',                hint: 'Paste a public M3U or XMLTV URL.' },
+  { id: 'file',    label: 'Upload file',        hint: 'Choose a local .m3u or .m3u8 file. 10 MB max.' },
+  { id: 'xtream',  label: 'Xtream-Codes login', hint: 'Host + username + password.' },
 ];
 
 var PROVIDER_TAG_OPTIONS = [

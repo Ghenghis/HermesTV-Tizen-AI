@@ -2,7 +2,7 @@ import React from 'react';
 import { validateCommand, generateCommandId } from './CommandValidator.jsx';
 import * as commandStore from '../store/commandStore.js';
 import * as hermesApi from '../api/hermesApi.js';
-import * as mockApi from '../api/mockApi.js';
+import { resolveOfflineCommand } from '../utils/commandMatchers.js';
 import * as voiceClient from '../api/azureVoiceClient.js';
 import * as voicePrefStore from '../store/voicePrefStore.js';
 import { getResponseText } from '../utils/commandResponseText.js';
@@ -298,9 +298,10 @@ function FloatingChatbot(props) {
     };
     commandStore.record(envelope);
 
+    // Offline path uses the local command-matcher table (no fake catalog/data).
     var validatePromise = online
       ? hermesApi.validateCommand({ command_text: text, profile_id: profileId })
-      : mockApi.validateCommand({ command_text: text, profile_id: profileId });
+      : Promise.resolve(resolveOfflineCommand(text));
 
     validatePromise.then(function(result) {
       setSubmitting(false);

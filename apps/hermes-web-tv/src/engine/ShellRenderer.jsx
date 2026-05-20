@@ -1,5 +1,6 @@
 import React from 'react';
 import { getShell } from './layoutRegistry.js';
+import EmptyState from '../components/EmptyState.jsx';
 
 // ShellRenderer is intentionally a thin pass-through. New shells (TiviMate,
 // Netflix, Plex, AppleTV, Samsung, MomMode, DavePower, Zero, LiveTV, plus the
@@ -32,6 +33,33 @@ function ShellRenderer(props) {
 
   if (!ShellComponent) {
     return null;
+  }
+
+  // W17-PURGE: when the catalog is empty (every provider returned zero items,
+  // or no provider has been configured) every shell — regardless of which
+  // one is active — renders an honest empty state with a "Open Settings"
+  // CTA. We DO NOT silently fill in fake content from a seed catalog.
+  // Individual shells therefore never have to handle the items.length === 0
+  // case; they just see the catalog they were handed.
+  var catalogLength = Array.isArray(catalog) ? catalog.length : 0;
+  if (catalogLength === 0) {
+    return (
+      <div
+        data-layout={layout}
+        data-empty="true"
+        style={{
+          width: '100%', height: '100%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <EmptyState
+          icon="📭"
+          title="No channels yet"
+          message="None of your providers returned content. Open Settings → Providers and verify your iptv-org / xTremeHD / Apollo Group credentials are valid and reachable."
+          cta={onOpenSettings ? { label: 'Open Settings', onClick: onOpenSettings } : null}
+        />
+      </div>
+    );
   }
 
   // Shells are React.lazy chunks (see layoutRegistry.js — boot bundle no

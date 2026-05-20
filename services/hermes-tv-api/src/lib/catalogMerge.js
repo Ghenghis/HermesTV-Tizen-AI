@@ -435,6 +435,7 @@ function getSourcesForItemId(itemId) {
 }
 
 function getLastMergedAt() { return _lastMergedAt; }
+function getLastMerged() { return _lastMerged; }
 
 module.exports = {
   normalizeTitle: normalizeTitle,
@@ -442,6 +443,7 @@ module.exports = {
   resolutionRank: resolutionRank,
   mergeByTitle: mergeByTitle,
   setLastMerged: setLastMerged,
+  getLastMerged: getLastMerged,
   getSourcesForItemId: getSourcesForItemId,
   getLastMergedAt: getLastMergedAt,
   // Constants exposed for tests + diagnostics.

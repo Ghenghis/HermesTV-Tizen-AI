@@ -22,8 +22,38 @@
 
 const { Router } = require('express');
 const router = Router();
-const { LIVE_DEFS } = require('../data/seedCatalog');
+const iptvOrg = require('../lib/iptvOrg');
+const m3uClient = require('../lib/m3uClient');
 const xmltv = require('../integrations/xmltv');
+
+// W17-PURGE: coverage + suggest-channels used to walk the seed catalog
+// (LIVE_DEFS). They now walk the real provider caches (iptv-org public +
+// operator-pasted M3U). When no provider is configured the helpers return
+// an empty list and the endpoints serve honest 0% coverage / no suggestions.
+function _collectLiveCatalog() {
+  var out = [];
+  try {
+    if (iptvOrg.isEnabled()) {
+      var orgItems = iptvOrg.fetchCatalog({ limit: 500 });
+      if (Array.isArray(orgItems)) {
+        for (var i = 0; i < orgItems.length; i++) {
+          if (orgItems[i] && orgItems[i].type === 'live') { out.push(orgItems[i]); }
+        }
+      }
+    }
+  } catch (_) {}
+  try {
+    if (m3uClient.isEnabled() && typeof m3uClient.getCachedCatalog === 'function') {
+      var m3uItems = m3uClient.getCachedCatalog();
+      if (Array.isArray(m3uItems)) {
+        for (var j = 0; j < m3uItems.length; j++) {
+          if (m3uItems[j] && m3uItems[j].type === 'live') { out.push(m3uItems[j]); }
+        }
+      }
+    }
+  } catch (_) {}
+  return out;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/epg?provider=<provider_id>&hours=<n>&force_refresh=1
@@ -215,15 +245,19 @@ const VALID_MATCH_STRATEGIES = ['fuzzy', 'exact', 'prefix'];
 // Since we don't yet have per-playlist EPG persisted, we report 0% coverage
 // against the seed channel list so the UI sees the shape it expects.
 router.get('/api/epg/coverage', (req, res) => {
-  const total = LIVE_DEFS.length;
-  // Count channels in the seed that have has_catchup=true as a proxy for
-  // "matched" since those are the ones with hand-curated EPG data.
-  const matched = LIVE_DEFS.filter(function(d) { return d.has_catchup; }).length;
+  // W17-PURGE: coverage is computed against the live provider catalog rather
+  // than the deleted seed. When no provider is configured we honestly report
+  // 0/0 coverage.
+  const live = _collectLiveCatalog();
+  const total = live.length;
+  const matched = live.filter(function(d) {
+    return d && d.metadata && d.metadata.has_catchup;
+  }).length;
   res.json({
     matched: matched,
     total: total,
     coverage_pct: total > 0 ? Math.round((matched / total) * 100) : 0,
-    _meta: { source: 'seed-static', generated_utc: new Date().toISOString() },
+    _meta: { source: total > 0 ? 'providers' : 'no-providers', generated_utc: new Date().toISOString() },
   });
 });
 
@@ -359,9 +393,11 @@ router.get('/api/epg/suggest-channels', (req, res) => {
     });
   }
 
+  // W17-PURGE: suggestions are pulled from real provider channel lists.
   // Score = (1 if substring match) + (token overlap count / total tokens)
   const tokens = name.split(/\s+/).filter(Boolean);
-  const scored = LIVE_DEFS.map(function(def) {
+  const live = _collectLiveCatalog();
+  const scored = live.map(function(def) {
     const candidate = (def.title || '').toLowerCase();
     const substringMatch = candidate.indexOf(name) !== -1 ? 1 : 0;
     var tokenHits = 0;
@@ -370,8 +406,8 @@ router.get('/api/epg/suggest-channels', (req, res) => {
     }
     const tokenScore = tokens.length > 0 ? tokenHits / tokens.length : 0;
     return {
-      channel_id: 'live.' + def.slug,
-      display_name: def.title,
+      channel_id: def.id || ('live.' + (def.slug || 'unknown')),
+      display_name: def.title || 'Unknown',
       score: substringMatch + tokenScore,
     };
   }).filter(function(s) { return s.score > 0; });
@@ -381,7 +417,7 @@ router.get('/api/epg/suggest-channels', (req, res) => {
   res.json({
     suggestions: scored.slice(0, 10),
     total: scored.length,
-    _meta: { source: 'seed-static', strategy: EPG_SETTINGS.match_strategy },
+    _meta: { source: live.length > 0 ? 'providers' : 'no-providers', strategy: EPG_SETTINGS.match_strategy },
   });
 });
 

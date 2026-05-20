@@ -19,7 +19,6 @@
 
 const { Router } = require('express');
 const router = Router();
-const { SEED_CATALOG } = require('../data/seedCatalog');
 const streamResolver = require('../lib/streamResolver');
 const m3uClient = require('../lib/m3uClient');
 const iptvOrg = require('../lib/iptvOrg');
@@ -41,25 +40,33 @@ function _makeTicketId() {
 
 // Resolve a HermesTV item by ID across all enabled catalog sources.
 // ID prefixes:
-//   "live-" / "vod-" / "series-" → seed catalog
 //   "m3u-<provider>-..."         → m3uClient cache (operator-pasted M3U)
 //   "iptv-..."                   → iptv-org public catalog
-// Synchronous — relies on the per-source caches already being warm.
-// /api/catalog should have been called before /api/play on any normal
-// user journey, so the caches are primed; cold-cache requests get 404.
+// W17-PURGE: the seed catalog lookup is gone with seedCatalog.js. /api/catalog
+// should have been called before /api/play on any normal user journey so the
+// per-provider caches are primed; cold-cache requests get 404 honestly.
+// We also try the merged-catalog snapshot so any item the user clicks on
+// inside /api/catalog (which may carry the merged id) resolves cleanly.
 function _findItem(itemId) {
-  for (var i = 0; i < SEED_CATALOG.length; i++) {
-    if (SEED_CATALOG[i].id === itemId) { return SEED_CATALOG[i]; }
+  if (typeof itemId !== 'string') { return null; }
+  if (itemId.indexOf('m3u-') === 0) {
+    var m3uItem = m3uClient.getCachedItemById(itemId);
+    if (m3uItem) { return m3uItem; }
+  } else if (itemId.indexOf('iptv-') === 0) {
+    var orgItem = iptvOrg.getCachedItemById(itemId);
+    if (orgItem) { return orgItem; }
   }
-  if (typeof itemId === 'string') {
-    if (itemId.indexOf('m3u-') === 0) {
-      var m3uItem = m3uClient.getCachedItemById(itemId);
-      if (m3uItem) { return m3uItem; }
-    } else if (itemId.indexOf('iptv-') === 0) {
-      var orgItem = iptvOrg.getCachedItemById(itemId);
-      if (orgItem) { return orgItem; }
+  // Last resort: scan the merged-catalog snapshot. catalogMerge re-emits
+  // items with possibly-different ids than the original provider IDs; this
+  // catches clicks on the merged-canonical id.
+  try {
+    var snap = catalogMerge.getLastMerged && catalogMerge.getLastMerged();
+    if (Array.isArray(snap)) {
+      for (var i = 0; i < snap.length; i++) {
+        if (snap[i] && snap[i].id === itemId) { return snap[i]; }
+      }
     }
-  }
+  } catch (_) {}
   return null;
 }
 

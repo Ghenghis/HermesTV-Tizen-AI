@@ -977,15 +977,15 @@ function App() {
           var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
           var actors = rawCatalog.actors || [];
           // X-Catalog-Source header (or _meta.source fallback) — honest data
-          // source signal for the Settings badge. When we're on the dev-mock
-          // path the badge shows 'dev-mock' so it's obvious in DevTools.
+          // source signal for the Settings badge. Wave-17 removed every mock
+          // fallback path; when the API is offline we surface 'api-offline'
+          // (not a fake catalog) so DevTools shows reality.
           var sourceHeader = rawCatalog._source_header || null;
           var meta = rawCatalog._meta || {};
           var metaSource = meta.source || null;
-          var catalogSource = isOnline ? (sourceHeader || metaSource || null) : 'dev-mock';
-          // m3u_providers and iptv_org_count land on _meta when the API has
-          // the Threadfin/M3U client wired (PR #53). Older mockApi responses
-          // and dev-mock paths leave them undefined — coalesce to null/0.
+          var catalogSource = isOnline ? (sourceHeader || metaSource || 'no-providers') : 'api-offline';
+          // m3u_providers + iptv_org_count + paid-panel status land on _meta
+          // when the API has those providers configured. Absent → null/0.
           var m3uProviders = meta.m3u_providers || null;
           var iptvOrgCount = (typeof meta.iptv_org_count === 'number') ? meta.iptv_org_count : 0;
 
@@ -2112,6 +2112,7 @@ function App() {
                   contentFilter={state.contentFilter}
                   providerFilter={state.providerFilter}
                   qualityFilter={state.qualityFilter}
+                  onOpenSettings={function() { patchState({ showSettings: true }); }}
                 />
               </div>
             );
@@ -2149,6 +2150,7 @@ function App() {
                 tier={state.tier}
                 columns={state.activeTab === 'discovery' ? (state.tier === 'enhanced' ? 8 : 4) : (state.tier === 'enhanced' ? 5 : 3)}
                 onItemClick={handleItemClick}
+                onOpenSettings={function() { patchState({ showSettings: true }); }}
               />
             </main>
           </React.Fragment>

@@ -175,7 +175,7 @@
   "chatbot.voice_title": "Modo walkie-talkie",
   "chatbot.voice_aria": "Cambiar al modo voz",
   "chatbot.voice_header": "{name} — Voz",
-  "chatbot.voice_listening": "Escuchando… (modo de prueba — solo Azure TTS)",
+  "chatbot.voice_listening": "Escuchando…",
   "chatbot.voice_switch_text": "Cambiar a texto",
   "chatbot.no_match_known": "No entendí «{text}». Prueba con «muestra películas», «muestra 4K», «modo sencillo» o «tema oscuro» — o toca una sugerencia.",
   "chatbot.no_match_generic": "No entendí eso. Prueba con «muestra películas», «muestra 4K», «modo sencillo» o «tema oscuro» — o toca una sugerencia.",

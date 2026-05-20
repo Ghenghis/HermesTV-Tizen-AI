@@ -1,8 +1,20 @@
 import React from 'react';
 import * as hermesApi from '../api/hermesApi.js';
-import * as mockApi from '../api/mockApi.js';
 import * as voiceClient from '../api/azureVoiceClient.js';
 import * as voicePrefStore from '../store/voicePrefStore.js';
+
+// W17-PURGE: previously this modal fell back to a fake "HRM-MOCK" pairing
+// code when offline. Under the no-fakes rule we now surface an honest
+// "needs network" envelope instead — a QR code that points nowhere would
+// be exactly the kind of placeholder UI the project bans.
+var OFFLINE_PAIRING = {
+  createPairing: function() {
+    return Promise.reject(new Error('Pairing requires a live connection to the DaveTV server.'));
+  },
+  getPairingStatus: function() {
+    return Promise.reject(new Error('Pairing requires a live connection to the DaveTV server.'));
+  },
+};
 
 // Poll interval — every 5s the TV asks the API "did the operator's phone
 // complete this pairing yet?" Cheap LAN HTTP call; modal closes the second
@@ -262,7 +274,7 @@ function QROnboarding(props) {
     if (!isOpen) { return undefined; }
 
     var cancelled = false;
-    var api = online ? hermesApi : mockApi;
+    var api = online ? hermesApi : OFFLINE_PAIRING;
 
     // Snapshot the current font-scale so we lock the QR size for this open.
     setFontScale(_resolveFontScale());
@@ -324,7 +336,7 @@ function QROnboarding(props) {
     if (!pairState.pairingCode) { return undefined; }
 
     var cancelled = false;
-    var api = online ? hermesApi : mockApi;
+    var api = online ? hermesApi : OFFLINE_PAIRING;
 
     var poll = function() {
       if (cancelled) { return; }
@@ -381,7 +393,7 @@ function QROnboarding(props) {
     // resets to the initial 'loading' shape because pairingCode is null
     // and the effect's dependency on isOpen is unchanged.
     setPairState(initialState);
-    var api = online ? hermesApi : mockApi;
+    var api = online ? hermesApi : OFFLINE_PAIRING;
     api.createPairing().then(function(envelope) {
       patchPair({
         pairingCode: envelope.pairing_code,

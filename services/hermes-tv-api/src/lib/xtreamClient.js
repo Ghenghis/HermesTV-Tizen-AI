@@ -47,8 +47,8 @@
  * --- Credential safety ---
  * `XTREAM_URL`, `XTREAM_USERNAME`, `XTREAM_PASSWORD` and any URL built
  * from them MUST be sanitised through `lib/sanitizeLog.sanitizeForLog`
- * before being written to console.warn/error. The sanitizer's
- * `/player_api.php[^\s'"]*/` pattern catches the full URL including
+ * before being written to console.warn/error. The sanitizer regex
+ * (player_api.php with any query suffix) catches the full URL including
  * embedded creds. Tests assert no log line ever contains the literal
  * username or password.
  *
