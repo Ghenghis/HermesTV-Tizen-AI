@@ -4,6 +4,7 @@ const { Router } = require('express');
 const jellyfin = require('../lib/jellyfin');
 const iptvOrg = require('../lib/iptvOrg');
 const m3uClient = require('../lib/m3uClient');
+const catalogMerge = require('../lib/catalogMerge');
 const { SEED_CATALOG } = require('../data/seedCatalog');
 const router = Router();
 
@@ -216,11 +217,57 @@ async function resolveCatalog() {
     }
   }
 
-  // Wave-11: dedupe the seed `live-NNN` placeholders once a real provider
-  // has loaded its channels. Those seed items reference fake source_id
-  // values (`apo-live-...` / `xtr-live-...`) that no real provider has,
-  // so /api/play returns 503 stream_unresolved when clicked. Hiding them
-  // when real channels exist means Mom + Dave only see playable channels.
+  // Wave-13: cross-provider channel merge. Group same-channel items across
+  // providers into ONE catalog entry with a sources[] array (one entry per
+  // provider variant). The user no longer sees three "ESPN" cards (one per
+  // provider) — they see one ESPN card. /api/play walks sources[] on
+  // resolve so the failed primary auto-falls-through to the next provider.
+  //
+  // Source priority: xtremehd > apollo_group > iptv-org > seed. Seeds land
+  // last because their source_id is fake; they only become the active
+  // source if every real provider variant fails to resolve.
+  var beforeMerge = baseItems.length;
+  var mergedItems;
+  try {
+    mergedItems = catalogMerge.mergeByTitle(baseItems);
+  } catch (mergeErr) {
+    // Never let a merge bug nuke the catalog response — fall back to the
+    // un-merged base list and surface the failure in the response meta.
+    var sanLogM = require('../lib/sanitizeLog').sanitizeForLog;
+    console.warn('[catalog] merge failed, serving un-merged: ' + sanLogM(mergeErr && mergeErr.message ? mergeErr.message : 'unknown'));
+    mergedItems = baseItems.map(function(it) {
+      // Synthesise a single-source sources[] so downstream consumers
+      // (play.js) can rely on the shape unconditionally.
+      var providerId = (Array.isArray(it.providers) && it.providers[0] && it.providers[0].provider_id) || it.provider || 'seed';
+      var clone = {};
+      for (var f in it) { if (Object.prototype.hasOwnProperty.call(it, f)) { clone[f] = it[f]; } }
+      clone.sources = [{
+        provider_id: providerId,
+        item_id: it.id,
+        source_id: (Array.isArray(it.providers) && it.providers[0] && it.providers[0].source_id) || null,
+        resolution: (it.metadata && it.metadata.resolution) || it.quality || null,
+        source_health: (Array.isArray(it.providers) && it.providers[0] && it.providers[0].source_health) || { status: 'unknown' },
+        is_seed_placeholder: isUnplayableSeedLive(it),
+      }];
+      return clone;
+    });
+  }
+  var mergedItemCount = beforeMerge - mergedItems.length;
+
+  // Publish the latest merged set to the in-process cache so /api/play can
+  // find a clicked item's full sources[] array on the next request. The
+  // cache is overwritten every catalog request, so the bound on staleness
+  // is just the time between a user opening a card and clicking ▶ Watch.
+  try { catalogMerge.setLastMerged(mergedItems); }
+  catch (_) { /* never block the catalog response on a cache write */ }
+
+  // Wave-11 (now post-merge): a merged item is "playable" if AT LEAST ONE
+  // of its sources points at a real provider (i.e. is_seed_placeholder is
+  // false on some source). After merging, the seed placeholders survive
+  // only inside the sources[] of items that also have a real provider —
+  // those are KEPT (the seed is a tertiary fallback). Items whose ONLY
+  // source is a seed placeholder are still unplayable; we drop them when
+  // we have any real provider data.
   //
   // Safety net: if BOTH real-provider fetches yielded zero items (Apollo
   // unreachable AND iptv-org disabled), we leave the seeds in so the
@@ -229,19 +276,29 @@ async function resolveCatalog() {
   var realProviderCount = m3uCount + iptvOrgCount;
   var seedDeduped = 0;
   if (realProviderCount > 0) {
-    var before = baseItems.length;
-    baseItems = baseItems.filter(function(it) { return !isUnplayableSeedLive(it); });
-    seedDeduped = before - baseItems.length;
+    var before = mergedItems.length;
+    mergedItems = mergedItems.filter(function(it) {
+      if (!isUnplayableSeedLive(it)) { return true; }
+      // It's a seed-rooted item; keep only if sources contains a non-seed entry.
+      if (Array.isArray(it.sources)) {
+        for (var s = 0; s < it.sources.length; s++) {
+          if (it.sources[s] && it.sources[s].is_seed_placeholder === false) { return true; }
+        }
+      }
+      return false;
+    });
+    seedDeduped = before - mergedItems.length;
   }
 
   return {
-    items: baseItems,
+    items: mergedItems,
     source: baseSource,
     iptv_org_count: iptvOrgCount,
     iptv_org_data_age_h: iptvOrgAge,
     m3u_count: m3uCount,
     m3u_providers: m3uProviders,
     seed_deduped: seedDeduped,
+    merged_duplicates: mergedItemCount,
   };
 }
 
@@ -296,12 +353,21 @@ router.get('/api/catalog', async (req, res) => {
 
   // --- Provider filter (mock only) ---
   // "all" is a no-op (explicit "show everything"). Any specific provider_id
-  // filters to items where that provider appears in the providers array.
+  // filters to items where that provider appears in EITHER the legacy
+  // providers[] array OR the wave-13 sources[] array (post-merge canonical
+  // place). Both shapes are checked so the filter survives the merge.
   if (provider_id && provider_id !== 'all' && !isJellyfin) {
-    items = items.filter((item) =>
-      Array.isArray(item.providers) &&
-      item.providers.some((p) => p.provider_id === provider_id)
-    );
+    items = items.filter((item) => {
+      if (Array.isArray(item.sources) &&
+          item.sources.some((s) => s.provider_id === provider_id)) {
+        return true;
+      }
+      if (Array.isArray(item.providers) &&
+          item.providers.some((p) => p.provider_id === provider_id)) {
+        return true;
+      }
+      return false;
+    });
   }
 
   // --- Quality sorting for mom_tv: 4K first, HDR-flagged items higher ---
@@ -332,6 +398,10 @@ router.get('/api/catalog', async (req, res) => {
     m3u_count: resolved.m3u_count,
     m3u_providers: resolved.m3u_providers,
     seed_deduped: resolved.seed_deduped || 0,
+    // Wave-13: how many duplicate items the cross-provider merge folded
+    // away. If the unmerged catalog had 3 ESPN entries and 2 CNN entries
+    // and 1 of each elsewhere, merged_duplicates is (3-1) + (2-1) = 3.
+    merged_duplicates: resolved.merged_duplicates || 0,
   };
 
   res.json({ catalog: items, total: items.length, _meta });
