@@ -5,6 +5,7 @@ import TimeShiftOverlay from './TimeShiftOverlay.jsx';
 import useWatchProgress from '../hooks/useWatchProgress.js';
 import useHlsStream from '../hooks/useHlsStream.js';
 import { fetchEPG } from '../api/epgClient.js';
+import playbackPositionStore from '../store/playbackPositionStore.js';
 
 // PlayerModal — TiviMate / Plex / IPTV Smarters class single-stream
 // player overlay. Built on top of the existing /api/play ticket flow.
@@ -256,6 +257,26 @@ function PlayerModal(props) {
     durationSec: watchDuration,
   });
   var recordTick = watchHook.recordTick;
+
+  // Resume-seek bookkeeping. We auto-seek to the last-known position at most
+  // once per (item open). The ref carries the contentId we've already seeked
+  // for so a stream-pipeline reconnect (which may re-fire loadedmetadata)
+  // doesn't snap the user back to the resume point after they manually
+  // seeked away from it.
+  var seekedItemIdRef = React.useRef(null);
+  // Reset the resume-seek flag whenever the active item changes so the next
+  // (item, profile) pairing gets a fresh chance to resume.
+  React.useEffect(function() {
+    seekedItemIdRef.current = null;
+  }, [item && item.id, profileId]);
+
+  // Flush any pending throttled position writes when the modal closes so the
+  // user's last frame survives, e.g., when they hit Close right after a seek.
+  React.useEffect(function() {
+    return function cleanup() {
+      try { playbackPositionStore.flush(); } catch (_e) { /* */ }
+    };
+  }, []);
 
   // ── Effects ───────────────────────────────────────────────────────────
 
@@ -514,12 +535,47 @@ function PlayerModal(props) {
     if (typeof v.currentTime === 'number') {
       setCurrentTime(v.currentTime);
       recordTick(v.currentTime);
+      // Mirror the position into the fast-path localStorage store for the
+      // Continue Watching rail. Live channels have no meaningful resume
+      // point — playhead is "now" — so we skip the write for type=live.
+      if (!isLive && item && item.id) {
+        var dur = (typeof v.duration === 'number' && isFinite(v.duration)) ? v.duration : 0;
+        playbackPositionStore.setPosition(profileId, String(item.id), v.currentTime, dur);
+      }
     }
   }
 
   function handleLoadedMetadata() {
     refreshTracks();
+    // Auto-seek to the last-known position for VOD/movies/episodes the
+    // first time metadata is ready for this (item, profile) pair. Live
+    // channels never resume — they always play "now".
+    var v = videoRef.current;
+    if (v && !isLive && item && item.id && seekedItemIdRef.current !== item.id) {
+      try {
+        var dur = (typeof v.duration === 'number' && isFinite(v.duration) && v.duration > 0) ? v.duration : 0;
+        var saved = playbackPositionStore.getPosition(profileId, String(item.id));
+        if (saved && typeof saved.seconds === 'number' && saved.seconds > 30) {
+          // Skip if we'd be jumping past the credits — the user clearly
+          // finished, so let them start over. We use the live duration
+          // when known, otherwise the stored duration as a fallback.
+          var effectiveDur = dur > 0 ? dur : (saved.duration || 0);
+          if (effectiveDur <= 0 || saved.seconds < (effectiveDur - 60)) {
+            try { v.currentTime = saved.seconds; } catch (_e) { /* engine not ready */ }
+          }
+        }
+      } catch (_e) { /* never let resume crash the player */ }
+      seekedItemIdRef.current = item.id;
+    }
     handleTimeUpdate();
+  }
+
+  // Mark watched + clear resume point when the user finishes the asset.
+  function handleEnded() {
+    setPlaying(false);
+    if (!isLive && item && item.id) {
+      try { playbackPositionStore.clearPosition(profileId, String(item.id)); } catch (_e) { /* */ }
+    }
   }
 
   function togglePlay() {
@@ -840,6 +896,7 @@ function PlayerModal(props) {
                 playsInline
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
+                onEnded={handleEnded}
                 onPlay={function() { setPlaying(true); }}
                 onPause={function() { setPlaying(false); }}
                 onVolumeChange={function() {

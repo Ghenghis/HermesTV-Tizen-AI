@@ -5,6 +5,7 @@ import { debounce } from '../utils/debounce.js';
 import LoadingSkeleton from './LoadingSkeleton.jsx';
 import ErrorState from './ErrorState.jsx';
 import EmptyState from './EmptyState.jsx';
+import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SearchModal — global "press / or Ctrl+K" search overlay.
@@ -160,10 +161,13 @@ function SearchModal(props) {
 
     setLoading(true);
     setError(null);
+    // Mom-never-limited rule: Mom gets up to 100 results per query, Dave 24.
+    // Backend enforces its own server-side cap on excess values, so this is
+    // a safe "give Sherri the wider window" lift.
     searchCatalog({
       query: q,
       type: tab,
-      limit: 24,
+      limit: capForProfile(profileId, 24) === 1e9 ? 100 : 24,
       profileId: profileId,
       signal: controller ? controller.signal : undefined,
     }).then(function(body) {

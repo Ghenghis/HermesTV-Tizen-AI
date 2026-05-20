@@ -3,6 +3,7 @@ import { applyShellFilters, posterBg } from './shellHelpers.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import WatchlistRail from '../components/WatchlistRail.jsx';
 import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
+import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StremioShell — HermesTV's 10th layout, modelled on the open-source Stremio
@@ -335,6 +336,9 @@ function StremioBoardRow(props) {
   var onItemSelect = props.onItemSelect;
   var allowMotion = props.allowMotion;
   var emptyHint = props.emptyHint;
+  var profile = props.profile;
+  // Mom-never-limited rule: Dave caps rows at 14, Mom sees the whole row.
+  var rowCap = capForProfile(profile, 14);
 
   return (
     <section style={{ marginBottom: '1.6rem' }}>
@@ -391,7 +395,7 @@ function StremioBoardRow(props) {
             scrollbarColor: COLOR_BORDER + ' transparent',
           }}
         >
-          {items.slice(0, 14).map(function(item, idx) {
+          {items.slice(0, rowCap).map(function(item, idx) {
             return (
               <StremioCard
                 key={item.id || idx}
@@ -490,8 +494,9 @@ function StremioShell(props) {
   // Continue Watching is currently a stub (the playback-progress store is on a
   // different track) — show the most-recent slice of the catalog as a
   // plausible placeholder. Real data slots in once the progress endpoint
-  // lands.
-  var continueWatching = filtered.slice(0, 8);
+  // lands. Mom-never-limited rule: Mom gets the unsliced filtered set, Dave
+  // gets the existing 8-item placeholder window.
+  var continueWatching = filtered.slice(0, capForProfile(profile, 8));
   var featuredMovies = filtered.filter(isMovie);
   var featuredSeries = filtered.filter(isSeries);
 
@@ -681,6 +686,7 @@ function StremioShell(props) {
               onItemSelect={onItemSelect}
               allowMotion={allowMotion}
               emptyHint="Play something to see your progress here."
+              profile={profile}
             />
             <StremioBoardRow
               title="Featured Movies"
@@ -688,6 +694,7 @@ function StremioShell(props) {
               onItemSelect={onItemSelect}
               allowMotion={allowMotion}
               emptyHint="No movies in the current catalog filter."
+              profile={profile}
             />
             <StremioBoardRow
               title="Featured Series"
@@ -695,6 +702,7 @@ function StremioShell(props) {
               onItemSelect={onItemSelect}
               allowMotion={allowMotion}
               emptyHint="No series in the current catalog filter."
+              profile={profile}
             />
           </div>
         )}

@@ -2,6 +2,7 @@ import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NuvioShell — HermesTV's cinematic, hero-driven layout (9th layout).
@@ -158,7 +159,7 @@ function NuvioRail(props) {
             msOverflowStyle: 'none',
           }}
         >
-          {items.slice(0, 24).map(function(item, idx) {
+          {items.slice(0, capForProfile(profile, 24)).map(function(item, idx) {
             var bg = posterBg(item, idx);
             var year = (item.metadata && item.metadata.year) || item.year || '';
             return (

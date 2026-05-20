@@ -21,6 +21,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React from 'react';
+import { capForProfile } from '../utils/isSystemLimited.js';
 
 function CatchupRail(props) {
   var profile = props.profile;
@@ -65,12 +66,14 @@ function CatchupRail(props) {
       pending = pending - 1;
       if (pending === 0 && !aborted) {
         // Sort by start_utc descending (most recent first) and cap at 24 cards.
+        // Mom-never-limited rule: Sherri's TV bypasses the cap so she sees the
+        // full catch-up window across all live channels.
         collected.sort(function(a, b) {
           var aT = a && a.start_utc ? new Date(a.start_utc).getTime() : 0;
           var bT = b && b.start_utc ? new Date(b.start_utc).getTime() : 0;
           return bT - aT;
         });
-        setPrograms(collected.slice(0, 24));
+        setPrograms(collected.slice(0, capForProfile(profile, 24)));
         setLoading(false);
       }
     }
