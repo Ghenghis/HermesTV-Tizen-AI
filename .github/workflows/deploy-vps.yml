@@ -206,9 +206,18 @@ jobs:
       # 162-249 byte-for-byte; the only addition is `tv.daveai.tech` as
       # primary host with `hermestv.daveai.tech` as fallback for the few
       # hours during/after the parallel domain-swap PR.
+      #
+      # NOTE: continue-on-error is true because Cloudflare returns 403 to
+      # GitHub Actions runner CIDR ranges, so this step structurally cannot
+      # pass when called from CI even if the deploy is healthy. The container
+      # healthcheck inside step (4) is the actual deploy gate; this is now an
+      # informational best-effort canary that produces warnings but never
+      # breaks deploys. Operator-side validation: `curl https://tv.daveai.tech/health`
+      # from a laptop or any non-Cloudflare-blocked IP.
       # ---------------------------------------------------------------------
       - name: Smoke-probe public HTTPS edge
         id: smoke
+        continue-on-error: true
         run: |
           set -uo pipefail
           # Brief warm-up: nginx upstream keepalive may still be holding a
