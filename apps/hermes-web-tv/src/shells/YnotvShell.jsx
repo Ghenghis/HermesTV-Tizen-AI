@@ -585,6 +585,9 @@ function YnotvShell(props) {
             <button
               key={it.id}
               tabIndex={0}
+              data-focusable="true"
+              data-focus-group="ynotv-rail"
+              data-card-id={'rail-' + it.id}
               aria-pressed={isActive}
               aria-label={it.label}
               title={it.label}
@@ -706,6 +709,8 @@ function YnotvShell(props) {
             >
               <button
                 tabIndex={0}
+                data-focusable="true"
+                data-focus-group="ynotv-calendar-nav"
                 aria-label="Previous month"
                 onClick={function() {
                   setCalendarAnchor(function(prev) {
@@ -735,6 +740,8 @@ function YnotvShell(props) {
               </div>
               <button
                 tabIndex={0}
+                data-focusable="true"
+                data-focus-group="ynotv-calendar-nav"
                 aria-label="Next month"
                 onClick={function() {
                   setCalendarAnchor(function(prev) {
@@ -805,6 +812,9 @@ function YnotvShell(props) {
                     key={idx}
                     role="gridcell"
                     tabIndex={isSelected ? 0 : -1}
+                    data-focusable={isSelected ? 'true' : undefined}
+                    data-focus-group="ynotv-calendar-grid"
+                    data-card-id={'cal-' + key}
                     aria-selected={isSelected}
                     aria-label={
                       cell.date.toDateString()
@@ -921,6 +931,9 @@ function YnotvShell(props) {
                       <button
                         key={item.id || idx}
                         tabIndex={0}
+                        data-focusable="true"
+                        data-focus-group="ynotv-calendar-releases"
+                        data-card-id={item.id || ('cal-release-' + idx)}
                         aria-label={item.title || 'Untitled'}
                         onClick={function() {
                           if (typeof onItemSelect === 'function') { onItemSelect(item); }
@@ -1023,6 +1036,9 @@ function YnotvShell(props) {
                         key={item.id || idx}
                         tabIndex={0}
                         data-ynotv-poster="true"
+                        data-focusable="true"
+                        data-focus-group="ynotv-grid"
+                        data-card-id={item.id || ('idx-' + idx)}
                         aria-label={(item.title || 'Untitled') + (year ? ' (' + year + ')' : '')}
                         onClick={function() {
                           if (typeof onItemSelect === 'function') { onItemSelect(item); }

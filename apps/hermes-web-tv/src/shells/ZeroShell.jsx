@@ -758,6 +758,9 @@ function ZeroShell(props) {
                     key={item.id || idx}
                     tabIndex={0}
                     data-zero-poster="true"
+                    data-focusable="true"
+                    data-card-id={item.id || ('idx-' + idx)}
+                    data-focus-group="zero-grid"
                     aria-label={(item.title || 'Untitled') + (year ? ' (' + year + ')' : '')}
                     onClick={function() { if (typeof onItemSelect === 'function') { onItemSelect(item); } }}
                     onKeyDown={function(e) {

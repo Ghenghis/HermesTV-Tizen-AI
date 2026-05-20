@@ -20,6 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React from 'react';
+import { getChannelArt } from '../utils/channelArt.js';
 
 // Eight-color fallback palette. Kept identical to the historical inline copy
 // so callers that fell through to a gradient render the same color they did
@@ -66,30 +67,56 @@ function _hashToPaletteIdx(item, idx) {
   return (idx || 0) % GRADIENT_PALETTE.length;
 }
 
+// Reject artwork URLs that are picsum random-photo placeholders. The seed
+// catalog used to ship `picsum.photos/seed/htv-<slug>` URLs for items that
+// didn't have a real Wikipedia/TMDb image — that produced random nature
+// photos labelled "ESPN", "Bloomberg", etc which read as broken art to
+// the user (audit-wave-9). The seed catalog no longer ships those URLs,
+// but we double-check here so any straggling third-party provider URL
+// that still embeds "picsum.photos" falls through to a clean gradient.
+function _isRealArt(url) {
+  return typeof url === 'string'
+    && url.length > 0
+    && url.indexOf('picsum.photos') === -1;
+}
+
 // Resolve a catalog item to a CSS `background` value. Checks every known
 // artwork field in priority order before falling back to a deterministic
-// gradient. Priority matches PR #68 seed shape:
+// gradient.
 //
-//   1. item.poster_url         — seed catalog primary field
-//   2. item.poster             — legacy field still used by some mocks
-//   3. item.logo_url           — channel-style art (live tiles)
-//   4. item.thumb              — fallback thumbnail
-//   5. item.metadata.poster_url — nested under metadata when surfaced from
-//                                an external provider response
-//   6. deterministic gradient  — last resort, hashed by item.id
+// Live channels prefer the channel logo (logo_url); VOD/series prefer the
+// 2:3 portrait poster (poster_url). When no real artwork is present we
+// hand off to channelArt.js for a deterministic gradient + initials tile
+// (rendered as a CSS background here — for components that want the
+// initials overlay, see getChannelArt in utils/channelArt.js).
 //
 // Returns a CSS `background` shorthand string. Callers drop it straight into
 // a style object (e.g. `style={{ background: posterBg(item, idx) }}`).
 export function posterBg(item, idx) {
   if (item) {
-    var url = item.poster_url
-      || item.poster
-      || item.logo_url
-      || item.thumb
-      || (item.metadata && item.metadata.poster_url);
+    var url = null;
+    var isLive = item.type === 'live';
+    if (isLive) {
+      if (_isRealArt(item.logo_url))    { url = item.logo_url; }
+      else if (_isRealArt(item.thumb))  { url = item.thumb; }
+    } else {
+      if (_isRealArt(item.poster_url))      { url = item.poster_url; }
+      else if (_isRealArt(item.poster))     { url = item.poster; }
+      else if (_isRealArt(item.thumb))      { url = item.thumb; }
+      else if (_isRealArt(item.logo_url))   { url = item.logo_url; }
+      else if (item.metadata && _isRealArt(item.metadata.poster_url)) {
+        url = item.metadata.poster_url;
+      }
+    }
     if (url) {
       return 'url(' + url + ') center/cover no-repeat';
     }
+    // No real artwork — pick a channelArt gradient. Keyed on the item id /
+    // slug / title so the same channel always lands on the same gradient
+    // between renders, and the gradient varies across channels so a wall
+    // of placeholder tiles reads as a varied palette instead of monochrome.
+    var art = getChannelArt(item);
+    return 'linear-gradient(135deg,' + art.gradient[0] + ',' + art.gradient[1] + ')';
   }
   return GRADIENT_PALETTE[_hashToPaletteIdx(item, idx)];
 }

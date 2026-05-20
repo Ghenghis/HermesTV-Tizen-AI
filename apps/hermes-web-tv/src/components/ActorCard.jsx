@@ -75,6 +75,8 @@ function ActorCard(props) {
         <img
           src={photoUrl}
           alt={name}
+          loading="lazy"
+          decoding="async"
           onError={function() { setImgError(true); }}
           style={{
             width: '64px',

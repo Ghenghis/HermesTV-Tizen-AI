@@ -42,8 +42,14 @@ function CatchupRail(props) {
   var setToast = toastState[1];
 
   // Pull the 12 most relevant live channels and fetch /api/catchup for each.
-  // Backend MAY return 200 with empty programs[] for channels with no past
-  // window — that's a clean no-op. 404/501 also fall through to empty.
+  // We MUST filter to channels that advertise catch-up support — the backend
+  // only carries a catch-up window for the subset tagged has_catchup=true
+  // (mirror of provider timeshift support). Firing /api/catchup/* for any
+  // other live channel produces a 404 storm in the console and the server
+  // log on every shell mount. Catalog items expose this signal at
+  //   item.metadata.has_catchup  (live items only)
+  // The fallback also accepts a top-level catch_up_available flag for any
+  // channel sourced from /api/channels rather than /api/catalog.
   React.useEffect(function() {
     if (!channels || channels.length === 0) {
       setLoading(false);
@@ -51,7 +57,13 @@ function CatchupRail(props) {
     }
     var liveChannels = [];
     for (var i = 0; i < channels.length && liveChannels.length < 12; i++) {
-      if (channels[i] && channels[i].type === 'live') liveChannels.push(channels[i]);
+      var ch = channels[i];
+      if (!ch || ch.type !== 'live') continue;
+      var hasCatchup = (ch.metadata && ch.metadata.has_catchup === true)
+        || ch.catch_up_available === true
+        || ch.has_catchup === true;
+      if (!hasCatchup) continue;
+      liveChannels.push(ch);
     }
     if (liveChannels.length === 0) {
       setLoading(false);

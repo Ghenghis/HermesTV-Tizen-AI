@@ -305,6 +305,8 @@ function MediaDetailPanel(props) {
               src={backdropUrl}
               alt=""
               aria-hidden="true"
+              loading="lazy"
+              decoding="async"
               style={{
                 width: '100%',
                 height: '100%',

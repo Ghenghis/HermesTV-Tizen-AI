@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
+import { isSystemLimited } from '../utils/isSystemLimited.js';
 import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
@@ -221,13 +222,17 @@ function ExtremeInfiniTVShell(props) {
   // operator catalogs with full Xtream playlists. Row height matches the
   // CSS-grid template below (56px fixed); the helper short-circuits when
   // the list is under the threshold so smaller catalogs pay no cost.
+  //
+  // W9-VIRTUALIZE: Mom gets a larger overscan for smoother feel without
+  // changing the visible-data contract.
+  var momProfile = !isSystemLimited(profile);
   var listScrollRef = React.useRef(null);
   var virt = useGridVirtualizer({
     scrollRef: listScrollRef,
     itemCount: displayItems.length,
     columns: 1,
     rowHeight: 56,
-    overscan: 2,
+    overscan: momProfile ? 4 : 2,
   });
 
   // The focused item is what the right pane reflects. When the focused

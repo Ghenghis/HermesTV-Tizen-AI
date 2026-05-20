@@ -316,6 +316,8 @@ function EPGGrid(props) {
               src={ch.logo_url}
               alt=""
               aria-hidden="true"
+              loading="lazy"
+              decoding="async"
               style={{
                 width: '40px',
                 height: '40px',

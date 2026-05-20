@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, useGridVirtualizer } from './shellHelpers.js';
+import { isSystemLimited } from '../utils/isSystemLimited.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import CategorySidebar from '../components/CategorySidebar.jsx';
 import CatchupRail from '../components/CatchupRail.jsx';
@@ -88,13 +89,16 @@ function TiviMateShell(props) {
   // can't take that. Sidebar rows are roughly 44 px (compact button),
   // EPG rows are a fixed 64 px (`height: 64px` below). Both short-circuit
   // when channelList.length < threshold.
+  // W9-VIRTUALIZE: Mom gets a larger overscan window (perf-feel boost) but
+  // never a content cap — she still sees every channel/row. See MEMORY.md.
+  var momProfile = !isSystemLimited(profile);
   var sidebarScrollRef = React.useRef(null);
   var sidebarVirt = useGridVirtualizer({
     scrollRef: sidebarScrollRef,
     itemCount: channelList.length,
     columns: 1,
     rowHeight: 44,
-    overscan: 3,
+    overscan: momProfile ? 6 : 3,
   });
   var epgScrollRef = React.useRef(null);
   var virt = useGridVirtualizer({
@@ -102,7 +106,7 @@ function TiviMateShell(props) {
     itemCount: channelList.length,
     columns: 1,
     rowHeight: 64,
-    overscan: 2,
+    overscan: momProfile ? 4 : 2,
   });
 
   return (

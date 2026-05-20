@@ -335,7 +335,7 @@ function _DetailsBlock(props) {
         fontSize: '11px'
       }}>
         {poster
-          ? <img alt="" src={poster} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? <img alt="" src={poster} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span>No poster</span>
         }
       </div>

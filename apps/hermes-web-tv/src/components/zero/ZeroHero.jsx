@@ -210,6 +210,8 @@ function ZeroHero(props) {
               type="button"
               tabIndex={0}
               data-zero-hero-cta="play"
+              data-focusable="true"
+              data-focus-group="zero-hero"
               aria-label={'Watch ' + (focusedItem.title || 'now')}
               onClick={function() { if (typeof onPlay === 'function') { onPlay(focusedItem); } }}
               onKeyDown={function(e) {
@@ -248,6 +250,8 @@ function ZeroHero(props) {
               type="button"
               tabIndex={0}
               data-zero-hero-cta="info"
+              data-focusable="true"
+              data-focus-group="zero-hero"
               aria-label={'More info about ' + (focusedItem.title || 'this title')}
               onClick={function() { if (typeof onMoreInfo === 'function') { onMoreInfo(focusedItem); } }}
               onKeyDown={function(e) {

@@ -117,7 +117,11 @@ function MomModeShell(props) {
     // by this number — it only affects how many rows are kept mounted.
     columns: Math.max(2, Math.floor((typeof window !== 'undefined' ? window.innerWidth : 1920) / (MOM_MIN_CARD_PX + 20))),
     rowHeight: 290,
-    overscan: 1,
+    // W9-VIRTUALIZE: Mom gets a larger overscan (4 rows) so the next row is
+    // ready before her slower remote-scroll reaches it. Dave-shells use 2.
+    // This is a perf-feel tweak, not a content cap — Mom still sees the
+    // entire filtered catalog (see MEMORY: "Mom's TV is never system-limited").
+    overscan: 4,
   });
 
   return (

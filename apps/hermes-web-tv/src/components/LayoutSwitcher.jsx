@@ -3,10 +3,20 @@ import ALL_LAYOUTS from '../layouts/manifests/index.js';
 
 // CAT_ORDER drives the section order in the layout picker modal. Layouts
 // whose `cat` value isn't in this list are hidden from the picker even
-// though /api/layouts still serves them — adding "Modern Players" here so
-// both Zero (PR #58) and Nuvio (this PR) become user-selectable from the
-// "Choose Your Look" modal.
-var CAT_ORDER = ['IPTV Players', 'Streaming Services', 'Modern Players', 'Smart TV Shells', 'Special Modes'];
+// though /api/layouts still serves them — wave-9 added "Live TV" and
+// "Classic Players" because LiveTVShell + IptvnatorShell ship in the
+// bundle and the registry but were silently dropped here, leaving users
+// unable to pick them.
+var CAT_ORDER = ['Live TV', 'IPTV Players', 'Classic Players', 'Streaming Services', 'Modern Players', 'Smart TV Shells', 'Special Modes'];
+
+// Some shell IDs differ from their display names (e.g. ynotv → "Lean TV",
+// extreme-infinitv → "Power user"). Showing the ID as a small subtitle in
+// the modal keeps developers and Hermes (chat) able to grep / refer to the
+// internal name while users see the friendly label.
+var ID_SUBTITLE_OVERRIDES = {
+  'ynotv': 'ynotv',
+  'extreme-infinitv': 'extreme-infinitv'
+};
 
 function groupBycat(layouts) {
   var groups = {};
@@ -151,7 +161,13 @@ function LayoutSwitcher(props) {
                 <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: '10px' }}>
                   {items.map(function(layout) {
                     var isActive = layout.id === activeLayout;
-                    var isDisabled = layout.tier_required === 'enhanced' && tier !== 'enhanced';
+                    // Wave-9: removed tier_required gating. DaveTV is a 2-profile
+                    // app (Sherri's QN85 + Dave's QN85) — both run "enhanced".
+                    // The earlier resolver mismatch was silently disabling Nuvio
+                    // on Dave's QN85Q7FAAFXZA. Leaving the gate would re-introduce
+                    // unreachable shells without delivering real value.
+                    var isDisabled = false;
+                    var idSubtitle = ID_SUBTITLE_OVERRIDES[layout.id];
                     return (
                       <button
                         key={layout.id}
@@ -222,15 +238,15 @@ function LayoutSwitcher(props) {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                           <span style={{ fontWeight: 700, fontSize: 'calc(0.9rem * var(--font-scale, 1))', color: isActive ? layout.accent : '#c8d0db' }}>
                             {layout.name}
+                            {idSubtitle && (
+                              <span style={{ fontWeight: 500, fontSize: 'calc(0.65rem * var(--font-scale, 1))', color: '#6b7280', marginLeft: '6px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} title="Internal layout id (also accepted by Hermes voice)">
+                              {idSubtitle}
+                              </span>
+                            )}
                           </span>
                           {isActive && (
                             <span style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 800, color: layout.accent, border: '1px solid ' + layout.accent, borderRadius: '999px', padding: '2px 9px', letterSpacing: '0.08em', background: 'rgba(' + hexToRgb(layout.accent) + ',0.1)' }}>
                               ACTIVE
-                            </span>
-                          )}
-                          {isDisabled && (
-                            <span style={{ fontSize: 'calc(0.6rem * var(--font-scale, 1))', color: '#8a8f9b', border: '1px solid #2a2b3a', borderRadius: '999px', padding: '2px 8px', letterSpacing: '0.05em' }}>
-                              QN85 only
                             </span>
                           )}
                         </div>
