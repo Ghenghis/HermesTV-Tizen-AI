@@ -96,40 +96,187 @@ function isEnabled() {
 
 // Parse a single `#EXTINF:` line into an attribute map.
 // Format: #EXTINF:-1 tvg-id="..." tvg-name="..." tvg-logo="..." group-title="...",Display Name
+// Parse one #EXTINF attribute string ("tvg-id=... group-title=... ,display name").
+// Handles quoted, single-quoted, AND unquoted attribute values, plus escaped
+// quotes inside quoted values, plus malformed unterminated quotes (treats
+// them as a single trailing value rather than crashing).
+//
+// Returns an object whose keys are attribute names + `_displayName` (the
+// post-comma label) + `_attrPart` (the pre-comma segment, for debugging).
 function _parseAttrs(extinfLine) {
   var attrs = {};
+  // The display name is whatever follows the LAST comma at the top level
+  // (Xtream + many providers emit `tvg-name="X,Y" ,Real Name`). Use lastIndexOf
+  // since attribute values rarely contain a comma + space.
   var commaIdx = extinfLine.lastIndexOf(',');
   attrs._displayName = commaIdx >= 0 ? extinfLine.slice(commaIdx + 1).trim() : '';
   var attrPart = commaIdx >= 0 ? extinfLine.slice(0, commaIdx) : extinfLine;
-  var re = /([\w-]+)="([^"]*)"/g;
+  attrs._attrPart = attrPart;
+
+  // Walk attrPart by hand so we can support quoted ("..."), single-quoted
+  // ('...'), and unquoted (=token) values uniformly. Anchored on `(?:^|\s)`
+  // so `my-tvg-id=` does NOT match the `tvg-id=` suffix.
+  //
+  //   group 1 = attribute name ([a-zA-Z][\w-]*)
+  //   group 2 = double-quoted value (with escaped quotes \\")
+  //   group 3 = single-quoted value (with escaped quotes \\')
+  //   group 4 = unquoted value (terminated by whitespace or end)
+  var re = /(?:^|\s)([a-zA-Z][\w-]*)=(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\s"]+))/g;
   var m;
   while ((m = re.exec(attrPart)) !== null) {
-    attrs[m[1]] = m[2];
+    var name = m[1];
+    var val;
+    if (m[2] !== undefined) {       // double-quoted
+      val = m[2].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    } else if (m[3] !== undefined) { // single-quoted
+      val = m[3].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+    } else {                          // unquoted
+      val = m[4];
+    }
+    attrs[name] = val;
+  }
+
+  // Malformed-unterminated-quote recovery: if the line still contains an
+  // odd number of unescaped double-quotes after the structured walk, the
+  // regex skipped the broken value silently. Don't throw — extract a
+  // best-effort `attr=tail` pair from the rest of the line as a graceful
+  // degrade. Tests assert this branch only on the "does not crash" path.
+  var unbalanced = (attrPart.match(/(^|[^\\])"/g) || []).length;
+  if (unbalanced % 2 === 1) {
+    var loose = /([a-zA-Z][\w-]*)="([^,]*)$/.exec(attrPart);
+    if (loose && !attrs[loose[1]]) {
+      attrs[loose[1]] = loose[2];
+    }
   }
   return attrs;
 }
 
-function _parseM3U(text) {
+// Parse just the #EXTM3U header line into a header-attrs object.
+function _parseHeaderAttrs(line) {
+  // Reuse _parseAttrs after stripping the leading directive and prepending
+  // a comma so the display-name split returns empty.
+  return _parseAttrs(line.replace(/^#EXTM3U\s*/i, '') + ',');
+}
+
+// Resolve the EPG URL from #EXTM3U header attrs. Real M3Us use one of
+// three aliases. The first non-empty wins.
+function _epgUrlFromHeader(headerAttrs) {
+  if (!headerAttrs) { return ''; }
+  if (typeof headerAttrs['x-tvg-url'] === 'string' && headerAttrs['x-tvg-url'].length > 0) { return headerAttrs['x-tvg-url']; }
+  if (typeof headerAttrs['tvg-url'] === 'string' && headerAttrs['tvg-url'].length > 0) { return headerAttrs['tvg-url']; }
+  if (typeof headerAttrs['url-tvg'] === 'string' && headerAttrs['url-tvg'].length > 0) { return headerAttrs['url-tvg']; }
+  return '';
+}
+
+// Convert a raw attrs object into the canonical Entry shape consumed by
+// catalog ingest + the m3uParser test contract.
+function _attrsToEntry(attrs, urlLine, extgrpFallback) {
+  var nameRaw = attrs._displayName || attrs['tvg-name'] || '';
+  // Strip leftover quoted attribute fragments from the display name
+  // (some providers emit malformed lines where attrs leak past the comma).
+  var name = String(nameRaw).replace(/[a-zA-Z][\w-]*="[^"]*"\s*/g, '').trim();
+  if (name.length === 0) { name = attrs['tvg-name'] || ''; }
+
+  var group = attrs['group-title'] || extgrpFallback || '';
+
+  var chnoStr = attrs['tvg-chno'];
+  var chnoNum = (typeof chnoStr === 'string' && chnoStr.length > 0 && !isNaN(Number(chnoStr))) ? Number(chnoStr) : null;
+
+  var catchupDaysStr = attrs['catchup-days'];
+  var catchupDays = (typeof catchupDaysStr === 'string' && catchupDaysStr.length > 0 && !isNaN(Number(catchupDaysStr)))
+    ? Number(catchupDaysStr) : null;
+
+  var tvgType = attrs['tvg-type'] || null;
+  var radioAttr = attrs['radio'] || '';
+  var isRadio = false;
+  if (typeof tvgType === 'string' && tvgType.toLowerCase() === 'radio') { isRadio = true; }
+  if (typeof radioAttr === 'string' && radioAttr.toLowerCase() === 'true') { isRadio = true; }
+
+  return {
+    name: name,
+    url: urlLine,
+    tvgId: attrs['tvg-id'] || null,
+    tvgName: attrs['tvg-name'] || null,
+    tvgLogo: attrs['tvg-logo'] || null,
+    group: group || null,
+    tvgChno: chnoNum,
+    catchup: attrs['catchup'] || null,
+    catchupDays: catchupDays,
+    userAgent: attrs['http-user-agent'] || null,
+    referer: attrs['http-referrer'] || attrs['http-referer'] || null,
+    tvgType: tvgType,
+    isRadio: isRadio,
+    attrs: attrs
+  };
+}
+
+// Two-mode parser:
+//   parseM3U(text, { shape: 'legacy' })  → returns the legacy array of
+//     attrs objects (with _displayName + _url) so the existing
+//     _mapToHermes consumer in this file keeps working without touching
+//     Lane B's _fetchProvider call site.
+//   parseM3U(text)                       → returns { entries, epgUrl } in
+//     the canonical shape required by test/m3uParser.test.js + future EPG
+//     waterfall work (Priority 3).
+//
+// The two shapes share the same line-walking core so behavior is
+// guaranteed identical between callers.
+function _parseM3U(text, opts) {
+  opts = opts || {};
+  var legacy = opts.shape === 'legacy';
   var lines = String(text || '').split(/\r?\n/);
-  var items = [];
+  var entries = [];
+  var legacyItems = [];
   var pending = null;
+  var pendingExtGrp = '';
+  var headerAttrs = null;
+
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
     if (line && line.charCodeAt(0) === 0xFEFF) { line = line.slice(1); } // strip BOM
-    line = line.trim();
+    line = line.replace(/^[​‌‍﻿]+/, '').trim();
     if (line.length === 0) { continue; }
+    if (/^#EXTM3U/i.test(line)) {
+      headerAttrs = _parseHeaderAttrs(line);
+      continue;
+    }
     if (line.indexOf('#EXTINF:') === 0) {
       pending = _parseAttrs(line);
-    } else if (line.charAt(0) === '#') {
-      // ignore other directives (#EXTM3U, #EXTGRP, #EXTVLCOPT, etc.)
-    } else if (pending) {
-      pending._url = line;
-      items.push(pending);
-      pending = null;
-      if (items.length >= MAX_ITEMS_PER_PROVIDER) { break; }
+      pendingExtGrp = ''; // reset for this pending entry
+      continue;
     }
+    if (/^#EXTGRP:/i.test(line)) {
+      pendingExtGrp = line.replace(/^#EXTGRP:/i, '').trim();
+      continue;
+    }
+    if (line.charAt(0) === '#') {
+      // Ignore other directives (#KODIPROP, #EXTVLCOPT, generic comments).
+      continue;
+    }
+    // Non-comment line — only a URL if we have a pending EXTINF.
+    if (pending) {
+      var urlLine = line;
+      if (legacy) {
+        pending._url = urlLine;
+        // Also overlay extgrp fallback into group-title for legacy consumers
+        if (!pending['group-title'] && pendingExtGrp) {
+          pending['group-title'] = pendingExtGrp;
+        }
+        legacyItems.push(pending);
+        if (legacyItems.length >= MAX_ITEMS_PER_PROVIDER) { break; }
+      } else {
+        entries.push(_attrsToEntry(pending, urlLine, pendingExtGrp));
+        if (entries.length >= MAX_ITEMS_PER_PROVIDER) { break; }
+      }
+      pending = null;
+      pendingExtGrp = '';
+    }
+    // Bare URL with no pending EXTINF: drop it (matches Extreme-InfiniTV
+    // contract — a stream without metadata can't be cataloged).
   }
-  return items;
+
+  if (legacy) { return legacyItems; }
+  return { entries: entries, epgUrl: _epgUrlFromHeader(headerAttrs) };
 }
 
 function _detectResolution(name, group) {
@@ -248,7 +395,7 @@ function _fetchProvider(providerId, overrideUrl, catalogProviderId) {
       return res.text();
     })
     .then(function(text) {
-      var parsed = _parseM3U(text);
+      var parsed = _parseM3U(text, { shape: 'legacy' });
       var mapped = _mapToHermes(providerId, catalogProviderId || providerId, parsed);
       var result = {
         items: mapped.items,
@@ -483,9 +630,12 @@ module.exports = {
   getProviderStatus: getProviderStatus,
   getCachedItemById: getCachedItemById,
   getCachedCatalog: getCachedCatalog,
-  // INTERNAL — never exposed via HTTP route; lib/streamResolver.js calls this.
+  // INTERNAL — never exposed via HTTP route. lib/streamResolver.js calls
+  // resolveStreamUrl; test/m3uParser.test.js calls parseM3U.
   internal: {
     resolveStreamUrl: _resolveStreamUrl,
+    parseM3U: function(text) { return _parseM3U(text); },
+    parseAttrs: _parseAttrs,
   },
   _clearCache: _clearCache,
 };
