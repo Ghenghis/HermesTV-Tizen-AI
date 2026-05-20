@@ -2,6 +2,9 @@ import React from 'react';
 import { searchCatalog } from '../api/searchClient.js';
 import * as recentSearchesStore from '../store/recentSearchesStore.js';
 import { debounce } from '../utils/debounce.js';
+import LoadingSkeleton from './LoadingSkeleton.jsx';
+import ErrorState from './ErrorState.jsx';
+import EmptyState from './EmptyState.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SearchModal — global "press / or Ctrl+K" search overlay.
@@ -473,60 +476,24 @@ function SearchModal(props) {
 
   function renderError() {
     return (
-      <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.7rem' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.55rem',
-          padding: '0.65rem 0.9rem',
-          background: 'rgba(239,68,68,0.08)',
-          border: '1px solid rgba(239,68,68,0.4)',
-          borderRadius: 'var(--radius-md, 12px)',
-          color: '#fca5a5',
-          fontSize: 'calc(0.88rem * var(--font-scale, 1))',
-        }}>
-          <span aria-hidden="true" style={{ fontSize: '18px' }}>⚠</span>
-          <span>Couldn&apos;t reach search — try again</span>
-        </div>
-        <button
-          tabIndex={0}
-          className="hermes-focusable hermes-press"
-          onClick={handleRetry}
-          onKeyDown={function(e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleRetry();
-            }
-          }}
-          style={{
-            padding: '0.55rem 1.15rem',
-            background: 'linear-gradient(135deg, var(--accent, #00d4ff), #6366f1)',
-            border: 'none',
-            borderRadius: 'var(--radius-pill, 999px)',
-            color: '#0a1628',
-            fontSize: 'calc(0.85rem * var(--font-scale, 1))',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 6px 18px rgba(0,212,255,0.28)',
-          }}
-          onFocus={_focusHalo}
-          onBlur={_clearHalo}
-        >Retry</button>
+      <div style={{ padding: '1.25rem' }}>
+        <ErrorState
+          title="Couldn't reach search"
+          message="The search service didn't respond. Try again in a moment."
+          onRetry={handleRetry}
+        />
       </div>
     );
   }
 
   function renderEmptyResults() {
     return (
-      <div style={{
-        padding: '2rem 1.25rem',
-        textAlign: 'center',
-        color: 'var(--muted, #8b949e)',
-        fontSize: 'calc(0.95rem * var(--font-scale, 1))',
-      }}>
-        <div style={{ fontSize: '32px', marginBottom: '0.4rem', opacity: 0.55 }} aria-hidden="true">⌕</div>
-        <div>No matches for &ldquo;{query}&rdquo;</div>
-        <div style={{ marginTop: '0.4rem', fontSize: 'calc(0.78rem * var(--font-scale, 1))' }}>
-          Try a different spelling or switch the filter tab.
-        </div>
+      <div style={{ padding: '1.25rem' }}>
+        <EmptyState
+          icon="⌕"
+          title={'No matches for "' + query + '"'}
+          message="Try a different spelling or switch the filter tab."
+        />
       </div>
     );
   }
@@ -645,44 +612,12 @@ function SearchModal(props) {
   }
 
   function renderLoading() {
-    // Lightweight shimmer placeholder — 4 skeleton cards matching the
-    // 4-up grid. Keeps the user's eye anchored to where results will
-    // appear so the page doesn't jump on first paint.
-    var placeholders = [0, 1, 2, 3];
+    // Shared LoadingSkeleton — grid variant gives a 4-up shimmer block that
+    // matches the result grid, so the eye stays anchored where results
+    // will land.
     return (
-      <div
-        aria-live="polite"
-        aria-busy="true"
-        style={{
-          padding: '0.85rem 1.25rem 1.4rem',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-          gap: '0.85rem',
-        }}
-      >
-        {placeholders.map(function(i) {
-          return (
-            <div
-              key={i}
-              aria-hidden="true"
-              style={{
-                background: 'var(--surface-raised, #1c2128)',
-                border: '1px solid var(--border, #30363d)',
-                borderRadius: 'var(--radius-lg, 16px)',
-                overflow: 'hidden',
-              }}
-            >
-              <div style={{
-                aspectRatio: '2 / 3',
-                background: 'linear-gradient(110deg, rgba(255,255,255,0.04) 30%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 70%)',
-              }} />
-              <div style={{ padding: '0.55rem 0.65rem 0.7rem' }}>
-                <div style={{ height: '0.7rem', background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-xs, 4px)', marginBottom: '0.35rem' }} />
-                <div style={{ height: '0.5rem', width: '50%', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-xs, 4px)' }} />
-              </div>
-            </div>
-          );
-        })}
+      <div style={{ padding: '0.85rem 1.25rem 1.4rem' }}>
+        <LoadingSkeleton variant="grid" count={4} />
       </div>
     );
   }

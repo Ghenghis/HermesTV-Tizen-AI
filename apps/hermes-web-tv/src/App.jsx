@@ -382,6 +382,10 @@ var INITIAL_STATE = {
   tier: 'degraded',
   tvModel: 'QN85Q7FAAFXZA',
   online: true,
+  // Pairing code for the Samsung-phone-as-remote flow (wave-6/7). Minted by
+  // the SSE listener useEffect right after profile load; consumed by the QR
+  // mount so the scanned URL becomes /remote.html?pair=HRM-XXXX.
+  remotePairCode: null,
   showProfilePicker: false,
   // First-launch onboarding overlay. Set true by the boot useEffect when
   // there's no active profile AND the onboarded flag has never been set,
@@ -712,6 +716,52 @@ function App() {
     window.addEventListener('keydown', onChannelKey);
     return function() { window.removeEventListener('keydown', onChannelKey); };
   }, [state.showPlayer]);
+
+  // Phone-as-remote SSE listener. Mints a pairing code on profile load,
+  // stores it in state, opens an EventSource to /api/remote/events, and
+  // dispatches every incoming remote keypress as a synthetic KeyboardEvent
+  // so the rest of the app's nav code (Tizen handler, search shortcuts,
+  // PlayerModal controls) reacts as if the user pressed the key locally.
+  React.useEffect(function() {
+    if (!state.profile || !state.online) { return; }
+    var aborted = false;
+    var es = null;
+
+    function attach(code) {
+      if (aborted) { return; }
+      patchState({ remotePairCode: code });
+      try {
+        es = new EventSource('/api/remote/events?pair_code=' + encodeURIComponent(code));
+        es.onmessage = function(evt) {
+          try {
+            var payload = JSON.parse(evt.data);
+            if (!payload || !payload.key) { return; }
+            var key = payload.key;
+            var ke = new KeyboardEvent('keydown', {
+              key: key,
+              code: key,
+              bubbles: true,
+              cancelable: true,
+            });
+            document.dispatchEvent(ke);
+          } catch (_) { /* malformed event — ignore */ }
+        };
+        es.onerror = function() { /* EventSource auto-reconnects */ };
+      } catch (e) {
+        console.warn('[remote] SSE attach failed: ' + (e && e.message));
+      }
+    }
+
+    fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      .then(function(r) { return r.json(); })
+      .then(function(body) { if (body && body.pairing_code) { attach(body.pairing_code); } })
+      .catch(function() { /* offline — silent */ });
+
+    return function cleanup() {
+      aborted = true;
+      if (es) { try { es.close(); } catch (e) { /* ignore */ } }
+    };
+  }, [state.profile && state.profile.profile_id, state.online]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {

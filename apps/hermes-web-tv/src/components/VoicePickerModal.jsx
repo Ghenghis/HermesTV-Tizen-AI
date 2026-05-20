@@ -1,6 +1,8 @@
 import React from 'react';
 import * as voiceClient from '../api/azureVoiceClient.js';
 import { useTranslation } from '../i18n/useTranslation.js';
+import LoadingSkeleton from './LoadingSkeleton.jsx';
+import EmptyState from './EmptyState.jsx';
 
 function VoicePickerModal(props) {
   var tx = useTranslation();
@@ -190,10 +192,17 @@ function VoicePickerModal(props) {
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
           {loading && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#8a8f9b', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>{t('voice.loading')}</div>
+            <div style={{ padding: '12px 0' }}>
+              <LoadingSkeleton variant="card" count={5} />
+            </div>
           )}
           {!loading && voices.length === 0 && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#8a8f9b', fontSize: 'calc(0.9rem * var(--font-scale, 1))' }}>{t('voice.empty')}</div>
+            <div style={{ padding: '12px 0' }}>
+              <EmptyState
+                icon="🔊"
+                title={t('voice.empty')}
+              />
+            </div>
           )}
           {voices.map(function(voice, idx) {
             var isCurrent = voice.id === currentVoiceId;

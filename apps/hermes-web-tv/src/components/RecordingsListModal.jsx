@@ -1,6 +1,9 @@
 import React from 'react';
 import { listRecordings, cancelRecording, deleteMany, getStorageStats } from '../api/dvrClient.js';
 import { getProfile } from '../store/profileStore.js';
+import LoadingSkeleton from './LoadingSkeleton.jsx';
+import ErrorState from './ErrorState.jsx';
+import EmptyState from './EmptyState.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RecordingsListModal — "My Recordings" panel (wave 2 expansion).
@@ -193,44 +196,16 @@ function _Spinner() {
 }
 
 // Friendly empty-state with CTA copy that points at the two places the user
-// can schedule from. We don't actually open a modal here — the parent is the
-// settings panel and the user knows where the EPG lives.
+// can schedule from. Delegates to the shared EmptyState component for
+// consistent type ramp + Mom-mode awareness.
 function _EmptyState(props) {
-  var fs = props.fontScale || 1;
   return (
-    <div
-      style={{
-        padding: '2.5rem 1.25rem',
-        textAlign: 'center',
-        color: 'var(--muted)'
-      }}
-    >
-      <div
-        aria-hidden="true"
-        style={{
-          width: '72px', height: '72px',
-          borderRadius: '50%',
-          margin: '0 auto 1.1rem',
-          background: 'rgba(239,68,68,0.12)',
-          border: '1px solid rgba(239,68,68,0.32)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fca5a5',
-          fontSize: '32px'
-        }}
-      >●</div>
-      <div style={{
-        fontWeight: 700,
-        fontSize: 'calc(1rem * ' + fs + ')',
-        color: 'var(--text, #e6edf3)',
-        marginBottom: '0.4rem'
-      }}>
-        No recordings yet
-      </div>
-      <div style={{ fontSize: 'calc(0.85rem * ' + fs + ')', maxWidth: '420px', margin: '0 auto', lineHeight: 1.55 }}>
-        Schedule from the <strong style={{ color: 'var(--accent, #00d4ff)' }}>EPG</strong>
-        {' '}or tap <strong style={{ color: 'var(--accent, #00d4ff)' }}>Record</strong> in the player to capture
-        a program. Anything you record will show up here.
-      </div>
+    <div style={{ padding: '1rem 1.25rem' }}>
+      <EmptyState
+        icon="●"
+        title="No recordings yet"
+        message="Schedule from the EPG or tap Record in the player to capture a program. Anything you record will show up here."
+      />
     </div>
   );
 }
@@ -1134,7 +1109,17 @@ function RecordingsListModal(props) {
 
         {/* Body */}
         <div style={{ padding: '0.25rem 0 0', maxHeight: '58vh', overflowY: 'auto' }}>
-          {error && (
+          {error && recordings.length === 0 && (
+            <div style={{ padding: '1rem 1.25rem' }}>
+              <ErrorState
+                title="Could not load recordings"
+                message={error}
+                onRetry={refresh}
+              />
+            </div>
+          )}
+
+          {error && recordings.length > 0 && (
             <div
               role="alert"
               style={{
@@ -1152,8 +1137,8 @@ function RecordingsListModal(props) {
           )}
 
           {loading && recordings.length === 0 && (
-            <div style={{ padding: '2rem 1.25rem', textAlign: 'center', color: 'var(--muted)' }}>
-              <_Spinner /> &nbsp;Loading recordings…
+            <div style={{ padding: '1rem 1.25rem' }}>
+              <LoadingSkeleton variant="card" count={6} />
             </div>
           )}
 
