@@ -392,6 +392,11 @@ var INITIAL_STATE = {
   // or by the Settings ▸ Replay onboarding action.
   showOnboarding: false,
   showQR: false,
+  // Phone-as-remote QR pairing modal (wave-8). Separate flag from `showQR`
+  // (which still feeds the legacy provider-import flow) so the same
+  // QROnboarding component can be mounted twice — once per mode — without
+  // the two trigger paths fighting over a single boolean.
+  showRemotePair: false,
   showSettings: false,
   // Playlist Import wizard — opened from Settings ▸ Playlists ▸ + Import playlist.
   // Lives at App.jsx level so the Settings modal can close before the wizard
@@ -635,6 +640,14 @@ function App() {
           patchState({ showQR: false });
           return true;
         }
+        if (state.showRemotePair) {
+          patchState({ showRemotePair: false });
+          return true;
+        }
+        if (sleepTimerOpen) {
+          setSleepTimerOpen(false);
+          return true;
+        }
         // First-launch wizard owns its own Esc → skip-confirm flow. Swallow
         // Tizen Back here so an accidental remote press during onboarding
         // can't drop Sherri back to Smart Hub mid-flow. The Skip link in
@@ -647,7 +660,7 @@ function App() {
       }
     );
     return cleanup;
-  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch, state.showProfileManagement, state.showScheduleRecording]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showRemotePair, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch, state.showProfileManagement, state.showScheduleRecording, sleepTimerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Samsung remote color buttons (RED / GREEN / YELLOW / BLUE) wired as
   // chatbot quick-commands. The Tizen keymap (utils/tizenKeyMap.js) registers
@@ -1819,6 +1832,71 @@ function App() {
             >
               &#x1F3A8; Look
             </button>
+
+            {/* Sleep timer button (wave-8) — opens the SleepTimer modal where
+                the user picks a countdown (15 / 30 / 45 / 60 / 120 min). The
+                head-less `useSleepTimer(state.profile)` hook above keeps the
+                countdown ticking even when the modal is closed; on expiry
+                the player closes via the `hermes:sleep-timer-fire` listener. */}
+            <button
+              tabIndex={0}
+              onClick={function() { setSleepTimerOpen(true); }}
+              title="Sleep timer — auto-close playback after N minutes"
+              aria-label="Open sleep timer"
+              style={{
+                padding: '0.4rem 0.9rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text)',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+                letterSpacing: '0.03em',
+                flexShrink: 0,
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid var(--accent)';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              &#x1F319; Sleep
+            </button>
+
+            {/* Phone-as-remote button (wave-8) — opens QROnboarding in
+                remote-pair mode. The QR encodes /remote.html?pair=HRM-XXXX,
+                and `state.remotePairCode` is already minted by the wave-7
+                SSE listener so the modal renders the live code on mount. */}
+            <button
+              tabIndex={0}
+              onClick={function() { patchState({ showRemotePair: true }); }}
+              title="Use your phone as a remote — scan a QR to pair"
+              aria-label="Open phone remote pairing"
+              style={{
+                padding: '0.4rem 0.9rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--border, #30363d)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text)',
+                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none',
+                letterSpacing: '0.03em',
+                flexShrink: 0,
+                transition: 'border-color 200ms var(--ease-out), color 200ms var(--ease-out), background-color 200ms var(--ease-out)',
+              }}
+              onFocus={function(e) {
+                e.currentTarget.style.outline = '2px solid var(--accent)';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+            >
+              &#x1F4F1; Phone Remote
+            </button>
           </div>
         </header>
 
@@ -1914,6 +1992,23 @@ function App() {
                   patchState({ providers: list });
                 }).catch(function() { /* non-fatal; tick again on next user action */ });
               }}
+            />
+          )}
+
+          {/* Phone-as-remote QR modal (wave-8) — same component as the
+              provider-import flow above, switched into mode='remote-pair'.
+              QROnboarding mints its own pairing code on open via POST /api/pair
+              (in `online` mode) or falls back to 'HRM-MOCK' offline; we don't
+              forward `state.remotePairCode` here because that mock SSE channel
+              would just race the modal's own /api/pair call. Opened from the
+              header "Phone Remote" button. */}
+          {state.showRemotePair && (
+            <QROnboarding
+              isOpen={state.showRemotePair}
+              mode="remote-pair"
+              onClose={function() { patchState({ showRemotePair: false }); }}
+              online={state.online}
+              profile={profile}
             />
           )}
 
