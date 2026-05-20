@@ -984,8 +984,8 @@ function App() {
           var meta = rawCatalog._meta || {};
           var metaSource = meta.source || null;
           var catalogSource = isOnline ? (sourceHeader || metaSource || 'no-providers') : 'api-offline';
-          // m3u_providers + iptv_org_count + xtream_status land on _meta when
-          // the API has those providers configured. Absent → coalesce to null/0.
+          // m3u_providers + iptv_org_count + paid-panel status land on _meta
+          // when the API has those providers configured. Absent → null/0.
           var m3uProviders = meta.m3u_providers || null;
           var iptvOrgCount = (typeof meta.iptv_org_count === 'number') ? meta.iptv_org_count : 0;
 
