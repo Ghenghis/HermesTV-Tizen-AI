@@ -22,6 +22,11 @@
  *     entry.disableProviderEpg suppresses the auto-derived primary
  *     (xtream-default + m3u-header) but keeps user override + additional.
  *
+ *   buildEpgUrlCandidatesFromRegistryRows(rows, xmltvUrl)
+ *     Converts providerRegistry.listFull() rows into credential-bearing
+ *     server-only XMLTV URL candidates. Provider rows are first; XMLTV_URL
+ *     is appended last as a fallback. Never call this from a route response.
+ *
  *   dedupeEpgUrls(sources) → Array  — exported for testing the primitive.
  *
  *   mergeProgrammeMaps(maps) → Map<tvgId, Array<Programme>>
@@ -30,6 +35,10 @@
  *
  *   mergeChannelNameMaps(maps) → Map<tvgId, displayName>
  *     Same waterfall semantics. Empty values rejected.
+ *
+ *   mergeEpgResults(results) → { channels, programs }
+ *     Waterfall merge for parsed XMLTV results. Earlier sources win for a
+ *     tvgId's programme list and channel display name.
  *
  *   detectGzip(url, bytes, headers) → boolean
  *     Truthy when ANY of:
@@ -144,6 +153,72 @@ function buildEpgUrlsFromEntry(entry, creds, headerEpgUrl) {
   return dedupeEpgUrls(raw);
 }
 
+function _registryEntry(row) {
+  row = row || {};
+  var additional = [];
+  if (Array.isArray(row.additionalEpgUrls)) {
+    additional = row.additionalEpgUrls;
+  } else if (Array.isArray(row.additional_epg_urls)) {
+    additional = row.additional_epg_urls;
+  }
+  return {
+    epgUrl: (typeof row.epgUrl === 'string') ? row.epgUrl : row.epg_url,
+    additionalEpgUrls: additional,
+    disableProviderEpg: row.disableProviderEpg === true || row.disable_provider_epg === true
+  };
+}
+
+function _registryCreds(row) {
+  row = row || {};
+  if (row.type !== 'xtream') { return {}; }
+  return {
+    host: row.url,
+    user: row.username,
+    pass: row.password
+  };
+}
+
+function buildEpgUrlCandidatesFromRegistryRows(rows, xmltvUrl) {
+  var raw = [];
+  if (Array.isArray(rows)) {
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || row.enabled === false) { continue; }
+      if (row.type !== 'm3u' && row.type !== 'xtream') { continue; }
+      var headerEpgUrl = (typeof row.headerEpgUrl === 'string')
+        ? row.headerEpgUrl
+        : (typeof row.header_epg_url === 'string' ? row.header_epg_url : '');
+      var urls = buildEpgUrlsFromEntry(_registryEntry(row), _registryCreds(row), headerEpgUrl);
+      for (var u = 0; u < urls.length; u++) {
+        raw.push({
+          url: urls[u].url,
+          source: urls[u].source,
+          kind: urls[u].kind,
+          registry_id: row.id || null,
+          provider_id: row.provider_id || row.id || null,
+          provider_type: row.type || null,
+          label: row.label || row.provider_id || row.id || null
+        });
+      }
+    }
+  }
+
+  var fallback = (typeof xmltvUrl === 'string') ? xmltvUrl.trim() : '';
+  if (fallback.length > 0) {
+    raw.push({
+      url: fallback,
+      source: 'xmltv-url',
+      kind: 'fallback',
+      registry_id: 'env-xmltv-url',
+      provider_id: 'xmltv',
+      provider_type: 'xmltv',
+      label: 'XMLTV_URL'
+    });
+  }
+
+  return dedupeEpgUrls(raw);
+}
+
 // ---------------------------------------------------------------------------
 // Programme + channel-name waterfall merges
 // ---------------------------------------------------------------------------
@@ -177,6 +252,66 @@ function mergeChannelNameMaps(maps) {
     });
   }
   return merged;
+}
+
+function _programmesMapFromEpg(epg) {
+  var out = new Map();
+  var programs = epg && Array.isArray(epg.programs) ? epg.programs : [];
+  for (var i = 0; i < programs.length; i++) {
+    var p = programs[i];
+    if (!p || typeof p.channel_id !== 'string' || p.channel_id.length === 0) { continue; }
+    if (!out.has(p.channel_id)) { out.set(p.channel_id, []); }
+    out.get(p.channel_id).push(p);
+  }
+  return out;
+}
+
+function _channelNameMapFromEpg(epg) {
+  var out = new Map();
+  var channels = epg && Array.isArray(epg.channels) ? epg.channels : [];
+  for (var i = 0; i < channels.length; i++) {
+    var c = channels[i];
+    if (!c || typeof c.id !== 'string' || c.id.length === 0) { continue; }
+    out.set(c.id, c.name || c.id);
+  }
+  return out;
+}
+
+function mergeEpgResults(results) {
+  var programMaps = [];
+  var nameMaps = [];
+  var logoById = new Map();
+  if (Array.isArray(results)) {
+    for (var i = 0; i < results.length; i++) {
+      var epg = results[i];
+      if (!epg || typeof epg !== 'object') { continue; }
+      programMaps.push(_programmesMapFromEpg(epg));
+      nameMaps.push(_channelNameMapFromEpg(epg));
+      var channels = Array.isArray(epg.channels) ? epg.channels : [];
+      for (var c = 0; c < channels.length; c++) {
+        if (channels[c] && typeof channels[c].id === 'string' && !logoById.has(channels[c].id)) {
+          logoById.set(channels[c].id, channels[c].logo_url || null);
+        }
+      }
+    }
+  }
+
+  var programmes = mergeProgrammeMaps(programMaps);
+  var names = mergeChannelNameMaps(nameMaps);
+  var channelsOut = [];
+  var programsOut = [];
+  names.forEach(function(name, tvgId) {
+    channelsOut.push({
+      id: tvgId,
+      name: name || tvgId,
+      logo_url: logoById.has(tvgId) ? logoById.get(tvgId) : null
+    });
+  });
+  programmes.forEach(function(arr) {
+    if (!Array.isArray(arr)) { return; }
+    for (var p = 0; p < arr.length; p++) { programsOut.push(arr[p]); }
+  });
+  return { channels: channelsOut, programs: programsOut };
 }
 
 // ---------------------------------------------------------------------------
@@ -519,9 +654,11 @@ function resolvePlayableEpgChannel(tvgId, displayName, index) {
 
 module.exports = {
   buildEpgUrlsFromEntry: buildEpgUrlsFromEntry,
+  buildEpgUrlCandidatesFromRegistryRows: buildEpgUrlCandidatesFromRegistryRows,
   dedupeEpgUrls: dedupeEpgUrls,
   mergeProgrammeMaps: mergeProgrammeMaps,
   mergeChannelNameMaps: mergeChannelNameMaps,
+  mergeEpgResults: mergeEpgResults,
   detectGzip: detectGzip,
   resolveTvgId: resolveTvgId,
   normaliseChannelName: normaliseChannelName,

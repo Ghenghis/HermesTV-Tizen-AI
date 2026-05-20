@@ -43,10 +43,14 @@ var path = require('path');
 var http = require('http');
 var https = require('https');
 
-var BASE = process.env.HERMES_PROVIDER_E2E_BASE || 'http://127.0.0.1:3199';
 var MODE = (process.env.PROVIDER_E2E_MODE || 'live').toLowerCase();
 var EMPTY_STATE = String(process.env.NO_PROVIDER_EMPTY_STATE || '').toLowerCase();
 var IS_EMPTY = EMPTY_STATE === '1' || EMPTY_STATE === 'true';
+var HAS_EXPLICIT_BASE = typeof process.env.HERMES_PROVIDER_E2E_BASE === 'string' &&
+  process.env.HERMES_PROVIDER_E2E_BASE.length > 0;
+var ALLOW_LOCAL_LIVE = String(process.env.PROVIDER_E2E_ALLOW_LOCAL_LIVE || '').toLowerCase() === '1' ||
+  String(process.env.PROVIDER_E2E_ALLOW_LOCAL_LIVE || '').toLowerCase() === 'true';
+var BASE = HAS_EXPLICIT_BASE ? process.env.HERMES_PROVIDER_E2E_BASE : 'http://127.0.0.1:3199';
 
 function nowIso() { return new Date().toISOString(); }
 function fmtTs() {
@@ -286,7 +290,7 @@ function call(method, p, body, options) {
 function bootApi() {
   return new Promise(function(resolve, reject) {
     // If the caller already pointed us at a remote BASE, don't boot.
-    if (process.env.HERMES_PROVIDER_E2E_BASE) { return resolve(); }
+    if (HAS_EXPLICIT_BASE) { return resolve(); }
     process.env.PORT = '3199';
     process.env.NODE_ENV = process.env.NODE_ENV || 'test';
     var apiPath = path.resolve(__dirname, '..', 'services', 'hermes-tv-api', 'src', 'index.js');
@@ -539,6 +543,11 @@ async function runLiveProof() {
   console.log('# base: ' + safeBaseLabel());
   console.log('# proof dir: docs/proof/provider-truth/' + TS + '/');
   console.log('');
+
+  if (!IS_EMPTY && !HAS_EXPLICIT_BASE && !ALLOW_LOCAL_LIVE) {
+    console.log('FAIL: live-provider proof requires HERMES_PROVIDER_E2E_BASE, or PROVIDER_E2E_ALLOW_LOCAL_LIVE=1 for an explicit local live proof');
+    process.exit(1);
+  }
 
   try {
     await bootApi();

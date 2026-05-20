@@ -355,6 +355,7 @@ jobs:
       PORT: '3199'
       NODE_ENV: 'test'
       PROVIDER_E2E_MODE: 'live'
+      PROVIDER_E2E_ALLOW_LOCAL_LIVE: '1'
       # Provider env vars get injected from GH Action secrets the operator
       # set per docs/OPERATOR_PROVIDER_WIRING.md. Without these set, the
       # runner FAILS by design (empty /api/catalog).

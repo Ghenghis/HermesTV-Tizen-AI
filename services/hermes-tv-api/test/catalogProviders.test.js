@@ -125,6 +125,19 @@ function request(srv, method, urlPath) {
   var providerStore = require('../src/lib/providerStore');
   providerStore._resetCacheForTests();
 
+  var app = require('../src/index');
+  var srv = await startServer(app);
+
+  var emptyChannels = await request(srv, 'GET', '/api/channels?profile_id=dave_tv');
+  ok('Channels are honestly empty when no providers exist',
+    emptyChannels.status === 200 &&
+      emptyChannels.body &&
+      Array.isArray(emptyChannels.body.channels) &&
+      emptyChannels.body.channels.length === 0 &&
+      emptyChannels.body._meta &&
+      emptyChannels.body._meta.source === 'no-providers',
+    JSON.stringify(emptyChannels.body));
+
   var m3u = await providerStore.add({
     type: 'm3u',
     label: 'Disk M3U Provider',
@@ -138,8 +151,29 @@ function request(srv, method, urlPath) {
     password: 'placeholderPass',
   });
 
-  var app = require('../src/index');
-  var srv = await startServer(app);
+  var channels = await request(srv, 'GET', '/api/channels?profile_id=dave_tv');
+  ok('GET /api/channels returns 200', channels.status === 200, 'status=' + channels.status);
+  ok('Channels include cold disk-backed M3U provider row',
+    channels.body && Array.isArray(channels.body.channels) &&
+      channels.body.channels.some(function(ch) {
+        return ch &&
+          ch.channel_id &&
+          ch.channel_id.indexOf('m3u-' + m3u.id + '-') === 0 &&
+          ch.display_name === 'Disk News HD' &&
+          Array.isArray(ch.provider_tags) &&
+          ch.provider_tags.indexOf('m3u-' + m3u.id) !== -1;
+      }),
+    JSON.stringify(channels.body));
+  ok('Channels include disk-backed Xtream provider row',
+    channels.body && Array.isArray(channels.body.channels) &&
+      channels.body.channels.some(function(ch) {
+        return ch &&
+          ch.channel_id === 'xtream-' + xtream.id + '-live-101' &&
+          ch.display_name === 'Xtream News' &&
+          Array.isArray(ch.provider_tags) &&
+          ch.provider_tags.indexOf('xtream-' + xtream.id) !== -1;
+      }),
+    JSON.stringify(channels.body));
 
   var catalog = await request(srv, 'GET', '/api/catalog');
   ok('GET /api/catalog returns 200', catalog.status === 200, 'status=' + catalog.status);

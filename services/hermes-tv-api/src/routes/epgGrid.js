@@ -3,7 +3,6 @@
 /**
  * routes/epgGrid.js — Extended EPG grid endpoint.
  *
- * The single-channel stub is in epg.js (another agent's file).
  * This file adds the multi-channel time-window grid used by the EPG UI.
  *
  * SECURITY CONTRACT
@@ -52,6 +51,7 @@ var catalogMerge = (function() { try { return require('../lib/catalogMerge'); } 
 var m3uClient = (function() { try { return require('../lib/m3uClient'); } catch (_) { return null; } })();
 var iptvOrg = (function() { try { return require('../lib/iptvOrg'); } catch (_) { return null; } })();
 var epgWaterfall = require('../lib/epgWaterfall');
+var providerRegistry = require('../lib/providerRegistry');
 
 function _asArray(v) {
   return Array.isArray(v) ? v : [];
@@ -110,6 +110,65 @@ function _programmesByTvgId(cached) {
   return out;
 }
 
+async function _epgCandidates() {
+  var rows = [];
+  try {
+    rows = await providerRegistry.listFull();
+  } catch (_) {
+    rows = [];
+  }
+  var xmltvUrl = (typeof process.env.XMLTV_URL === 'string' && process.env.XMLTV_URL.trim().length > 0)
+    ? process.env.XMLTV_URL.trim()
+    : '';
+  return epgWaterfall.buildEpgUrlCandidatesFromRegistryRows(rows, xmltvUrl);
+}
+
+function _safeSourceMeta(candidate, epg, cacheInfo) {
+  return {
+    source: candidate.source,
+    kind: candidate.kind,
+    registry_id: candidate.registry_id,
+    provider_id: candidate.provider_id,
+    provider_type: candidate.provider_type,
+    source_label: xmltv && xmltv._safeSourceLabel ? xmltv._safeSourceLabel(candidate.url) : 'none',
+    channel_count: epg && Array.isArray(epg.channels) ? epg.channels.length : 0,
+    program_count: epg && Array.isArray(epg.programs) ? epg.programs.length : 0,
+    error: epg && epg.error ? epg.error : null,
+    cache: cacheInfo ? {
+      age_ms: cacheInfo.age_ms,
+      fresh: cacheInfo.fresh,
+      expires_at: cacheInfo.expires_at,
+    } : null,
+  };
+}
+
+async function _loadProviderEpgs(useForce) {
+  if (!xmltv || typeof xmltv.getCachedEpg !== 'function' || typeof xmltv.fetchEpg !== 'function') {
+    return { candidates: [], sources: [], epg: { channels: [], programs: [] } };
+  }
+  var candidates = await _epgCandidates();
+  var epgs = [];
+  var sourceMeta = [];
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    var epg = null;
+    try {
+      var cached = !useForce ? xmltv.getCachedEpg(c.url) : null;
+      epg = cached && cached.data ? cached.data : await xmltv.fetchEpg(c.url, { forceRefresh: useForce });
+      epgs.push(epg);
+      sourceMeta.push(_safeSourceMeta(c, epg, xmltv.getCachedEpg(c.url)));
+    } catch (_) {
+      epg = { channels: [], programs: [], error: 'unexpected' };
+      sourceMeta.push(_safeSourceMeta(c, epg, null));
+    }
+  }
+  return {
+    candidates: candidates,
+    sources: sourceMeta,
+    epg: epgWaterfall.mergeEpgResults(epgs)
+  };
+}
+
 function _programStart(p) {
   return Date.parse(p.start_utc || p.start || '');
 }
@@ -142,7 +201,7 @@ function _matchesChannelFilter(filter, row) {
 }
 
 // ── GET /api/epg/grid ─────────────────────────────────────────────────────────
-router.get('/api/epg/grid', function(req, res) {
+router.get('/api/epg/grid', async function(req, res) {
   const { start, end, profile_id } = req.query;
 
   // profile_id
@@ -199,25 +258,27 @@ router.get('/api/epg/grid', function(req, res) {
     });
   }
 
-  // Honest empty when no XMLTV is configured. When XMLTV_URL is set + the
-  // xmltv cache holds a parsed result, walk its programmes by raw XMLTV tvgId,
-  // then map each row to the latest playable catalog/source identity when a
-  // real provider/catalog item proves that relationship. Unmapped rows keep
-  // the raw XMLTV metadata and explicitly do not claim a playable channel_id.
+  // Walk providerRegistry EPG sources first, then XMLTV_URL as a fallback.
+  // Rows are mapped to the latest playable catalog/source identity only when
+  // a real provider/catalog item proves that relationship. Unmapped rows keep
+  // raw XMLTV metadata and explicitly do not claim a playable channel_id.
   var programs = [];
-  var epgMeta = { source: 'no-epg', tvg_ids: 0, programmes_total: 0, mapped: 0, unmapped: 0 };
-  if (xmltv && typeof xmltv.getCachedEpg === 'function' &&
-      typeof process.env.XMLTV_URL === 'string' && process.env.XMLTV_URL.length > 0) {
+  var epgMeta = { source: 'no-epg', tvg_ids: 0, programmes_total: 0, mapped: 0, unmapped: 0, sources: [] };
+  var wantForce = req.query.force_refresh === '1' || req.query.force_refresh === 'true';
+  var forceAllowed = process.env.EPG_ALLOW_FORCE_REFRESH === '1';
+  var useForce = wantForce && forceAllowed;
+  var loaded = await _loadProviderEpgs(useForce);
+  if (loaded.candidates.length > 0) {
     try {
-      var cached = xmltv.getCachedEpg(process.env.XMLTV_URL);
-      var epgData = cached && (cached.data || cached);
-      if (cached) {
-        var byId = _programmesByTvgId(cached);
+      var epgData = loaded.epg;
+      if (epgData) {
+        var byId = _programmesByTvgId(epgData);
         var ids = Object.keys(byId);
         var channelNames = _channelNamesByTvgId(epgData);
         var playableIndex = epgWaterfall.buildPlayableEpgIndex(_catalogItemsForMapping());
         var channelFilter = _channelFilterSet(req.query.channelIds);
-        epgMeta.source = 'xmltv';
+        epgMeta.source = 'xmltv-merged';
+        epgMeta.sources = loaded.sources;
         epgMeta.tvg_ids = ids.length;
         epgMeta.mapping_source_items =
           (playableIndex && playableIndex.byName && typeof playableIndex.byName.size === 'number')
@@ -264,6 +325,9 @@ router.get('/api/epg/grid', function(req, res) {
       }
     } catch (_) { /* fall through to empty */ }
   }
+  epgMeta.force_refresh = useForce
+    ? 'applied'
+    : (wantForce && !forceAllowed ? 'denied (set EPG_ALLOW_FORCE_REFRESH=1)' : 'not_requested');
 
   return res.status(200).json({
     window_start: new Date(startMs).toISOString(),

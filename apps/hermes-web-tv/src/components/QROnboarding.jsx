@@ -78,7 +78,7 @@ function _buildProviderSetupUrl(pairingCode, setupUrl) {
     return hermesApi.buildApiUrl(direct.charAt(0) === '/' ? direct : ('/' + direct));
   }
   if (!pairingCode) { return ''; }
-  return hermesApi.buildApiUrl('/setup/provider?code=' + encodeURIComponent(pairingCode));
+  return hermesApi.buildApiUrl('/api/setup/provider?code=' + encodeURIComponent(pairingCode));
 }
 
 // ── QR sizing ───────────────────────────────────────────────────────────────
