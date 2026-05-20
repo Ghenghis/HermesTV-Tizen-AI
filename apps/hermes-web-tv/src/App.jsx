@@ -1,6 +1,7 @@
 import React from 'react';
 import * as profileStore from './store/profileStore.js';
 import * as voicePrefStore from './store/voicePrefStore.js';
+import * as providerVisibilityStore from './store/providerVisibilityStore.js';
 import * as hermesApi from './api/hermesApi.js';
 import * as voiceClient from './api/azureVoiceClient.js';
 import ThemeProvider from './components/ThemeProvider.jsx';
@@ -362,12 +363,67 @@ function matchesActorFilter(item, actorFilter) {
   return false;
 }
 
-function applyFilters(catalog, providerFilter, contentFilter, qualityFilter, actorFilter) {
+// W16-PROVIDERS — per-profile provider visibility. `hiddenSet` is a plain
+// map { provider_id: true } of providers the user has hidden via
+// Settings ▸ Providers. Returns false to DROP the item when all of its
+// providers/sources are hidden — i.e. an iptv-org-only ESPN card vanishes
+// when iptv-org is hidden, but a multi-source ESPN card stays as long as
+// at least one of its sources is still visible.
+//
+// hiddenSet treats 'iptv-org' and 'iptv_org' as the same provider (the
+// store normalises to underscores; the catalog uses the hyphenated form).
+//
+// We pass false through when there are zero hidden providers — the
+// common case for fresh profiles — so the filter is a no-op until the
+// user actually flips a toggle.
+function _isProviderHidden(pid, hiddenSet) {
+  if (typeof pid !== 'string') { return false; }
+  if (hiddenSet[pid]) { return true; }
+  if (pid === 'iptv-org' && hiddenSet.iptv_org) { return true; }
+  if (pid === 'iptv_org' && hiddenSet['iptv-org']) { return true; }
+  return false;
+}
+
+function matchesProviderVisibility(item, hiddenSet) {
+  if (!hiddenSet) { return true; }
+  var anyVisible = false;
+  var anySource = false;
+  // Wave-13 canonical: sources[] is the merged list.
+  if (Array.isArray(item.sources)) {
+    for (var i = 0; i < item.sources.length; i++) {
+      var sid = item.sources[i] && item.sources[i].provider_id;
+      if (!sid) { continue; }
+      anySource = true;
+      if (!_isProviderHidden(sid, hiddenSet)) { anyVisible = true; break; }
+    }
+  }
+  // Pre-merge providers[] shape — still appears for seed/jellyfin entries.
+  if (!anyVisible && Array.isArray(item.providers)) {
+    for (var j = 0; j < item.providers.length; j++) {
+      var pid = item.providers[j] && item.providers[j].provider_id;
+      if (!pid) { continue; }
+      anySource = true;
+      if (!_isProviderHidden(pid, hiddenSet)) { anyVisible = true; break; }
+    }
+  }
+  // Old flat-string provider.
+  if (!anyVisible && typeof item.provider === 'string') {
+    anySource = true;
+    if (!_isProviderHidden(item.provider, hiddenSet)) { anyVisible = true; }
+  }
+  // Items with no provider at all (rare — seed jellyfin items) are NEVER
+  // hidden by this filter — only items that name a provider can be hidden.
+  if (!anySource) { return true; }
+  return anyVisible;
+}
+
+function applyFilters(catalog, providerFilter, contentFilter, qualityFilter, actorFilter, hiddenSet) {
   return catalog.filter(function(item) {
     return matchesProviderFilter(item, providerFilter) &&
            matchesContentFilter(item, contentFilter) &&
            matchesQualityFilter(item, qualityFilter) &&
-           matchesActorFilter(item, actorFilter);
+           matchesActorFilter(item, actorFilter) &&
+           matchesProviderVisibility(item, hiddenSet);
   });
 }
 
@@ -490,6 +546,35 @@ function App() {
   // the App level. See the import comment for why this duplicates the gate
   // already mounted inside MediaDetailPanel.
   var parentalGate = useParentalGate();
+
+  // W16-PROVIDERS — per-profile visibility map. We keep the hidden-set in
+  // local component state so a toggle flip re-renders the catalog grid
+  // immediately, without waiting on a /api/catalog round-trip. The store
+  // is the source of truth (localStorage-backed); we re-read on every
+  // 'hermestv:provider-visibility-changed' event so any surface flipping
+  // a toggle (today: Settings ▸ Providers) drives the same refresh path.
+  var hiddenProvidersResult = React.useState({});
+  var hiddenProviders = hiddenProvidersResult[0];
+  var setHiddenProviders = hiddenProvidersResult[1];
+  React.useEffect(function() {
+    var profileId = (state.profile && state.profile.profile_id) || null;
+    function recompute() {
+      if (!profileId) { setHiddenProviders({}); return; }
+      var hiddenList = providerVisibilityStore.getHiddenList(profileId);
+      var map = {};
+      for (var i = 0; i < hiddenList.length; i++) { map[hiddenList[i]] = true; }
+      setHiddenProviders(map);
+    }
+    recompute();
+    function onChange() { recompute(); }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hermestv:provider-visibility-changed', onChange);
+      return function() {
+        window.removeEventListener('hermestv:provider-visibility-changed', onChange);
+      };
+    }
+    return undefined;
+  }, [state.profile && state.profile.profile_id]);
 
   // Wave-14 W14-DIRECTPLAY pre-warm latch. Set true the first time a live
   // card is focused so we only kick off the PlayerModal + hls.js dynamic
@@ -1578,12 +1663,20 @@ function App() {
   // Rules of Hooks. The lazy-shells split (PR #135) already cut the boot
   // bundle by 49%; this filter runs in <10 ms even on the full 1000+ item
   // catalog and isn't a meaningful re-render cost.
+  // W16-PROVIDERS: pass hiddenProviders (per-profile map of explicitly hidden
+  // provider_ids). Empty map = no-op; toggling a provider in Settings
+  // immediately removes its cards from every shell. Mom defaults to all-on
+  // so this map is empty for her until she explicitly hides a source.
+  var hiddenForFilter = (hiddenProviders && Object.keys(hiddenProviders).length > 0)
+    ? hiddenProviders
+    : null;
   var filteredCatalog = applyFilters(
     state.catalog,
     state.providerFilter,
     state.contentFilter,
     state.qualityFilter,
-    state.actorFilter ? state.actorFilter.actor_id : null
+    state.actorFilter ? state.actorFilter.actor_id : null,
+    hiddenForFilter
   );
 
   // ── Main app shell ──

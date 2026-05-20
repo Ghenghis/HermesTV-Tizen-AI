@@ -11,6 +11,10 @@ var PlaybackSettings = React.lazy(function() { return import('./settings/Playbac
 var ParentalControls = React.lazy(function() { return import('./settings/ParentalControls.jsx'); });
 var BackupRestore = React.lazy(function() { return import('./settings/BackupRestore.jsx'); });
 var Diagnostics = React.lazy(function() { return import('./settings/Diagnostics.jsx'); });
+// Wave-16: per-profile provider visibility — show/hide iptv-org, xtremehd,
+// apollo_group, jellyfin, xtream. Lives in its own lazy chunk so the
+// Settings modal's first paint isn't slowed by the source-health fetch.
+var ProvidersSettings = React.lazy(function() { return import('./settings/ProvidersSettings.jsx'); });
 // Recordings (DVR) lives inside the Playback tab — wraps the
 // RecordingsListModal launcher and the global DVR settings form. The
 // underlying client hits /api/dvr/* on hermes-tv-api.
@@ -41,6 +45,7 @@ var RecordingsSection = React.lazy(function() { return import('./settings/Record
 var TABS = [
   { id: 'playlists',   label: 'Playlists',   icon: '☰' },
   { id: 'general',     label: 'General',     icon: '⇅' },
+  { id: 'providers',   label: 'Providers',   icon: '◉' },
   { id: 'appearance',  label: 'Appearance',  icon: '◐' },
   { id: 'features',    label: 'Features',    icon: '✦' },
   { id: 'network',     label: 'Network',     icon: '⇄' },
@@ -433,6 +438,19 @@ function SettingsPanelTabbed(props) {
     );
   }
 
+  function renderProviders() {
+    return (
+      <React.Suspense fallback={<_Card icon="◉" header="Providers"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
+        <ProvidersSettings
+          profile={profile}
+          providers={providers}
+          m3uProviders={m3uProviders}
+          iptvOrgCount={iptvOrgCount}
+        />
+      </React.Suspense>
+    );
+  }
+
   function renderPlayback() {
     return (
       <React.Suspense fallback={<_Card icon="▶" header="Playback"><div style={{ color: 'var(--muted)' }}>Loading…</div></_Card>}>
@@ -615,6 +633,7 @@ function SettingsPanelTabbed(props) {
     switch (activeTab) {
       case 'playlists':   return renderPlaylists();
       case 'general':     return renderGeneral();
+      case 'providers':   return renderProviders();
       case 'appearance':  return renderAppearance();
       case 'features':    return renderFeatures();
       case 'network':     return renderNetwork();

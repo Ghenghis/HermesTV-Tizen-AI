@@ -367,8 +367,43 @@ async function resolveCatalog() {
   };
 }
 
+// Wave-16: parse the `?hide_providers=A,B,C` query param into a normalised
+// Set of provider_ids the caller wants stripped from the response. Returns
+// null when the param is empty/missing so resolveCatalog's filter is a
+// no-op (and Cloudflare's edge cache shares the unfiltered entry). Accepts
+// both hyphenated ("iptv-org") and underscored ("iptv_org") spellings so
+// the client store key normalisation doesn't break server-side filtering.
+function parseHideProviders(raw) {
+  if (typeof raw !== 'string' || raw.length === 0) { return null; }
+  // Cap length to defeat absurdly long inputs hitting the edge cache.
+  if (raw.length > 256) { return null; }
+  const parts = raw.split(',');
+  const set = {};
+  let count = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const p = (parts[i] || '').trim().toLowerCase();
+    if (!p) { continue; }
+    // Allow only [a-z0-9_-] in provider IDs.
+    if (!/^[a-z0-9_-]{1,32}$/.test(p)) { continue; }
+    set[p] = true;
+    // Mirror the hyphen ↔ underscore alias so 'iptv-org' in the query
+    // also hides items tagged 'iptv_org' (and vice versa).
+    if (p === 'iptv-org') { set['iptv_org'] = true; }
+    else if (p === 'iptv_org') { set['iptv-org'] = true; }
+    count += 1;
+  }
+  if (count === 0) { return null; }
+  return set;
+}
+
 router.get('/api/catalog', async (req, res) => {
   const { profile_id, provider_id } = req.query;
+  // W16-PROVIDERS — `?hide_providers=apollo_group,xtremehd` lets the client
+  // ask the server to strip items by provider. The client also re-filters
+  // defensively so a stale Cloudflare cache entry never reveals a hidden
+  // provider, but doing the filter here keeps the response size honest
+  // when the visibility set is stable.
+  const hiddenSet = parseHideProviders(req.query.hide_providers);
 
   if (profile_id !== undefined && !VALID_PROFILES.includes(profile_id)) {
     return res.status(400).json({
@@ -435,6 +470,44 @@ router.get('/api/catalog', async (req, res) => {
     });
   }
 
+  // --- Wave-16 hide_providers filter ---
+  // Drop items whose only providers are in the hidden set. Items with at
+  // least one source NOT in the hidden set survive (consistent with the
+  // client-side filter in App.jsx).
+  let hiddenDropped = 0;
+  if (hiddenSet) {
+    const before = items.length;
+    items = items.filter((item) => {
+      let anyVisible = false;
+      let anySource = false;
+      if (Array.isArray(item.sources)) {
+        for (let i = 0; i < item.sources.length; i++) {
+          const sid = item.sources[i] && item.sources[i].provider_id;
+          if (!sid) { continue; }
+          anySource = true;
+          if (!hiddenSet[sid]) { anyVisible = true; break; }
+        }
+      }
+      if (!anyVisible && Array.isArray(item.providers)) {
+        for (let j = 0; j < item.providers.length; j++) {
+          const pid = item.providers[j] && item.providers[j].provider_id;
+          if (!pid) { continue; }
+          anySource = true;
+          if (!hiddenSet[pid]) { anyVisible = true; break; }
+        }
+      }
+      if (!anyVisible && typeof item.provider === 'string') {
+        anySource = true;
+        if (!hiddenSet[item.provider]) { anyVisible = true; }
+      }
+      // Items with no providers at all are NEVER dropped by this filter —
+      // only items naming a provider can be hidden.
+      if (!anySource) { return true; }
+      return anyVisible;
+    });
+    hiddenDropped = before - items.length;
+  }
+
   // --- Quality sorting for mom_tv: 4K first, HDR-flagged items higher ---
   // Only meaningful for mock items (Jellyfin items use a different shape).
   if (profile_id === 'mom_tv' && !isJellyfin) {
@@ -467,6 +540,10 @@ router.get('/api/catalog', async (req, res) => {
     // away. If the unmerged catalog had 3 ESPN entries and 2 CNN entries
     // and 1 of each elsewhere, merged_duplicates is (3-1) + (2-1) = 3.
     merged_duplicates: resolved.merged_duplicates || 0,
+    // Wave-16: how many items the hide_providers query param dropped.
+    // 0 when the param is missing — the catalog is unfiltered.
+    hidden_dropped: hiddenDropped,
+    hidden_providers: hiddenSet ? Object.keys(hiddenSet) : [],
   };
 
   res.json({ catalog: items, total: items.length, _meta });
