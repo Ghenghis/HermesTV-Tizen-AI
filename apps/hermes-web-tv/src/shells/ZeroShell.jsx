@@ -630,11 +630,13 @@ function ZeroShell(props) {
 
         {/* Featured live-channel strip — Zero's FavoriteChannelBar pattern.
             Only shown on the Live tab so VOD-grid users don't lose vertical
-            real estate. */}
+            real estate. Mom-never-limited: previously Mom saw 8 / Dave 12 —
+            inverted. Mom now sees the full strip (limit=Infinity), Dave keeps
+            the 12-channel cap. */}
         {activeTab === 'live' && (
           <ZeroChannelStrip
             channels={liveChannels}
-            limit={momMode ? 8 : 12}
+            limit={momMode ? Infinity : 12}
             onItemFocus={_publishFocus}
             onItemSelect={onItemSelect}
             focusedItemId={focusedItem && focusedItem.id}

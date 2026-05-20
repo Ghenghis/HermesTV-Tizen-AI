@@ -67,8 +67,11 @@ function LayoutSwitcher(props) {
   // user_profiles_sherri_dave) so she gets the larger touch surface.
   var isMomMode = (profile && profile.mom_mode) || fontScale >= 1.4;
   var gridColumns = isMomMode ? '1fr' : 'repeat(auto-fill, minmax(180px, 1fr))';
-  var cardPadding = isMomMode ? '18px 20px' : '14px 16px';
-  var cardMinHeight = isMomMode ? '56px' : 'auto';
+  var cardPadding = isMomMode ? '20px 20px' : '14px 16px';
+  // Touch-target floor: Sherri sometimes uses the TV as a tablet, so each
+  // layout tile must be at least 64×64 (WCAG 2.5.5 target-size + the
+  // wave-8 Mom-mode audit requirement). Was 56 → 64.
+  var cardMinHeight = isMomMode ? '64px' : 'auto';
 
   return (
     <div

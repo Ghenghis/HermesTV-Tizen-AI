@@ -6,6 +6,7 @@ import FavoritesRail from '../components/FavoritesRail.jsx';
 import RecentlyWatchedRail from '../components/RecentlyWatchedRail.jsx';
 import WatchlistRail from '../components/WatchlistRail.jsx';
 import useFavorites from '../hooks/useFavorites.js';
+import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NetflixShell — HermesTV's cinematic horizontal-rail layout, inspired by the
@@ -51,11 +52,16 @@ function CardRow(props) {
 
   if (!items || items.length === 0) return null;
 
+  // Per Mom-never-limited rule: Dave's rails cap at 12, Mom's cap is bypassed
+  // so Sherri sees every card we have for that row (poster rows are cheap on
+  // the QN85 — the perf cost we were avoiding is a UN-class concern).
+  var rowCap = capForProfile(profile, 12);
+
   return (
     <div style={{ marginBottom: '28px' }}>
       <h3 style={{ margin: '0 0 12px', padding: '0 24px', fontSize: 'calc(16px * ' + fontScale + ')', fontWeight: 700, color: '#e5e5e5', letterSpacing: '0.3px' }}>{title}</h3>
       <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '6px 24px 10px', scrollbarWidth: 'none' }}>
-        {items.slice(0, 12).map(function(item, idx) {
+        {items.slice(0, rowCap).map(function(item, idx) {
           // Per-card aspect: live channels are landscape 16:9 logos/thumbs,
           // VOD/movies/series stay 2:3 portrait posters. Cards in a single
           // rail mix gracefully because the row-flex stretches vertically;
@@ -402,7 +408,7 @@ function NetflixShell(props) {
             catalog={filtered}
           />
           <CardRow title="Top Picks For You" items={filtered} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
-          <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 8)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, capForProfile(profile, 8))} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(4)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="New Arrivals" items={filtered.slice().reverse()} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
         </div>

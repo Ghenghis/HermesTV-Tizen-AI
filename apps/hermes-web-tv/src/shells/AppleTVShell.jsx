@@ -2,6 +2,7 @@ import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AppleTVShell — HermesTV's clean, glass-blur, big-typography layout, inspired
@@ -40,11 +41,13 @@ function HScrollRow(props) {
   var allowMotion = tier === 'enhanced' && !(profile && profile.reduced_motion);
 
   if (!items || items.length === 0) return null;
+  // Mom-never-limited rule: Dave caps Apple rails at 10, Mom bypasses entirely.
+  var rowCap = capForProfile(profile, 10);
   return (
     <div style={{ marginBottom: '32px' }}>
       <h3 style={{ margin: '0 0 12px 32px', fontSize: 'calc(17px * ' + fontScale + ')', fontWeight: 600, color: '#f5f5f7', letterSpacing: '-0.01em' }}>{title}</h3>
       <div style={{ display: 'flex', gap: '14px', overflowX: 'auto', padding: '6px 32px 10px', scrollbarWidth: 'none' }}>
-        {items.slice(0, 10).map(function(item, idx) {
+        {items.slice(0, rowCap).map(function(item, idx) {
           return (
             <div
               key={item.id || idx}

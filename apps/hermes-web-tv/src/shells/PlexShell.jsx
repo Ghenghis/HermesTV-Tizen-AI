@@ -6,6 +6,7 @@ import FavoritesRail from '../components/FavoritesRail.jsx';
 import RecentlyWatchedRail from '../components/RecentlyWatchedRail.jsx';
 import WatchlistRail from '../components/WatchlistRail.jsx';
 import useFavorites from '../hooks/useFavorites.js';
+import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PlexShell — HermesTV's media-server-style layout.
@@ -63,9 +64,10 @@ function GridSection(props) {
       }}>{title}</h3>
       {/* auto-fill minmax keeps the grid dense at 1920×1080 without
           scrolling past the viewport: ~7 cols of 220 px tiles, 16/9
-          aspect-ratio caps row height so 3+ rows are visible at once. */}
+          aspect-ratio caps row height so 3+ rows are visible at once.
+          Mom's TV bypasses the section cap — she sees the full grid. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' }}>
-        {items.slice(0, 14).map(function(item, idx) {
+        {items.slice(0, capForProfile(profile, 14)).map(function(item, idx) {
           return (
             <div
               key={item.id || idx}
@@ -422,10 +424,10 @@ function PlexShell(props) {
           fontScale={fontScale}
           catalog={filtered}
         />
-        <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, 4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
-        <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, 10)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, capForProfile(profile, 4))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, capForProfile(profile, 10))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
         <GridSection title="Series" items={series.length > 0 ? series : filtered.slice(4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
-        <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, 8)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, capForProfile(profile, 8))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
 
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px', color: '#8b8f95', fontSize: 'calc(14px * ' + fontScale + ')' }}>
