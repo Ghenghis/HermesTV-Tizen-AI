@@ -153,12 +153,27 @@ async function probeLayouts() {
 }
 
 // Wave-17 purged the seed catalog (live-100..vod-200..ser-300..ACTORS).
-// E2E smoke now asserts the HONEST contract: catalog returns a well-formed
-// envelope, and a real item from the catalog (when any provider is wired in
-// CI env) flows through play + download. With no providers configured, the
-// dependent probes mark themselves "PASS — skipped, no provider items" so
-// the gate still says 12 PASS, 0 FAIL when the no-fake-content contract is
-// honoured. Real provider wiring (iptv-org) flips them to full assertions.
+// Lane 09 (CI provider gate, docs/47 contract): this script has two honest
+// modes, gated by the NO_PROVIDER_EMPTY_STATE env var:
+//
+//   NO_PROVIDER_EMPTY_STATE=1 (empty-state mode)
+//     - The catalog is allowed to be empty.
+//     - The play / download / season-download probes mark themselves as
+//       "PASS — skipped, no provider items" so the gate still says
+//       12 PASS, 0 FAIL when the honest no-providers contract holds.
+//     - This is the CI mode for PRs / push-to-main on a host that has no
+//       provider secrets wired.
+//
+//   default mode (live mode)
+//     - The catalog MUST contain at least one real provider item.
+//     - When firstPlayableItemId is null, the play/download probes FAIL
+//       (not skip). Per docs/46 §"Non-Negotiable Truth Rules":
+//         "No test may report provider playback as passing because no
+//          provider items were configured."
+//     - This is the release-gate mode for the dedicated provider-live
+//       workflow + the post-deploy VPS verification step.
+var ALLOW_EMPTY_STATE = String(process.env.NO_PROVIDER_EMPTY_STATE || '').toLowerCase();
+ALLOW_EMPTY_STATE = (ALLOW_EMPTY_STATE === '1' || ALLOW_EMPTY_STATE === 'true');
 let firstPlayableItemId = null;
 let firstSeriesItemId = null;
 
@@ -200,8 +215,11 @@ let playTicketId = null;
 
 async function probePlay() {
   if (!firstPlayableItemId) {
-    pass('POST /api/play', 'skipped — no provider items in CI env (catalog total=0)');
-    return;
+    if (ALLOW_EMPTY_STATE) {
+      pass('POST /api/play', 'skipped — no provider items in CI env (catalog total=0, NO_PROVIDER_EMPTY_STATE=1)');
+      return;
+    }
+    return fail('POST /api/play', 'no provider items in catalog (live mode requires at least one). Set NO_PROVIDER_EMPTY_STATE=1 ONLY for the honest empty-state CI job.');
   }
   const r = await call('POST', '/api/play', {
     body: { item_id: firstPlayableItemId, profile_id: 'mom_tv' },
@@ -218,26 +236,32 @@ async function probePlay() {
 
 async function probePlayStream() {
   if (!firstPlayableItemId) {
-    pass('GET /api/play/:ticket/stream', 'skipped — no provider items in CI env');
-    return;
+    if (ALLOW_EMPTY_STATE) {
+      pass('GET /api/play/:ticket/stream', 'skipped — no provider items (NO_PROVIDER_EMPTY_STATE=1)');
+      return;
+    }
+    return fail('GET /api/play/:ticket/stream', 'live mode requires a real catalog item — none available');
   }
   if (!playTicketId) {
     return fail('GET /api/play/:ticket/stream', 'no ticket from previous probe');
   }
   const r = await call('GET', '/api/play/' + playTicketId + '/stream');
-  // Per current contract: 302 (clean redirect) OR 503 (operator must wire
-  // Threadfin) OR 503 (stream_unresolved / stream_temporarily_unavailable).
-  if (r.status === 302 || r.status === 503) {
+  // Per current contract: 200 (in-API HLS proxy response), 206 (range), 302
+  // (clean redirect for iptv-org public CDN), OR 503 (operator config issue).
+  if (r.status === 200 || r.status === 206 || r.status === 302 || r.status === 503) {
     pass('GET /api/play/:ticket/stream', 'status=' + r.status + ' (acceptable in CI env)');
   } else {
-    fail('GET /api/play/:ticket/stream', 'status=' + r.status + ' (expected 302 or 503)');
+    fail('GET /api/play/:ticket/stream', 'status=' + r.status + ' (expected 200/206/302/503)');
   }
 }
 
 async function probeDownloadMovie() {
   if (!firstPlayableItemId) {
-    pass('POST /api/download', 'skipped — no provider items in CI env');
-    return;
+    if (ALLOW_EMPTY_STATE) {
+      pass('POST /api/download', 'skipped — no provider items (NO_PROVIDER_EMPTY_STATE=1)');
+      return;
+    }
+    return fail('POST /api/download', 'live mode requires a real catalog item — none available');
   }
   const r = await call('POST', '/api/download', {
     body: { item_id: firstPlayableItemId, profile_id: 'mom_tv' },
@@ -253,7 +277,14 @@ async function probeDownloadMovie() {
 
 async function probeDownloadSeason() {
   if (!firstSeriesItemId) {
-    pass('POST /api/download (series)', 'skipped — no series in catalog');
+    if (ALLOW_EMPTY_STATE) {
+      pass('POST /api/download (series)', 'skipped — no series in catalog (NO_PROVIDER_EMPTY_STATE=1)');
+      return;
+    }
+    // In live mode a missing series is still a soft pass — not every paid
+    // provider exposes series. The play probe is the gate that proves a
+    // playable upstream exists.
+    pass('POST /api/download (series)', 'no series in this provider mix (live mode soft-pass)');
     return;
   }
   const r = await call('POST', '/api/download', {

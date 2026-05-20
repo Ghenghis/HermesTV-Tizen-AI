@@ -22,6 +22,14 @@ name: Deploy VPS
         required: false
         default: 'main'
         type: string
+      run_provider_live:
+        description: 'After deploy, run the live-provider truth proof against the VPS public host. Requires real providers configured on the VPS.'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 # Two clicks in quick succession should queue, not race. We never want two
 # `docker compose build` runs fighting over the same image layer cache on the
@@ -340,3 +348,78 @@ jobs:
             exit 1
           fi
           exit 0
+
+      # ---------------------------------------------------------------------
+      # 6) Provider-live truth proof (Lane 09 release-gate).
+      # Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md, a deploy is not
+      # release-ready until at least one configured provider produces a
+      # non-zero catalog + playable stream from the public host.
+      #
+      # This step runs ONLY when the operator dispatches the workflow with
+      # run_provider_live=true. It executes tools/test-provider-e2e.js
+      # against the deployed VPS (HERMES_PROVIDER_E2E_BASE points at the
+      # public HTTPS host). The runner FAILS when /api/catalog is empty
+      # or /api/providers is empty — no skip can count as PASS.
+      #
+      # Proof artifacts (sanitized — no credentials/URLs) are uploaded to
+      # the workflow run regardless of outcome so the operator can read
+      # the ledger from GH Actions UI.
+      # ---------------------------------------------------------------------
+      - name: Provider-live truth proof (against deployed VPS)
+        if: ${{ inputs.run_provider_live == 'true' }}
+        env:
+          PRIMARY_HOST: ${{ env.PRIMARY_HOST }}
+          FALLBACK_HOST: ${{ env.FALLBACK_HOST }}
+          HERMES_PROVIDER_E2E_BASE: https://${{ env.PRIMARY_HOST }}
+          PROVIDER_E2E_MODE: 'live'
+        run: |
+          set -euo pipefail
+          echo "Provider-live proof: target=https://${PRIMARY_HOST}"
+
+          # Sanity-check the host before we hand it to the proof runner.
+          # If the public edge isn't reachable from the runner (Cloudflare 403
+          # noted in step 5), fall back to FALLBACK_HOST. If neither works
+          # this step exits 1 — the deploy itself was healthy, but the
+          # release-gate proof failed, and that's the contract.
+          PRIMARY_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${PRIMARY_HOST}/health" 2>/dev/null || echo "000")
+          if [ "$PRIMARY_CODE" != "200" ]; then
+            FALLBACK_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${FALLBACK_HOST}/health" 2>/dev/null || echo "000")
+            if [ "$FALLBACK_CODE" = "200" ]; then
+              echo "::warning::Primary ${PRIMARY_HOST} returned ${PRIMARY_CODE}; using fallback ${FALLBACK_HOST}"
+              echo "HERMES_PROVIDER_E2E_BASE=https://${FALLBACK_HOST}" >> "$GITHUB_ENV"
+            else
+              echo "::error::Neither host reachable for provider-live proof (${PRIMARY_CODE} / ${FALLBACK_CODE})"
+              exit 1
+            fi
+          fi
+
+          # Use Node 20 from the runner — tools/test-provider-e2e.js has no
+          # deps outside the workspace, so we don't need npm ci here.
+          node --version
+          node tools/test-provider-e2e.js | tee provider-live-vps.log
+
+      - name: Enforce provider-live PASS (no skip allowed)
+        if: ${{ inputs.run_provider_live == 'true' }}
+        run: |
+          if [ ! -f provider-live-vps.log ]; then
+            echo "::error::provider-live-vps.log missing — proof step did not run"
+            exit 1
+          fi
+          if ! grep -qE '^=== Results: [1-9][0-9]* PASS, 0 FAIL' provider-live-vps.log; then
+            echo "::error::Provider-live proof did not return PASS against the deployed VPS"
+            echo "::error::Per docs/46, no skip may count as PASS in live mode."
+            tail -n 60 provider-live-vps.log
+            exit 1
+          fi
+          echo "Provider-live proof against VPS: PASS"
+
+      - name: Upload provider-live proof artifacts
+        if: ${{ always() && inputs.run_provider_live == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-truth-vps-${{ github.run_id }}
+          path: |
+            docs/proof/provider-truth/
+            provider-live-vps.log
+          if-no-files-found: warn
+          retention-days: 30
