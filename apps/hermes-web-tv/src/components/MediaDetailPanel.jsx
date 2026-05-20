@@ -708,32 +708,15 @@ function MediaDetailPanel(props) {
             </div>
           )}
 
-          {/* Streaming quality section */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div
-              style={{
-                fontSize: 'calc(0.75rem * var(--font-scale, 1))',
-                fontWeight: '700',
-                color: 'var(--muted)',
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                marginBottom: '0.5rem',
-              }}
-            >
-              Streaming Quality
-            </div>
-            <StreamingQualityBar item={item} provider_id={selectedProviderId} />
-          </div>
-
-          {/* Source compare section */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <SourceComparePanel
-              item={item}
-              onSelectProvider={onSelectProvider}
-              selectedProviderId={selectedProviderId}
-              globalProviders={globalProviders}
-            />
-          </div>
+          {/* Wave-14 W14-NOPOPUP: Streaming Quality slider + SourceComparePanel
+              picker were strongly disliked by the user ("useless, makes too
+              much work to watch, needs to be instant"). The wave-13 server-
+              side auto-fallback already walks sources[] first-success-wins,
+              so the user never needs to pick a provider pre-play. If a
+              source fails mid-stream the player can surface a "Try next
+              server" affordance inside the playback overlay — never as a
+              pre-play modal. Both blocks removed; the imports stay so the
+              components remain available for future in-player surfacing. */}
 
           {/* Skip-intro preference — only shown for series carrying
               intro / credits markers in metadata. The toggle persists per
@@ -837,50 +820,10 @@ function MediaDetailPanel(props) {
               of a dead-end placeholder. We also surface a short copy line
               that explains WHEN the rail will populate, so the operator
               isn't left guessing whether the empty space is a bug. */}
-          <div
-            aria-label="Recommended titles — loading"
-            style={{
-              padding: '0.9rem',
-              backgroundColor: 'var(--surface-raised, #1c2128)',
-              borderRadius: 'var(--radius-md, 12px)',
-              border: '1px solid var(--border, #30363d)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 24px rgba(0,0,0,0.25)',
-              marginTop: '1.25rem',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.5rem',
-                marginBottom: '0.6rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 'calc(0.75rem * var(--font-scale, 1))',
-                  fontWeight: '700',
-                  color: 'var(--muted)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {isSeries ? 'More series like this' : 'More like this'}
-              </div>
-              <div
-                style={{
-                  fontSize: 'calc(0.7rem * var(--font-scale, 1))',
-                  color: 'var(--muted)',
-                  fontStyle: 'italic',
-                }}
-              >
-                Recommendations coming soon — we'll surface titles based on cast, genre, and watch history.
-              </div>
-            </div>
-            <LoadingSkeleton variant="rail" count={5} />
-          </div>
+          {/* Wave-14 W14-NOPOPUP: empty "More like this" placeholder removed.
+              An empty skeleton rail with a "Recommendations coming soon"
+              caption added friction without value. When the recommendations
+              backend lands we'll bring this back populated. */}
         </div>
       </div>
 
