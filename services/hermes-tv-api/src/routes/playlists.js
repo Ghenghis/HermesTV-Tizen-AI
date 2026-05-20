@@ -619,6 +619,61 @@ async function handleSave(req, res) {
   _playlistOrder.push(id);
   _trim();
 
+  // Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md P0#2: "saved playlists are
+  // in-memory and do not feed catalog/playback after restart". The fix is
+  // to mirror the credential-bearing record into providerStore so it
+  // survives restart and gets picked up by catalog ingest. The in-memory
+  // _playlists record stays (it carries the parsed channel list which
+  // is short-lived smoke-test data); the durable provider config goes
+  // to disk.
+  var persistedProviderId = null;
+  try {
+    var providerStore = require('../lib/providerStore');
+    var SANITIZE = require('../lib/sanitizeLog').sanitizeForLog;
+    var addInput = null;
+    if (type === 'url') {
+      addInput = {
+        type: 'm3u',
+        label: name,
+        url: source.url,
+        epg_url: (source.epg_url && typeof source.epg_url === 'string') ? source.epg_url : undefined
+      };
+    } else if (type === 'xtream' && xtreamCreds) {
+      addInput = {
+        type: 'xtream',
+        label: name,
+        url: xtreamCreds.server_url,
+        username: xtreamCreds.username,
+        password: xtreamCreds.password
+      };
+    }
+    // file imports are local one-shots — no URL to refetch on restart, so
+    // we leave them in the in-memory record only. Future enhancement could
+    // store the parsed channel list as a JSON catalog file alongside
+    // providers.json.
+    if (addInput) {
+      var saved = await providerStore.add(addInput).catch(function(err) {
+        if (err && err.code === 'VALIDATION_FAILED') {
+          // Validation failure on persist is non-fatal here — the in-memory
+          // import still returns 200 with channel counts so the operator
+          // sees the preview worked. Just log so it shows up in diagnostics.
+          console.warn('[playlists] persist skipped (validation): ' + SANITIZE(err.message));
+          return null;
+        }
+        console.warn('[playlists] persist failed: ' + SANITIZE(err && err.message ? err.message : 'unknown'));
+        return null;
+      });
+      if (saved && saved.id) {
+        persistedProviderId = saved.id;
+        record._persisted_provider_id = saved.id;
+      }
+    }
+  } catch (e) {
+    // Never block the response on persistence.
+    var SANITIZE2 = require('../lib/sanitizeLog').sanitizeForLog;
+    console.warn('[playlists] provider persist hook errored: ' + SANITIZE2(e && e.message ? e.message : 'unknown'));
+  }
+
   return res.status(200).json({
     id: record.id,
     name: record.name,
@@ -626,6 +681,7 @@ async function handleSave(req, res) {
     source_type: record.source_type,
     channels_count: record.channels_count,
     created_at: record.created_at,
+    persisted_provider_id: persistedProviderId,
   });
 }
 

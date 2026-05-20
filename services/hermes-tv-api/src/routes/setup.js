@@ -168,11 +168,37 @@ router.get('/setup/provider', (req, res) => {
   res.send(SETUP_PAGE_HTML);
 });
 
-// POST /setup/provider/submit — not yet implemented (B4 phase)
+// POST /setup/provider/submit — persists a provider config into providerStore.
+// Body: { type, label, url, username?, password?, epg_url? }
+// Response: 201 with masked row.
+//
+// Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md P0#2 ("Provider setup does not
+// store usable config"): this endpoint is now durable. The persisted record
+// survives process restart via providerStore (data/providers.json on the API
+// container's writable volume) and is the SAME store that /api/providers
+// surfaces.
 router.post('/setup/provider/submit', (req, res) => {
-  res.status(501).json({
-    error: 'not_implemented',
-    message: 'Provider credential storage is pending B4 phase implementation.',
+  var providerStore = require('../lib/providerStore');
+  var SANITIZE = require('../lib/sanitizeLog').sanitizeForLog;
+  var body = req.body || {};
+  providerStore.add({
+    type: body.type,
+    label: body.label,
+    url: body.url,
+    username: body.username,
+    password: body.password,
+    epg_url: body.epg_url,
+  }).then((masked) => {
+    res.status(201).json({
+      provider: masked,
+      message: 'Provider saved. It will appear in /api/providers and feed catalog/playback on the next refresh.',
+    });
+  }).catch((err) => {
+    if (err && err.code === 'VALIDATION_FAILED') {
+      return res.status(400).json({ error: 'validation_failed', errors: err.errors || [err.message] });
+    }
+    console.warn('[setup] provider submit failed: ' + SANITIZE(err && err.message ? err.message : 'unknown'));
+    res.status(500).json({ error: 'save_failed', message: 'Could not save provider config.' });
   });
 });
 

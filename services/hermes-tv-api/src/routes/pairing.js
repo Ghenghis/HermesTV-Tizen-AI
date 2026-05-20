@@ -165,7 +165,29 @@ router.get('/api/pair/:code', function(req, res) {
 
 // POST /api/pair/:code/complete - operator's phone landing page hits this
 // once provider creds are stored. Phase 1: trusts the caller (LAN-only via
-// CORS). Phase 2 will add a short-lived auth header derived from the code.
+// CORS).
+//
+// Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md P0#2 ("Pairing completion is
+// in memory and stores no credentials"): when the caller supplies the
+// optional `provider_config` payload, we persist it via providerStore so it
+// survives restart and feeds the rest of the registry. The pairing envelope
+// itself stays in-memory (short-lived TTL handshake state); the provider
+// credential data is durable.
+//
+// Body shape (minimum):
+//   { provider_id: 'apollo' | 'xtremehd' }          // legacy — marks status only
+// Or (durable):
+//   {
+//     provider_id: 'apollo' | 'xtremehd',
+//     provider_config: {
+//       type: 'm3u' | 'xtream' | 'stalker',
+//       label: '...',
+//       url:   '...',
+//       username?: '...',
+//       password?: '...',
+//       epg_url?: '...'
+//     }
+//   }
 router.post('/api/pair/:code/complete', function(req, res) {
   var code = req.params.code;
   if (!CODE_PATTERN.test(code)) {
@@ -188,13 +210,46 @@ router.post('/api/pair/:code/complete', function(req, res) {
       pairing_code: code,
     });
   }
-  var providerId = req.body && req.body.provider_id;
+  var body = req.body || {};
+  var providerId = body.provider_id;
   if (VALID_PROVIDERS.indexOf(providerId) === -1) {
     return res.status(400).json({
       error: 'validation_failed',
       message: 'provider_id must be one of: ' + VALID_PROVIDERS.join(', '),
     });
   }
+
+  // Durable path — if the caller sent provider_config, persist it.
+  if (body.provider_config && typeof body.provider_config === 'object') {
+    var providerStore = require('../lib/providerStore');
+    var SANITIZE = require('../lib/sanitizeLog').sanitizeForLog;
+    var cfg = body.provider_config;
+    return providerStore.add({
+      type: cfg.type,
+      label: cfg.label || providerId,
+      url: cfg.url,
+      username: cfg.username,
+      password: cfg.password,
+      epg_url: cfg.epg_url,
+    }).then(function(masked) {
+      env.status = 'completed';
+      env.provider_id = providerId;
+      env.persisted_provider_id = masked.id;
+      var out = _serialize(env);
+      out.persisted_provider = masked;
+      return res.json(out);
+    }).catch(function(err) {
+      if (err && err.code === 'VALIDATION_FAILED') {
+        return res.status(400).json({ error: 'validation_failed', errors: err.errors || [err.message] });
+      }
+      console.warn('[pairing] persist failed: ' + SANITIZE(err && err.message ? err.message : 'unknown'));
+      return res.status(500).json({ error: 'persist_failed', message: 'Could not persist provider config.' });
+    });
+  }
+
+  // Legacy path — provider_id only, no creds (kept for backwards-compat with
+  // the original phone-as-remote demo wave; new clients should send
+  // provider_config so credentials become durable).
   env.status = 'completed';
   env.provider_id = providerId;
   return res.json(_serialize(env));
