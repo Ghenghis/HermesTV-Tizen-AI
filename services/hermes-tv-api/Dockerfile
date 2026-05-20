@@ -3,6 +3,17 @@ WORKDIR /app
 # Build context is the REPO ROOT (set in upstream/docker-vps/VPS_COMPOSE.yml),
 # so paths below are repo-root-relative. This lets us COPY cross-app
 # resources (layout manifests + upstream catalog) that the API serves.
+
+# Build-arg for embedding the deploy commit into the image. Compose passes
+# GIT_SHA from the VPS shell (set by the deploy workflow via
+# `git rev-parse HEAD`). Falls back to 'unknown' on local builds without
+# the arg so /api/version still answers (it just reports 'unknown').
+ARG GIT_SHA=unknown
+ARG BUILD_TIME
+ENV GIT_SHA=${GIT_SHA}
+ENV HERMES_GIT_SHA=${GIT_SHA}
+ENV HERMES_BUILD_TIME=${BUILD_TIME}
+
 COPY services/hermes-tv-api/package*.json ./
 # npm 10+ removed --only=production (deprecated since npm 7); --omit=dev is
 # the supported replacement and is forward-compatible with npm 11+.

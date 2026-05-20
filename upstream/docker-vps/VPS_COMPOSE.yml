@@ -141,6 +141,13 @@ services:
       # — both of which the API serves (see /api/layouts, /api/upstream-apps).
       context: ../..
       dockerfile: services/hermes-tv-api/Dockerfile
+      # Embed the deploy SHA into the image so /api/version no longer reports
+      # git_sha=unknown. The deploy workflow exports GIT_SHA + BUILD_TIME on
+      # the VPS shell before running `docker compose build`; missing on the
+      # VPS, the Dockerfile ARG default ('unknown') keeps the build green.
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-}
     container_name: hermestv-vps-api
     # env_file path is relative to THIS compose file location. Operator places
     # /home/operator/hermestv/.env (mode 0600); from upstream/docker-vps/ that's

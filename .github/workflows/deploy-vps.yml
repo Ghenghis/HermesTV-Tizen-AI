@@ -171,6 +171,15 @@ jobs:
           NEW_SHA=\$(git rev-parse HEAD)
           echo "  remote: HEAD is now \$NEW_SHA"
 
+          # Embed the deploy SHA + build time into the api image so
+          # /api/version no longer reports git_sha=unknown. The api
+          # Dockerfile accepts ARG GIT_SHA/BUILD_TIME; compose forwards
+          # these env vars as build-args. Exporting once here covers
+          # both the build and any subsequent commands in this shell.
+          export GIT_SHA="\$NEW_SHA"
+          export BUILD_TIME="\$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "  remote: embedding GIT_SHA=\$GIT_SHA BUILD_TIME=\$BUILD_TIME"
+
           echo "  remote: docker compose build ${API_CONTAINER}+${WEB_CONTAINER} (3-6 min)"
           docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" \
             build hermes-tv-api hermes-web-tv
