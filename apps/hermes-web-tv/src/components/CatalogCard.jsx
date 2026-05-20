@@ -85,7 +85,29 @@ function CatalogCard(props) {
   var title = item.title || 'Untitled';
   var contentType = item.content_type || item.type || 'live';
   var quality = item.quality || item.metadata || {};
-  var providerTags = item.provider_tags || (item.provider ? [item.provider] : []);
+  // W16-PROVIDERS — derive providerTags from the richest source available.
+  // Wave-13 canonicalises providers under item.sources[].provider_id; older
+  // shapes still use item.providers[].provider_id or a flat item.provider.
+  // We prefer sources → providers → provider_tags → provider so the corner
+  // badge correctly identifies "iptv-org / xtremehd / apollo_group" on any
+  // catalog shape the merge step produces.
+  var providerTags = item.provider_tags;
+  if (!providerTags || !providerTags.length) {
+    providerTags = [];
+    if (Array.isArray(item.sources)) {
+      for (var spi = 0; spi < item.sources.length; spi++) {
+        var spid = item.sources[spi] && item.sources[spi].provider_id;
+        if (spid && providerTags.indexOf(spid) === -1) { providerTags.push(spid); }
+      }
+    }
+    if (!providerTags.length && Array.isArray(item.providers)) {
+      for (var ppi = 0; ppi < item.providers.length; ppi++) {
+        var ppid = item.providers[ppi] && item.providers[ppi].provider_id;
+        if (ppid && providerTags.indexOf(ppid) === -1) { providerTags.push(ppid); }
+      }
+    }
+    if (!providerTags.length && item.provider) { providerTags = [item.provider]; }
+  }
   var epg = item.epg || {};
   var catchUpAvailable = item.catch_up_available || quality.has_catchup || false;
 
@@ -339,6 +361,12 @@ function CatalogCard(props) {
             <WatchlistButton profile={profile} item={item} />
           </span>
         )}
+
+        {/* W16-PROVIDERS — provider corner badge. Subtle 10-11 px chip in the
+            bottom-right of the poster so the user can instantly see whether
+            a card is iptv-org, xtremehd, or apollo. Translucent black bg +
+            provider-tinted border keeps it readable on any poster. */}
+        <ProviderBadge providerTags={providerTags} corner />
       </div>
 
       {/* Card content body — sits BELOW the poster, not behind it. */}

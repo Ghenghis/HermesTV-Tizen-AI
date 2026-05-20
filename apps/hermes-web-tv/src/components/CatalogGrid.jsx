@@ -4,6 +4,57 @@ import EmptyState from './EmptyState.jsx';
 import { useGridVirtualizer } from '../shells/shellHelpers.js';
 import { isSystemLimited } from '../utils/isSystemLimited.js';
 
+// W16-PROVIDERS — provider display labels for section headers when
+// "Group by Provider" is on. Keeps the header text readable ("iptv-org"
+// rather than "iptv_org", "Apollo Group TV" instead of "apollo_group").
+var PROVIDER_DISPLAY = {
+  'iptv-org':    'iptv-org',
+  'iptv_org':    'iptv-org',
+  apollo_group:  'Apollo Group TV',
+  apollo:        'Apollo Group TV',
+  xtremehd:      'xTremeHD',
+  xtream:        'Xtream Codes',
+  jellyfin:      'Jellyfin',
+  seed:          'Built-in',
+  unknown:       'Other'
+};
+
+function _primaryProvider(item) {
+  if (!item) { return 'unknown'; }
+  // Prefer wave-13 sources[] canonical order — first entry is the primary
+  // source after merge (xtremehd > apollo_group > iptv-org > seed).
+  if (Array.isArray(item.sources) && item.sources.length > 0) {
+    var sid = item.sources[0] && item.sources[0].provider_id;
+    if (sid) { return sid; }
+  }
+  if (Array.isArray(item.providers) && item.providers.length > 0) {
+    var pid = item.providers[0] && item.providers[0].provider_id;
+    if (pid) { return pid; }
+  }
+  if (typeof item.provider === 'string' && item.provider) { return item.provider; }
+  if (Array.isArray(item.provider_tags) && item.provider_tags.length > 0) {
+    return item.provider_tags[0];
+  }
+  return 'unknown';
+}
+
+function _displayName(pid) {
+  return PROVIDER_DISPLAY[pid] || pid || 'Other';
+}
+
+// Storage helpers for the per-profile "Group by Provider" preference.
+var GROUP_KEY_PREFIX = 'daveTV:group-by-provider:';
+function _readGroupPref(profileId) {
+  if (!profileId) { return false; }
+  try { return localStorage.getItem(GROUP_KEY_PREFIX + profileId) === '1'; }
+  catch (_e) { return false; }
+}
+function _writeGroupPref(profileId, on) {
+  if (!profileId) { return; }
+  try { localStorage.setItem(GROUP_KEY_PREFIX + profileId, on ? '1' : '0'); }
+  catch (_e) { /* silent */ }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CatalogGrid — the "Standard Grid" fallback shell when no layout is picked.
 //
@@ -81,6 +132,21 @@ function CatalogGrid(props) {
     );
   }
 
+  // W16-PROVIDERS — Group-by-Provider toggle (persists per profile).
+  var groupByState = React.useState(function() { return _readGroupPref(profileId); });
+  var groupBy = groupByState[0];
+  var setGroupBy = groupByState[1];
+  // When the active profile changes (profile picker), re-read the pref so
+  // Mom and Dave each remember their own grouping preference.
+  React.useEffect(function() {
+    setGroupBy(_readGroupPref(profileId));
+  }, [profileId]);
+  function toggleGroupBy() {
+    var next = !groupBy;
+    setGroupBy(next);
+    _writeGroupPref(profileId, next);
+  }
+
   // Filter by provider tab
   var filtered = items.filter(function(item) {
     if (activeTab === 'all') { return true; }
@@ -93,6 +159,33 @@ function CatalogGrid(props) {
     var access = item.profile_access || [];
     return !profileId || access.indexOf(profileId) !== -1;
   });
+
+  // When grouping is on, sort items so same-provider entries are contiguous
+  // and remember per-provider counts for the section headers.
+  var groups = null;
+  if (groupBy) {
+    var buckets = {};
+    var order = [];
+    for (var gi = 0; gi < filtered.length; gi++) {
+      var pp = _primaryProvider(filtered[gi]);
+      if (!buckets[pp]) { buckets[pp] = []; order.push(pp); }
+      buckets[pp].push(filtered[gi]);
+    }
+    // Stable provider order: known providers first (xtremehd, apollo_group,
+    // iptv-org), everything else by descending bucket size so the user sees
+    // their largest source first.
+    var PROVIDER_RANK = { xtremehd: 1, apollo_group: 2, 'iptv-org': 3, iptv_org: 3, jellyfin: 4, xtream: 5 };
+    order.sort(function(a, b) {
+      var ra = PROVIDER_RANK[a] || 99;
+      var rb = PROVIDER_RANK[b] || 99;
+      if (ra !== rb) { return ra - rb; }
+      return (buckets[b].length - buckets[a].length);
+    });
+    groups = [];
+    for (var oi = 0; oi < order.length; oi++) {
+      groups.push({ id: order[oi], items: buckets[order[oi]] });
+    }
+  }
 
   // Determine grid columns from layout and tier
   // enhanced: 5 for grid-standard, 8 for discovery, 2 for jumbo-rail
@@ -157,9 +250,13 @@ function CatalogGrid(props) {
   var momProfile = !isSystemLimited(profile);
   var overscan = momProfile ? 4 : 2;
 
+  // When grouped, the per-section grids virtualize themselves via CSS
+  // overflow + the sentinel walk; we tell the top-level virtualizer to
+  // treat itemCount as 0 so its row-windowing math is a no-op. The
+  // sections below render the full per-provider lists.
   var virt = useGridVirtualizer({
     scrollRef: scrollRefHolder,
-    itemCount: filtered.length,
+    itemCount: groupBy ? 0 : filtered.length,
     columns: cols,
     rowHeight: ROW_HEIGHT_PX,
     overscan: overscan,
@@ -248,8 +345,128 @@ function CatalogGrid(props) {
     }
   }, [virt.startIndex, virt.endIndex, filtered.length]);
 
+  // Group-by-Provider toolbar. Sits above the grid; small button + count.
+  // Always rendered (even when there's only one provider) so the user can
+  // discover the feature.
+  var toolbar = (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: '0.5rem',
+        padding: '0.5rem 1.5rem 0',
+        flexShrink: 0,
+      }}
+    >
+      <button
+        tabIndex={0}
+        role="switch"
+        aria-checked={groupBy}
+        aria-label="Group by provider"
+        onClick={toggleGroupBy}
+        onKeyDown={function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroupBy(); }
+        }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          padding: '0.4rem 0.85rem',
+          background: groupBy ? 'rgba(0,212,255,0.18)' : 'transparent',
+          border: '1px solid ' + (groupBy ? 'var(--accent, #00d4ff)' : 'var(--border, #30363d)'),
+          borderRadius: '999px',
+          color: groupBy ? 'var(--accent, #00d4ff)' : 'var(--muted)',
+          fontSize: 'calc(0.78rem * var(--font-scale, 1))',
+          fontWeight: 700,
+          cursor: 'pointer',
+          outline: 'none',
+        }}
+        onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent, #00d4ff)'; }}
+        onBlur={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
+      >
+        <span aria-hidden="true">⊞</span>
+        <span>{groupBy ? 'Grouped by provider' : 'Group by provider'}</span>
+      </button>
+    </div>
+  );
+
+  if (groupBy && groups && groups.length > 0) {
+    // Grouped view — one section per provider, each section is its own grid.
+    // We bypass the central virtualizer for this mode (the per-section grids
+    // still benefit from CSS overflow + the same DOM-mount footprint we had
+    // pre-virtualization, since the user explicitly opted into seeing every
+    // section's contents). Section headers double as virtualization landmarks
+    // so the user can scroll directly to xTremeHD / iptv-org / Apollo.
+    return (
+      <div ref={sentinelRef}>
+        {toolbar}
+        <div ref={gridRootRef}>
+          {groups.map(function(g) {
+            var headerLabel = _displayName(g.id);
+            var count = g.items.length;
+            return (
+              <section
+                key={g.id}
+                aria-label={headerLabel + ' (' + count + ' items)'}
+                style={{ marginTop: '0.75rem' }}
+              >
+                <header
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    padding: '0.6rem 1.5rem 0.3rem',
+                    fontSize: 'calc(0.85rem * var(--font-scale, 1))',
+                    fontWeight: 800,
+                    color: 'var(--text, #e6edf3)',
+                    letterSpacing: '0.04em',
+                    borderTop: '1px solid var(--border, #30363d)',
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--accent, #00d4ff)',
+                    }}
+                  />
+                  <span>{headerLabel}</span>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({count.toLocaleString()})</span>
+                </header>
+                <div className={gridClass} style={gridStyle}>
+                  {g.items.map(function(item, idx) {
+                    var cardId = item.item_id || item.id;
+                    return (
+                      <div
+                        key={g.id + '::' + cardId}
+                        data-card-id={cardId}
+                        data-card-index={idx}
+                      >
+                        <CatalogCard
+                          item={item}
+                          profile={profile}
+                          tier={tier}
+                          onClick={onItemClick}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={sentinelRef}>
+      {toolbar}
       {/* Top spacer — preserves scrollbar geometry for unmounted rows.
           height=0 when virtualization is off (catalog under threshold). */}
       {virt.topSpacer > 0 && (

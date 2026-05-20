@@ -229,15 +229,42 @@ async function resolveCatalog() {
   };
 }
 
+// Wave-16: parse the `?hide_providers=A,B,C` query param into a normalised
+// Set of provider_ids the caller wants stripped from the response. Returns
+// null when the param is empty/missing so the filter is a no-op (and
+// Cloudflare's edge cache shares the unfiltered entry). Accepts both
+// hyphenated ("iptv-org") and underscored ("iptv_org") spellings so the
+// client store key normalisation doesn't break server-side filtering.
+function parseHideProviders(raw) {
+  if (typeof raw !== 'string' || raw.length === 0) { return null; }
+  if (raw.length > 256) { return null; } // defeat absurdly long inputs
+  var parts = raw.split(',');
+  var set = {};
+  var count = 0;
+  for (var i = 0; i < parts.length; i++) {
+    var p = (parts[i] || '').trim().toLowerCase();
+    if (!p) { continue; }
+    if (!/^[a-z0-9_-]{1,32}$/.test(p)) { continue; }
+    set[p] = true;
+    if (p === 'iptv-org') { set['iptv_org'] = true; }
+    else if (p === 'iptv_org') { set['iptv-org'] = true; }
+    count += 1;
+  }
+  if (count === 0) { return null; }
+  return set;
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/catalog
 // Optional query params:
 //   ?profile_id=dave_tv|mom_tv   — filters by profile_access (when present)
 //   ?provider_id=apollo_group|xtremehd|iptv-org|jellyfin|all — provider filter
+//   ?hide_providers=A,B,C        — wave-16 visibility toggle (server-side)
 // ---------------------------------------------------------------------------
 router.get('/api/catalog', async function(req, res) {
   var profile_id = req.query.profile_id;
   var provider_id = req.query.provider_id;
+  var hiddenSet = parseHideProviders(req.query.hide_providers);
 
   if (profile_id !== undefined && VALID_PROFILES.indexOf(profile_id) === -1) {
     return res.status(400).json({
@@ -292,6 +319,44 @@ router.get('/api/catalog', async function(req, res) {
     });
   }
 
+  // --- Wave-16 hide_providers filter ---
+  // Drop items whose only providers are in the hidden set. Items with at
+  // least one source NOT in the hidden set survive (consistent with the
+  // client-side filter in App.jsx).
+  var hiddenDropped = 0;
+  if (hiddenSet) {
+    var before = items.length;
+    items = items.filter(function(item) {
+      var anyVisible = false;
+      var anySource = false;
+      if (Array.isArray(item.sources)) {
+        for (var i = 0; i < item.sources.length; i++) {
+          var sid = item.sources[i] && item.sources[i].provider_id;
+          if (!sid) { continue; }
+          anySource = true;
+          if (!hiddenSet[sid]) { anyVisible = true; break; }
+        }
+      }
+      if (!anyVisible && Array.isArray(item.providers)) {
+        for (var j = 0; j < item.providers.length; j++) {
+          var pid = item.providers[j] && item.providers[j].provider_id;
+          if (!pid) { continue; }
+          anySource = true;
+          if (!hiddenSet[pid]) { anyVisible = true; break; }
+        }
+      }
+      if (!anyVisible && typeof item.provider === 'string') {
+        anySource = true;
+        if (!hiddenSet[item.provider]) { anyVisible = true; }
+      }
+      // Items with no providers at all are NEVER dropped by this filter —
+      // only items naming a provider can be hidden.
+      if (!anySource) { return true; }
+      return anyVisible;
+    });
+    hiddenDropped = before - items.length;
+  }
+
   // Mom-mode quality sort: 4K first, HDR-flagged higher.
   if (profile_id === 'mom_tv' && !isJellyfin) {
     items.sort(function(a, b) {
@@ -317,6 +382,10 @@ router.get('/api/catalog', async function(req, res) {
     m3u_count: resolved.m3u_count,
     m3u_providers: resolved.m3u_providers,
     merged_duplicates: resolved.merged_duplicates || 0,
+    // Wave-16: how many items the hide_providers query param dropped.
+    // 0 when the param is missing — the catalog is unfiltered.
+    hidden_dropped: hiddenDropped,
+    hidden_providers: hiddenSet ? Object.keys(hiddenSet) : [],
   };
 
   res.json({ catalog: items, total: items.length, _meta: _meta });
