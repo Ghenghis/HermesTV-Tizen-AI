@@ -95,6 +95,102 @@ function getProviders() {
   });
 }
 
+// Wave-20 — multi-provider CRUD endpoints backing the AddProviderModal.
+// Every payload is JSON. The server returns MASKED rows (no username /
+// password) on every endpoint except /parse-qr (which returns the parsed
+// candidate fields back to the same client that just submitted the raw
+// QR text, so the confirm sub-step can pre-fill the form).
+function listProviders() {
+  return fetchWithTimeout(BASE_URL + '/api/providers').then(function(response) {
+    if (!response.ok) { throw makeNetworkError('Providers list failed: HTTP ' + response.status); }
+    return response.json();
+  });
+}
+
+function addProvider(body) {
+  return fetchWithTimeout(BASE_URL + '/api/providers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  }).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      if (!response.ok && response.status !== 201) {
+        var msg = (parsed && parsed.errors && parsed.errors.length > 0)
+          ? parsed.errors.join('; ')
+          : ('Add provider failed: HTTP ' + response.status);
+        var err = new Error(msg);
+        err.status = response.status;
+        err.body = parsed;
+        throw err;
+      }
+      return parsed;
+    });
+  });
+}
+
+function updateProvider(id, patch) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  }).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      if (!response.ok) {
+        var msg = (parsed && parsed.errors && parsed.errors.length > 0)
+          ? parsed.errors.join('; ')
+          : ('Update provider failed: HTTP ' + response.status);
+        var err = new Error(msg);
+        err.status = response.status;
+        err.body = parsed;
+        throw err;
+      }
+      return parsed;
+    });
+  });
+}
+
+function removeProvider(id) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/' + encodeURIComponent(id), {
+    method: 'DELETE',
+  }).then(function(response) {
+    if (response.status === 204) { return { ok: true }; }
+    return response.json().then(function(parsed) {
+      var err = new Error((parsed && parsed.message) || ('Remove provider failed: HTTP ' + response.status));
+      err.status = response.status;
+      err.body = parsed;
+      throw err;
+    });
+  });
+}
+
+function testProvider(id) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/' + encodeURIComponent(id) + '/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  }, 15000).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      return parsed;
+    });
+  });
+}
+
+function parseQrText(text) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/parse-qr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: String(text || '') }),
+  }).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      return parsed;
+    });
+  });
+}
+
 function getCatalog() {
   return fetchWithTimeout(BASE_URL + '/api/catalog').then(function(response) {
     if (!response.ok) {
@@ -252,4 +348,6 @@ export {
   submitCommand, validateCommand, startPlayback,
   startDownload, listDownloads, cancelDownload,
   createPairing, getPairingStatus,
+  // Wave-20 multi-provider CRUD
+  listProviders, addProvider, updateProvider, removeProvider, testProvider, parseQrText,
 };

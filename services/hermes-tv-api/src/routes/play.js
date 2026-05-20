@@ -103,6 +103,14 @@ function _streamExtFor(itemId) {
   return '';
 }
 
+function _looksLikeHlsManifest(url) {
+  if (typeof url !== 'string') { return false; }
+  var lower = url.toLowerCase();
+  return lower.indexOf('.m3u8') !== -1 ||
+    lower.indexOf('type=m3u') !== -1 ||
+    lower.indexOf('output=m3u8') !== -1;
+}
+
 // Wave-13: build the ordered sources[] array for a clicked item, using
 // the latest catalog merge if available. Falls back to the legacy
 // providers[] shape so a /api/play that arrives before /api/catalog has
@@ -429,7 +437,7 @@ function _streamHandler(req, res) {
       catch (_) { /* setHeader after writeHead — ignore */ }
     }
 
-    if (resolved.credential_bearing) {
+    if (resolved.credential_bearing && _looksLikeHlsManifest(resolved.url)) {
       // In-API HLS proxy path (wave-11). Fetch the upstream playlist
       // server-side, rewrite every segment URL to /api/proxy/<ticket>/seg/<b64>,
       // and serve the rewritten body. The credential never reaches the client.
@@ -471,6 +479,35 @@ function _streamHandler(req, res) {
         });
     }
 
+    if (resolved.credential_bearing) {
+      return hlsProxy.proxyDirectStream({
+        upstreamUrl: resolved.url,
+        ticket: req.params.ticket,
+        req: req,
+        res: res,
+        deferErrors: true,
+      })
+        .then(function() {
+          try { streamProbe.recordProviderOutcome(providerId, true); }
+          catch (_) { /* probe lib unavailable — non-fatal */ }
+          if (pickedIndex >= 0 && t.internal) { t.internal.current_source_index = pickedIndex; }
+        })
+        .catch(function(err) {
+          var sanLogDirect = require('../lib/sanitizeLog').sanitizeForLog;
+          var msgDirect = (err && err.message) ? err.message : 'unknown';
+          try { streamProbe.recordProviderOutcome(providerId, false); }
+          catch (_) { /* */ }
+          failures.push({
+            provider_id: providerId,
+            reason: 'direct_stream_failed',
+            detail: sanLogDirect(msgDirect),
+          });
+          console.log('[play] source ' + i + ' (' + providerId + ') failed: ' + sanLogDirect(msgDirect) + ', advancing to source ' + (i + 1));
+          if (!res.headersSent) { return _tryNext(i + 1); }
+          return null;
+        });
+    }
+
     // Clean public URL — 302 to the upstream CDN. We treat this as a
     // success at the API layer (the upstream redirect target's own
     // reachability is the browser's problem after this point).
@@ -483,7 +520,9 @@ function _streamHandler(req, res) {
   return _tryNext(0);
 }
 
-router.get(/^\/api\/play\/([^\/]+)\/stream(?:\.m3u8|\.mpd)?$/, _streamHandler);
+var STREAM_ROUTE_RE = /^\/api\/play\/([^\/]+)\/stream(?:\.m3u8|\.mpd)?$/;
+router.head(STREAM_ROUTE_RE, _streamHandler);
+router.get(STREAM_ROUTE_RE, _streamHandler);
 
 /**
  * GET /api/play/:ticket/sources

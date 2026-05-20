@@ -67,3 +67,9 @@ docs/research/vps-phase-1-audit-RUN-*.md
 # These are produced on every test run and never belong in source control.
 tests/playwright/test-results/
 tests/playwright/report/
+
+# Wave-20: operator provider credentials live in the API container's writable
+# data/ volume — never committed to git. The lib/providerStore.js write path
+# also chmod's the file to 0600 on POSIX.
+services/hermes-tv-api/data/providers.json
+services/hermes-tv-api/data/providers.json.tmp-*

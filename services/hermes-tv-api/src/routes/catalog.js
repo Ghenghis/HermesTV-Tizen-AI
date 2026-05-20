@@ -24,7 +24,7 @@ var sanitizeLog = require('../lib/sanitizeLog').sanitizeForLog;
 var router = Router();
 
 var VALID_PROFILES = ['dave_tv', 'mom_tv'];
-var VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'iptv-org', 'jellyfin', 'all'];
+var VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'xtream', 'iptv-org', 'jellyfin', 'all'];
 
 // X-Catalog-Source header values surfaced to the client so DevTools / Settings
 // can render a "Live Jellyfin" / "iptv-org" / "operator providers" / "empty"
@@ -127,24 +127,25 @@ async function resolveCatalog() {
   // Operator-pasted M3U providers (Apollo Group, xTremeHD).
   var m3uCount = 0;
   var m3uProviders = null;
-  if (m3uClient.isEnabled()) {
-    try {
-      var m3uItems = await m3uClient.fetchCatalog({ limit: 600 });
-      if (Array.isArray(m3uItems) && m3uItems.length > 0) {
-        m3uCount = m3uItems.length;
-        baseItems = baseItems.concat(m3uItems);
-        if (baseSource === SRC_NONE) {
-          baseSource = SRC_PROVIDERS_ONLY;
-        } else {
-          baseSource = SRC_MERGED;
-        }
+  try {
+    // Always call fetchCatalog. Disk-backed providers are discovered through
+    // providerRegistry asynchronously, so a cold-start isEnabled() check can
+    // be stale before the first registry snapshot is loaded.
+    var m3uItems = await m3uClient.fetchCatalog({ limit: 600 });
+    if (Array.isArray(m3uItems) && m3uItems.length > 0) {
+      m3uCount = m3uItems.length;
+      baseItems = baseItems.concat(m3uItems);
+      if (baseSource === SRC_NONE) {
+        baseSource = SRC_PROVIDERS_ONLY;
+      } else {
+        baseSource = SRC_MERGED;
       }
-      // Status is reported even on zero items so Settings can show
-      // "configured but fetch failed" diagnostics.
-      m3uProviders = m3uClient.getProviderStatus();
-    } catch (err) {
-      console.warn('[catalog] m3u merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
     }
+    // Status is reported even on zero items so Settings can show
+    // "configured but fetch failed" diagnostics.
+    m3uProviders = m3uClient.getProviderStatus();
+  } catch (err) {
+    console.warn('[catalog] m3u merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
   }
 
   // Xtream Codes panel (the de-facto paid-IPTV REST API). Activates when the
@@ -155,37 +156,27 @@ async function resolveCatalog() {
   // across xTreme + m3u + iptv-org.
   var xtreamCount = 0;
   var xtreamStatus = null;
-  if (xtreamClient.isEnabled()) {
-    try {
-      var live = await xtreamClient.getLiveStreams();
-      var vod = await xtreamClient.getVodStreams();
-      var series = await xtreamClient.getSeriesList();
-      var xtreamItems = [];
-      var addBatch = function(arr, type) {
-        if (!Array.isArray(arr)) { return; }
-        for (var xi = 0; xi < arr.length; xi++) {
-          try {
-            var shaped = xtreamClient.toHermesItem(arr[xi], type);
-            if (shaped) { xtreamItems.push(shaped); }
-          } catch (_) { /* malformed — skip */ }
-        }
-      };
-      addBatch(live, 'live');
-      addBatch(vod, 'vod');
-      addBatch(series, 'series');
-      if (xtreamItems.length > 0) {
-        xtreamCount = xtreamItems.length;
-        baseItems = baseItems.concat(xtreamItems);
-        if (baseSource === SRC_NONE) {
-          baseSource = SRC_PROVIDERS_ONLY;
-        } else {
-          baseSource = SRC_MERGED;
-        }
+  try {
+    // Same cold-start rule as M3U: fetchAll* refreshes providerRegistry first.
+    var live = await xtreamClient.fetchAllLive();
+    var vod = await xtreamClient.fetchAllVod();
+    var series = await xtreamClient.fetchAllSeries();
+    var xtreamItems = [];
+    if (Array.isArray(live)) { for (var li = 0; li < live.length; li++) { xtreamItems.push(live[li]); } }
+    if (Array.isArray(vod)) { for (var vi = 0; vi < vod.length; vi++) { xtreamItems.push(vod[vi]); } }
+    if (Array.isArray(series)) { for (var si = 0; si < series.length; si++) { xtreamItems.push(series[si]); } }
+    if (xtreamItems.length > 0) {
+      xtreamCount = xtreamItems.length;
+      baseItems = baseItems.concat(xtreamItems);
+      if (baseSource === SRC_NONE) {
+        baseSource = SRC_PROVIDERS_ONLY;
+      } else {
+        baseSource = SRC_MERGED;
       }
-      try { xtreamStatus = xtreamClient.getProviderStatus(); } catch (_) { xtreamStatus = null; }
-    } catch (err) {
-      console.warn('[catalog] xtream merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
     }
+    try { xtreamStatus = xtreamClient.getProviderStatus(); } catch (_) { xtreamStatus = null; }
+  } catch (err) {
+    console.warn('[catalog] xtream merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
   }
 
   // Cross-provider title merge. If three providers all carry "ESPN" the user
@@ -273,10 +264,12 @@ router.get('/api/catalog', async function(req, res) {
     });
   }
 
-  if (provider_id !== undefined && VALID_PROVIDERS.indexOf(provider_id) === -1) {
+  if (provider_id !== undefined &&
+      VALID_PROVIDERS.indexOf(provider_id) === -1 &&
+      !/^(m3u|xtream|stalker)-prov-[a-f0-9]{8}$/i.test(provider_id)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: "Invalid provider_id '" + provider_id + "'. Valid values: apollo_group, xtremehd, iptv-org, jellyfin, all",
+      message: "Invalid provider_id '" + provider_id + "'. Use all, a known provider id, or a registry-backed provider id.",
     });
   }
 
@@ -381,6 +374,8 @@ router.get('/api/catalog', async function(req, res) {
     iptv_org_count: resolved.iptv_org_count,
     m3u_count: resolved.m3u_count,
     m3u_providers: resolved.m3u_providers,
+    xtream_count: resolved.xtream_count,
+    xtream_status: resolved.xtream_status,
     merged_duplicates: resolved.merged_duplicates || 0,
     // Wave-16: how many items the hide_providers query param dropped.
     // 0 when the param is missing — the catalog is unfiltered.

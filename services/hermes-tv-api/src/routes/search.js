@@ -88,15 +88,25 @@ function _filterByProfile(items, profileId) {
 }
 
 function _projectItem(item) {
-  return {
+  var projected = {
     id: item.id,
     title: item.title,
     type: item.type,
     category: item.category,
+    provider: item.provider || null,
     poster_url: item.poster_url || null,
     logo_url: item.logo_url || null,
     resolution: (item.metadata && item.metadata.resolution) || item.resolution || null,
+    metadata: item.metadata || null,
   };
+  if (Array.isArray(item.providers)) {
+    projected.providers = item.providers;
+  }
+  if (Array.isArray(item.sources)) {
+    projected.sources = item.sources;
+    projected.preferred_source = item.sources[0] || null;
+  }
+  return projected;
 }
 
 // ─── GET /api/search?q=...&profile_id=...&type=... ───────────────────────────

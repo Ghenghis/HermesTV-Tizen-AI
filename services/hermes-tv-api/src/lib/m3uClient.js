@@ -29,6 +29,10 @@
  */
 
 var SANITIZE = require('./sanitizeLog').sanitizeForLog;
+// Provider truth contract: all provider config flows through the registry,
+// not directly through env or providerStore. We keep a synchronous snapshot
+// for resolver/status callers, refreshed by fetchCatalog().
+var providerRegistry = require('./providerRegistry');
 
 var CACHE_TTL_MS = 5 * 60 * 1000;
 var FETCH_TIMEOUT_MS = 15000;
@@ -37,6 +41,10 @@ var MAX_ITEMS_PER_PROVIDER = 1500;
 // Per-provider cache: { items, streamsByLocalId, fetchedAt, error }
 var _cache = {};
 var _inFlight = {};
+
+// Synchronous snapshot of providerRegistry.listFull() m3u rows. Each entry:
+// { cacheKey, provider_id, url, label, registry_id, source }.
+var _registrySnapshot = [];
 
 var PROVIDER_DEFS = {
   apollo_group: { envVar: 'APOLLO_M3U_URL', label: 'Apollo Group' },
@@ -52,11 +60,38 @@ function _providerUrl(providerId) {
   return (typeof url === 'string' && url.trim().length > 0) ? url.trim() : null;
 }
 
+// Async hook so fetchCatalog can refresh the registry snapshot. Best-effort:
+// on read error we keep the previous snapshot.
+async function _refreshRegistrySnapshot() {
+  try {
+    var rows = await providerRegistry.listFull();
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r && r.type === 'm3u' && r.enabled !== false && typeof r.url === 'string' && r.url.length > 0) {
+        var isEnv = r.source === 'env';
+        var cacheKey = isEnv ? (r.provider_id || String(r.id || '').replace(/^env-/, '')) : r.id;
+        out.push({
+          cacheKey: cacheKey,
+          provider_id: r.provider_id || cacheKey,
+          url: r.url,
+          label: r.label || r.provider_id || r.id,
+          registry_id: r.id,
+          source: r.source || 'config',
+        });
+      }
+    }
+    _registrySnapshot = out;
+  } catch (e) {
+    console.warn('[m3uClient] registry snapshot refresh failed: ' + SANITIZE(e && e.message ? e.message : 'unknown'));
+  }
+}
+
 function isEnabled() {
   for (var k in PROVIDER_DEFS) {
     if (_providerUrl(k)) { return true; }
   }
-  return false;
+  return _registrySnapshot.length > 0;
 }
 
 // Parse a single `#EXTINF:` line into an attribute map.
@@ -150,7 +185,7 @@ function _safeLogo(url) {
   return url;
 }
 
-function _mapToHermes(providerId, parsed) {
+function _mapToHermes(cacheKey, providerId, parsed) {
   var items = [];
   var streamsByLocalId = {};
   for (var i = 0; i < parsed.length; i++) {
@@ -160,7 +195,7 @@ function _mapToHermes(providerId, parsed) {
     var group = p['group-title'] || 'general';
     var logo = _safeLogo(p['tvg-logo']);
     var localId = tvgId ? _slug(tvgId) : _slug(name) + '-' + i;
-    var hermesId = 'm3u-' + providerId + '-' + localId;
+    var hermesId = 'm3u-' + cacheKey + '-' + localId;
     var resolution = _detectResolution(name, group);
     streamsByLocalId[localId] = p._url;
     items.push({
@@ -187,8 +222,13 @@ function _mapToHermes(providerId, parsed) {
   return { items: items, streamsByLocalId: streamsByLocalId };
 }
 
-function _fetchProvider(providerId) {
-  var url = _providerUrl(providerId);
+// _fetchProvider supports both env-configured providers (URL looked up via
+// PROVIDER_DEFS) and store-backed providers (URL passed explicitly via
+// overrideUrl). The cache and in-flight tables are keyed by providerId so
+// store rows with their unique `prov-<hex>` IDs never collide with the
+// well-known `apollo_group` / `xtremehd` keys.
+function _fetchProvider(providerId, overrideUrl, catalogProviderId) {
+  var url = (typeof overrideUrl === 'string' && overrideUrl.length > 0) ? overrideUrl : _providerUrl(providerId);
   if (!url) {
     return Promise.resolve({ items: [], streamsByLocalId: {}, fetchedAt: _now(), error: 'not_configured' });
   }
@@ -209,7 +249,7 @@ function _fetchProvider(providerId) {
     })
     .then(function(text) {
       var parsed = _parseM3U(text);
-      var mapped = _mapToHermes(providerId, parsed);
+      var mapped = _mapToHermes(providerId, catalogProviderId || providerId, parsed);
       var result = {
         items: mapped.items,
         streamsByLocalId: mapped.streamsByLocalId,
@@ -263,8 +303,8 @@ function _getAnyCached(providerId) {
 async function fetchCatalog(opts) {
   opts = opts || {};
   var limit = (typeof opts.limit === 'number' && opts.limit > 0) ? opts.limit : 600;
-  var providerIds = Object.keys(PROVIDER_DEFS).filter(_providerUrl);
-  if (providerIds.length === 0) { return []; }
+  await _refreshRegistrySnapshot();
+  if (_registrySnapshot.length === 0) { return []; }
 
   // Stale-while-revalidate. Live measurement on 2026-05-20 showed that when
   // the 5-min TTL expired, the next /api/catalog request blocked ~30 s waiting
@@ -282,14 +322,15 @@ async function fetchCatalog(opts) {
   //     populates the cold cache before user traffic typically arrives.
   var results = [];
   var coldFetches = [];
-  for (var k = 0; k < providerIds.length; k++) {
-    var pid = providerIds[k];
+  for (var k = 0; k < _registrySnapshot.length; k++) {
+    var row = _registrySnapshot[k];
+    var pid = row.cacheKey;
     var any = _getAnyCached(pid);
     var fresh = _getFreshCached(pid);
     if (any) { results.push(any); }
     if (!fresh) {
       // Kick off refresh, but never await on the request path.
-      var p = _fetchProvider(pid);
+      var p = _fetchProvider(pid, row.url, row.provider_id);
       if (!any) {
         // Cold cache — race the fetch against a 2 s hedge so the first
         // request after boot can still return SOMETHING if pre-warm hasn't
@@ -338,10 +379,23 @@ async function fetchCatalog(opts) {
  */
 function _resolveStreamUrl(hermesChannelId) {
   if (typeof hermesChannelId !== 'string') { return null; }
+  // Registry-backed providers use IDs of shape `prov-<hex>`. The
+  // hermes ID then becomes `m3u-prov-<hex>-<localId>`. We greedy-match the
+  // first hyphen-group; if the resulting providerId is `prov` we know it's
+  // a store row and need to re-split to capture `prov-<hex>` as the
+  // provider key plus the rest as the localId.
   var m = /^m3u-([^-]+)-(.+)$/.exec(hermesChannelId);
   if (!m) { return null; }
   var providerId = m[1];
   var localId = m[2];
+  if (providerId === 'prov') {
+    // Re-split: providerId is `prov-<hex>`, localId is everything after.
+    var m2 = /^m3u-(prov-[a-f0-9]+)-(.+)$/.exec(hermesChannelId);
+    if (m2) {
+      providerId = m2[1];
+      localId = m2[2];
+    }
+  }
   var c = _cache[providerId];
   if (!c || !c.streamsByLocalId) { return null; }
   return c.streamsByLocalId[localId] || null;
@@ -364,6 +418,22 @@ function getProviderStatus() {
       age_ms: c ? (_now() - c.fetchedAt) : null,
     };
   });
+  // Surface every registry-backed provider too. Their cacheKey is
+  // `prov-<hex>` so they slot into the same map without colliding with the
+  // env-configured well-known keys.
+  for (var i = 0; i < _registrySnapshot.length; i++) {
+    var row = _registrySnapshot[i];
+    var cc = _cache[row.cacheKey];
+    status[row.provider_id] = {
+      configured: true,
+      label: row.label,
+      count: cc ? cc.items.length : 0,
+      error: cc ? cc.error : null,
+      age_ms: cc ? (_now() - cc.fetchedAt) : null,
+      registry_id: row.registry_id,
+      source: row.source,
+    };
+  }
   return status;
 }
 

@@ -1,0 +1,21 @@
+{
+  "timestamp": "20260520-180916",
+  "mode": "empty-state",
+  "base": "http://127.0.0.1:3199",
+  "env": {
+    "APOLLO_M3U_URL": null,
+    "XTREMEHD_M3U_URL": null,
+    "XTREAM_URL": null,
+    "XTREAM_USERNAME": null,
+    "XTREAM_PASSWORD": null,
+    "JELLYFIN_URL": null,
+    "JELLYFIN_API_KEY": null,
+    "IPTV_ORG_ENABLED": null
+  },
+  "pass": [
+    "empty_providers",
+    "empty_catalog_honest"
+  ],
+  "fail": [],
+  "notes": []
+}
