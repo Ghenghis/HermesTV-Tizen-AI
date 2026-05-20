@@ -30,6 +30,34 @@ var INSTRUCTION_SPOKEN = INSTRUCTION_STEPS.join(' ');
 // reads "DaveTV".
 var BRAND_LABEL = 'DaveTV';
 
+// Remote-pair flow: replaces the provider-import copy. The QR encodes a deep
+// link into /remote.html?pair=HRM-XXXX so the phone immediately wakes up as a
+// trackpad + D-pad + voice button. We narrate the same sub-text so Mom can
+// hear what the link will do before tapping it.
+var REMOTE_PAIR_HEADING = 'Scan to control ' + BRAND_LABEL + ' from your phone';
+var REMOTE_PAIR_SUBTEXT =
+  'Open the link on your phone — your phone becomes a remote with a trackpad, ' +
+  'D-pad, and voice button.';
+var REMOTE_PAIR_SPOKEN = REMOTE_PAIR_SUBTEXT + ' ' + INSTRUCTION_SPOKEN;
+
+// Build the QR-encoded target URL for the remote-pair flow. We use the
+// browser origin (protocol + host + optional port) so the phone hits the
+// same Vite/nginx host serving the TV. SSR / opaque-origin contexts fall
+// back to a relative URL — phones scanning at runtime always have origin,
+// but the relative form keeps unit tests / pre-render hydration happy.
+function _buildRemotePairUrl(pairingCode) {
+  var safeCode = pairingCode || '';
+  var path = '/remote.html?pair=' + encodeURIComponent(safeCode);
+  if (typeof window === 'undefined' || !window.location) { return path; }
+  var loc = window.location;
+  var origin = loc.origin;
+  if (!origin) {
+    if (loc.protocol && loc.host) { origin = loc.protocol + '//' + loc.host; }
+  }
+  if (!origin) { return path; }
+  return origin + path;
+}
+
 // ── QR sizing ───────────────────────────────────────────────────────────────
 // Mom-mode (font-scale ≥ 1.25) must scan from the couch, so the QR has a
 // 256 px floor and scales up with font-scale. We pin the inner SVG to the
@@ -47,12 +75,20 @@ function _resolveFontScale() {
 
 // Simple static SVG QR code placeholder — black squares pattern.
 // Phase 2 will replace this with a real QR encoding the pairing URL
-// (tv.daveai.tech/setup/provider?code=HRM-XXXX). For Phase 1 the pairing
+// (tv.daveai.tech/setup/provider?code=HRM-XXXX in provider mode, or
+// /remote.html?pair=HRM-XXXX in remote-pair mode). For Phase 1 the pairing
 // code itself is the surface the operator types into their phone — the
-// QR pattern is decorative. Size is driven by props so the parent can
-// honour Mom's font-scale (min 256 px).
+// QR pattern is decorative. We expose the resolved target URL via
+// aria-label + data-qr-target so the real encoder swap is a one-liner,
+// and screen readers can still announce the destination today.
+// Size is driven by props so the parent can honour Mom's font-scale
+// (min 256 px).
 function QRPlaceholder(props) {
   var size = (props && typeof props.size === 'number' && props.size > 0) ? props.size : QR_BASE_PX;
+  var targetUrl = (props && typeof props.targetUrl === 'string') ? props.targetUrl : '';
+  var label = targetUrl
+    ? 'Pairing QR code — scan with your phone camera, opens ' + targetUrl
+    : 'Pairing QR code — scan with your phone camera';
   return (
     <svg
       width={size}
@@ -60,7 +96,8 @@ function QRPlaceholder(props) {
       viewBox="0 0 100 100"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Pairing QR code — scan with your phone camera"
+      aria-label={label}
+      data-qr-target={targetUrl || undefined}
       style={{ display: 'block', shapeRendering: 'crispEdges' }}
     >
       <rect width="100" height="100" fill="#ffffff" />
@@ -169,6 +206,13 @@ function QROnboarding(props) {
   var online = props.online !== false; // default true unless explicitly offline
   var onCompleted = props.onCompleted; // optional — called when status flips to 'completed'
   var profile = props.profile || null; // optional — needed to gate the TTS button
+  // mode='remote-pair' swaps the heading + sub-text + QR target so the QR
+  // deep-links into /remote.html?pair=<code> (phone becomes a remote with
+  // trackpad + D-pad + voice). Default mode keeps the legacy provider-import
+  // copy so existing call sites (OnboardingWizard, Settings ▸ Providers) are
+  // unchanged.
+  var mode = props.mode === 'remote-pair' ? 'remote-pair' : 'provider';
+  var isRemotePairMode = mode === 'remote-pair';
 
   var initialState = {
     pairingCode: null,        // string from POST /api/pair (or 'HRM-MOCK' offline)
@@ -368,7 +412,11 @@ function QROnboarding(props) {
     // narration of an action prompt.
     var p;
     try {
-      p = voiceClient.speak(INSTRUCTION_SPOKEN, {
+      // spokenScript is resolved per-mode further down in render. We re-read
+      // it here from the same heuristic so the speech matches the visible
+      // copy regardless of which mode the modal opened in.
+      var script = (mode === 'remote-pair') ? REMOTE_PAIR_SPOKEN : INSTRUCTION_SPOKEN;
+      p = voiceClient.speak(script, {
         profile: profile,
         intent: 'command_confirmation',
       });
@@ -439,6 +487,21 @@ function QROnboarding(props) {
   var isLoading = pairState.status === 'loading';
   var showRefreshButton = pairState.isStale && (pairState.status === 'pending' || pairState.status === 'expired');
   var showSpeakButton = !!profile && voiceEnabled && pairState.status !== 'completed';
+
+  // Mode-driven copy: heading, dialog aria-label, instruction sub-text and
+  // the spoken script for the TTS button. The QR data target also flips —
+  // in provider mode the static placeholder stays, in remote-pair mode the
+  // SVG carries the deep link into /remote.html?pair=<code>.
+  var headingText = isRemotePairMode
+    ? REMOTE_PAIR_HEADING
+    : 'Add a Provider to ' + BRAND_LABEL;
+  var dialogAriaLabel = isRemotePairMode
+    ? REMOTE_PAIR_HEADING
+    : 'Add a Provider to ' + BRAND_LABEL;
+  var subTextLine = isRemotePairMode ? REMOTE_PAIR_SUBTEXT : null;
+  var qrTargetUrl = isRemotePairMode
+    ? _buildRemotePairUrl(pairState.pairingCode)
+    : '';
 
   var statusBlock;
   if (pairState.status === 'completed') {
@@ -589,7 +652,7 @@ function QROnboarding(props) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={'Add a Provider to ' + BRAND_LABEL}
+      aria-label={dialogAriaLabel}
       onKeyDown={handleKeyDown}
       onClick={handleOverlayClick}
       className="hermes-modal-overlay"
@@ -637,8 +700,23 @@ function QROnboarding(props) {
             textAlign: 'center',
           }}
         >
-          Add a Provider to {BRAND_LABEL}
+          {headingText}
         </h2>
+
+        {subTextLine ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: 'calc(0.95rem * var(--font-scale, 1))',
+              color: 'var(--muted)',
+              textAlign: 'center',
+              lineHeight: '1.45',
+              maxWidth: '90%',
+            }}
+          >
+            {subTextLine}
+          </p>
+        ) : null}
 
         <div
           style={{
@@ -653,7 +731,7 @@ function QROnboarding(props) {
         >
           {isLoading
             ? <div data-qr-skeleton><QRSkeleton size={qrPixelSize} /></div>
-            : <QRPlaceholder size={qrPixelSize} />}
+            : <QRPlaceholder size={qrPixelSize} targetUrl={qrTargetUrl} />}
         </div>
 
         {/* Pairing code */}

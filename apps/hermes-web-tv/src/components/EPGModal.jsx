@@ -1,7 +1,8 @@
 import React from 'react';
 import EPGGrid from './EPGGrid.jsx';
-import { SkeletonRow } from './Skeleton.jsx';
 import { fetchEPG } from '../api/epgClient.js';
+import LoadingSkeleton from './LoadingSkeleton.jsx';
+import ErrorState from './ErrorState.jsx';
 
 // EPGModal — full-screen modal that wraps the shipped EPGGrid component.
 // Fetches /api/epg via the epgClient on mount, shows a skeleton while
@@ -86,6 +87,12 @@ function EPGModal(props) {
   var data = dataResult[0];
   var setData = dataResult[1];
 
+  // Bumped by the ErrorState retry button to force a re-fetch without
+  // changing isOpen / providerFilter / activeTab.
+  var retryResult = React.useState(0);
+  var retryNonce = retryResult[0];
+  var setRetryNonce = retryResult[1];
+
   // Esc / Tizen Back closes — keyboard nav inside the grid is owned by
   // EPGGrid itself, so we only handle the modal-level escape here.
   React.useEffect(function() {
@@ -124,7 +131,7 @@ function EPGModal(props) {
       setData({ status: 'error', channels: [], programs: [], errorMessage: msg });
     });
     return function() { cancelled = true; };
-  }, [isOpen, providerFilter, activeTab]);
+  }, [isOpen, providerFilter, activeTab, retryNonce]);
 
   if (!isOpen) { return null; }
 
@@ -286,53 +293,25 @@ function EPGModal(props) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '0.75rem' }}>
           {(data.status === 'idle' || data.status === 'loading') && (
             <div
-              role="status"
-              aria-live="polite"
-              aria-label="Loading TV guide"
               style={{
                 flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
                 padding: '0.5rem',
                 backgroundColor: 'var(--bg, #0d1117)',
                 borderRadius: 'var(--radius-md, 12px)',
                 overflow: 'hidden',
               }}
             >
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
+              <LoadingSkeleton variant="detail" />
             </div>
           )}
 
           {data.status === 'error' && (
-            <div
-              role="alert"
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.75rem',
-                color: 'var(--muted, #8b949e)',
-                textAlign: 'center',
-                padding: '2rem',
-              }}
-            >
-              <div style={{ fontSize: '2rem', color: '#e3b341' }}>&#x26A0;</div>
-              <div style={{ fontWeight: 600, fontSize: 'calc(1rem * var(--font-scale, 1))', color: 'var(--text, #e6edf3)' }}>
-                Could not load TV guide
-              </div>
-              <div style={{ fontSize: 'calc(0.85rem * var(--font-scale, 1))', maxWidth: '520px' }}>
-                {data.errorMessage}
-              </div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+              <ErrorState
+                title="Could not load TV guide"
+                message={data.errorMessage}
+                onRetry={function() { setRetryNonce(retryNonce + 1); }}
+              />
             </div>
           )}
 

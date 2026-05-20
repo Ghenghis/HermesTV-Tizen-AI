@@ -4,6 +4,7 @@ import App from './App.jsx';
 import './index.css';
 import './design/animations.css';
 import { installConsoleBuffer } from './utils/consoleBuffer.js';
+import { registerServiceWorker } from './registerSW.js';
 
 // Install the console ring buffer before React mounts so it captures
 // startup logs (Tizen API availability checks, profile bootstrap,
@@ -16,3 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
+// Service Worker — wired AFTER the React mount so SW install never blocks
+// first paint. Only registers in production (no-op on localhost).
+registerServiceWorker();

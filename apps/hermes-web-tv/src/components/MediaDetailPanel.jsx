@@ -3,7 +3,7 @@ import ActorCard from './ActorCard.jsx';
 import StreamingQualityBar from './StreamingQualityBar.jsx';
 import SourceComparePanel from './SourceComparePanel.jsx';
 import SeriesEpisodesBlock from './SeriesEpisodesBlock.jsx';
-import { SkeletonRow } from './Skeleton.jsx';
+import LoadingSkeleton from './LoadingSkeleton.jsx';
 import ParentalLockOverlay from './ParentalLockOverlay.jsx';
 import useParentalGate from '../hooks/useParentalGate.js';
 import { getSkipIntro, setSkipIntro } from '../store/skipIntroPrefStore.js';
@@ -701,11 +701,7 @@ function MediaDetailPanel(props) {
                   })}
                 </div>
               ) : (
-                <div aria-label="Loading cast" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <SkeletonRow />
-                  <SkeletonRow />
-                  <SkeletonRow />
-                </div>
+                <LoadingSkeleton variant="rail" count={4} />
               )}
             </div>
           )}
@@ -881,9 +877,7 @@ function MediaDetailPanel(props) {
                 Recommendations coming soon — we'll surface titles based on cast, genre, and watch history.
               </div>
             </div>
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
+            <LoadingSkeleton variant="rail" count={5} />
           </div>
         </div>
       </div>
