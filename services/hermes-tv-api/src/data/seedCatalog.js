@@ -30,44 +30,44 @@
 // Artwork helpers — see also the KNOWN_LOGOS / KNOWN_POSTERS maps below.
 //
 // Without real artwork the shells (NetflixShell, TiviMate, Zero, Apple TV,
-// Samsung, Mom Mode, Dave Power) fall back to coloured gradients because
-// `item.poster` / `item.poster_url` are absent. To make the catalog look
-// like a real lineup on a freshly-deployed VPS we attach:
+// Samsung, Mom Mode, Dave Power) render a deterministic gradient + 2-letter
+// initials tile via apps/hermes-web-tv/src/utils/channelArt.js. We attach
+// real artwork URLs when we have them and `null` otherwise — the web layer
+// recognises null and falls through to the gradient placeholder.
 //
 //   * logo_url    — Wikipedia Commons thumb URL for ~50 well-known networks,
-//                   picsum.photos placeholder (seeded by slug) for the rest.
-//                   Shape: square-ish channel logo.
+//                   null when unknown. Shape: square-ish channel logo.
 //   * poster_url  — TMDb /t/p/w500 path for a handful of famous titles,
-//                   picsum.photos placeholder (seeded by slug) otherwise.
-//                   Shape: 2:3 portrait poster.
+//                   null when unknown. Shape: 2:3 portrait poster.
 //   * poster      — alias of poster_url (the 6 OG shells read item.poster,
 //                   ZeroShell + CatalogCard read item.poster_url). Carrying
 //                   both keeps every shell happy without changing render code.
+//   * thumb       — landscape thumb URL (480x270) when available, else null.
 //
-// All of these are free-tier public CDNs (Wikipedia upload.wikimedia.org,
-// TMDb image.tmdb.org, picsum.photos). No credentials, no API calls — direct
-// image URLs only. The web app's CSP allows img-src 'self' data: blob: http:
-// https: so all three hosts are reachable from the TV.
+// Why null and not a picsum.photos placeholder? Before wave-9 the catalog
+// shipped picsum.photos URLs for every unknown slug, producing random nature
+// photos labelled with channel names like "ESPN" and "Bloomberg" — the user
+// reported this as "broken/oversized" art. Channel logos are square / wide;
+// movie posters are 2:3 portrait; a random photo crammed into either slot
+// looks visibly wrong. Returning null lets the client render a clean
+// initials-on-gradient tile that matches the card's aspect-ratio.
+//
+// All real-artwork hosts are free-tier public CDNs (Wikipedia
+// upload.wikimedia.org, TMDb image.tmdb.org). No credentials, no API calls —
+// direct image URLs only. The web app's CSP allows img-src 'self' data:
+// blob: http: https: so both hosts are reachable from the TV.
 //
 // When the operator wires real providers (Jellyfin / Threadfin / iptv-org),
 // those adapters supply their own poster_url / logo_url and this seed is
 // replaced wholesale.
 // ---------------------------------------------------------------------------
 
-// picsum.photos returns a deterministic image keyed by the seed; the same
-// slug always renders the same poster, so the catalog is stable across
-// rebuilds and the operator's eye can recognise a tile they tab past
-// (instead of getting a roulette of random photos).
-function picsumPoster(slug)  { return 'https://picsum.photos/seed/htv-' + slug + '/300/450'; }
-function picsumLogo(slug)    { return 'https://picsum.photos/seed/htv-logo-' + slug + '/200/200'; }
-function picsumThumb(slug)   { return 'https://picsum.photos/seed/htv-thumb-' + slug + '/480/270'; }
-
 // ---------------------------------------------------------------------------
 // KNOWN_LOGOS — Wikipedia Commons thumb URLs for well-known live channels.
 // Picked for stability (long-standing Commons files) and reasonable file
 // sizes (240px thumb wrappers around the original SVG/PNG). Anything not in
-// this map gets a picsum placeholder so the tile still renders artwork
-// rather than a coloured gradient.
+// this map returns null from logoFor() so the web layer renders a
+// channelArt gradient tile with the channel's initials instead.
 // ---------------------------------------------------------------------------
 var KNOWN_LOGOS = {
   // Sports
@@ -150,8 +150,9 @@ var KNOWN_LOGOS = {
 // ---------------------------------------------------------------------------
 // KNOWN_POSTERS — TMDb /t/p/w500 image paths for movies and series the
 // operator is likely to recognise. The paths come from TMDb's public image
-// CDN (no API key needed for asset GETs). Anything not in this map gets a
-// picsum placeholder so every card still has artwork.
+// CDN (no API key needed for asset GETs). Anything not in this map returns
+// null from posterFor() so the web layer renders a channelArt gradient
+// tile with the title's initials instead.
 // ---------------------------------------------------------------------------
 var TMDB_BASE = 'https://image.tmdb.org/t/p/w500';
 var KNOWN_POSTERS = {
@@ -191,8 +192,12 @@ var KNOWN_POSTERS = {
   'sherlock':                   TMDB_BASE + '/7WTsnHkbA0FaG6R9twfFde0I9hl.jpg',
 };
 
-function logoFor(slug)    { return KNOWN_LOGOS[slug] || picsumLogo(slug); }
-function posterFor(slug)  { return KNOWN_POSTERS[slug] || picsumPoster(slug); }
+// Return real artwork when known, null otherwise. The web layer
+// (apps/hermes-web-tv/src/utils/channelArt.js) generates a deterministic
+// gradient + initials tile when these are null, which looks correct at
+// every aspect ratio (square logo slots, 2:3 poster slots, 16:9 thumbs).
+function logoFor(slug)    { return KNOWN_LOGOS[slug] || null; }
+function posterFor(slug)  { return KNOWN_POSTERS[slug] || null; }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -212,13 +217,12 @@ function liveItem(seq, opts) {
       },
     };
   });
-  // Live channels: logo_url is the channel bug (Wikipedia logo when known);
-  // poster_url / poster / thumb give shells that draw a card background
-  // something to show besides a gradient. Same image is fine — picsum keeps
-  // every channel visually distinct because the seed is the slug.
+  // Live channels: logo_url is the channel bug (Wikipedia logo when known,
+  // null otherwise). poster_url / thumb mirror the logo when we have one;
+  // when we don't, all artwork fields are null and the web layer renders
+  // a channelArt initials-on-gradient tile (see utils/channelArt.js). No
+  // more picsum.photos random nature photos labelled with network names.
   var logo = logoFor(opts.slug);
-  var poster = picsumPoster(opts.slug);
-  var thumb = picsumThumb(opts.slug);
   return {
     id: id,
     type: 'live',
@@ -226,10 +230,10 @@ function liveItem(seq, opts) {
     provider: providers[0] ? providers[0].provider_id : 'apollo_group',
     category: opts.category,
     logo_url: logo,
-    poster_url: poster,
-    poster: poster,
-    thumb: thumb,
-    thumbnail_url: thumb,
+    poster_url: logo,
+    poster: logo,
+    thumb: logo,
+    thumbnail_url: logo,
     profile_access: opts.profile_access || ['dave_tv', 'mom_tv'],
     providers: providers,
     metadata: {
@@ -255,10 +259,11 @@ function vodItem(seq, opts) {
     };
   });
   // Movies: TMDb poster when known (Top Gun, Dune, Oppenheimer, etc.),
-  // picsum 2:3 portrait placeholder otherwise. No logo for VOD — the field
+  // null otherwise — the web layer falls through to a channelArt initials
+  // tile so an unknown movie still renders a clean 2:3 placeholder rather
+  // than a random photo cropped to portrait. No logo for VOD — the field
   // is kept for backwards compat with shells that fall back to it.
   var poster = posterFor(opts.slug);
-  var thumb = picsumThumb(opts.slug);
   return {
     id: id,
     type: 'vod',
@@ -268,8 +273,8 @@ function vodItem(seq, opts) {
     logo_url: poster,
     poster_url: poster,
     poster: poster,
-    thumb: thumb,
-    thumbnail_url: thumb,
+    thumb: poster,
+    thumbnail_url: poster,
     profile_access: opts.profile_access || ['dave_tv', 'mom_tv'],
     providers: providers,
     metadata: {
@@ -298,9 +303,9 @@ function seriesItem(seq, opts) {
     };
   });
   // Series: TMDb poster when known (Stranger Things, Severance, The Bear,
-  // ...), picsum 2:3 portrait otherwise.
+  // ...), null otherwise — the web layer renders a channelArt initials
+  // tile so unknown series still get a clean 2:3 placeholder.
   var poster = posterFor(opts.slug);
-  var thumb = picsumThumb(opts.slug);
 
   // Optional series-only metadata — kept additive so callers that don't
   // set the new fields render exactly the same shape they did before
@@ -334,8 +339,8 @@ function seriesItem(seq, opts) {
     logo_url: poster,
     poster_url: poster,
     poster: poster,
-    thumb: thumb,
-    thumbnail_url: thumb,
+    thumb: poster,
+    thumbnail_url: poster,
     profile_access: opts.profile_access || ['dave_tv', 'mom_tv'],
     providers: providers,
     metadata: metadata,
@@ -426,8 +431,10 @@ var DEMO_DEFS = [
 ];
 
 function liveDemoItem(def) {
-  var poster = picsumPoster(def.slug);
-  var thumb = picsumThumb(def.slug);
+  // Demo channels always carry a real logo URL (i.imgur.com or Wikipedia
+  // Commons — see DEMO_DEFS above). Mirror the logo into the poster /
+  // thumb slots so every shell renders the same channel bug; the web
+  // layer's channelArt path only fires if the operator strips the logo.
   return {
     id: def.id,
     type: 'live',
@@ -436,10 +443,10 @@ function liveDemoItem(def) {
     category: def.category,
     resolution: def.resolution,
     logo_url: def.logo_url,
-    poster_url: poster,
-    poster: poster,
-    thumb: thumb,
-    thumbnail_url: thumb,
+    poster_url: def.logo_url,
+    poster: def.logo_url,
+    thumb: def.logo_url,
+    thumbnail_url: def.logo_url,
     profile_access: ['dave_tv', 'mom_tv'],
     providers: [
       {

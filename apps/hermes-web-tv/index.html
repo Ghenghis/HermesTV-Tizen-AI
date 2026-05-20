@@ -9,9 +9,9 @@
   <!-- DNS prefetch + preconnect: app pulls poster art + channel logos from
        these CDNs. Pairs every dns-prefetch with a preconnect so Tizen 6.5
        opens the TCP socket during HTML parse — first card render drops by
-       ~150-300 ms on cold network state. -->
-  <link rel="dns-prefetch" href="https://picsum.photos">
-  <link rel="preconnect" href="https://picsum.photos" crossorigin>
+       ~150-300 ms on cold network state. Wave-9 dropped picsum.photos —
+       the catalog no longer ships random nature placeholders, the web
+       layer renders a deterministic gradient + initials tile instead. -->
   <link rel="dns-prefetch" href="https://upload.wikimedia.org">
   <link rel="preconnect" href="https://upload.wikimedia.org" crossorigin>
   <link rel="dns-prefetch" href="https://static.wikia.nocookie.net">

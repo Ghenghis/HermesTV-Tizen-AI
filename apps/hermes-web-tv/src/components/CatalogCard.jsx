@@ -5,6 +5,7 @@ import * as watchHistoryStore from '../store/watchHistoryStore.js';
 import useFavorites from '../hooks/useFavorites.js';
 import WatchlistButton from './WatchlistButton.jsx';
 import { installLongPress } from '../utils/touchGestures.js';
+import { getChannelArt } from '../utils/channelArt.js';
 
 var CONTENT_TYPE_LABELS = {
   live: 'LIVE',
@@ -110,16 +111,35 @@ function CatalogCard(props) {
   // Poster source — live items prefer landscape thumbs (then logo as a
   // last resort), VOD prefers the 2:3 poster. Falling back the other way
   // is what stretched a square channel logo into a portrait box.
+  //
+  // Reject picsum.photos URLs — pre-wave-9 the seed catalog shipped random
+  // nature photos under those URLs labelled with channel names, which read
+  // as broken art. Null-out picsum so the channelArt placeholder fires.
+  function _realArt(u) {
+    return typeof u === 'string' && u.length > 0 && u.indexOf('picsum.photos') === -1;
+  }
+  function _pick() {
+    for (var i = 0; i < arguments.length; i++) {
+      if (_realArt(arguments[i])) { return arguments[i]; }
+    }
+    return null;
+  }
   var posterUrl;
   if (isLive) {
     posterUrl = isEnhanced
-      ? (item.thumbnail_url || item.logo_url || item.poster_url || null)
-      : (item.thumbnail_url || item.logo_url || null);
+      ? _pick(item.thumbnail_url, item.logo_url, item.poster_url)
+      : _pick(item.thumbnail_url, item.logo_url);
   } else {
     posterUrl = isEnhanced
-      ? (item.poster_url || item.thumbnail_url || item.logo_url || null)
-      : (item.thumbnail_url || item.poster_url || item.logo_url || null);
+      ? _pick(item.poster_url, item.thumbnail_url, item.logo_url)
+      : _pick(item.thumbnail_url, item.poster_url, item.logo_url);
   }
+
+  // Resolve the channelArt placeholder once so the empty-poster branch and
+  // the focus ring share a stable gradient. Two-letter initials over a
+  // deterministic gradient — looks correct at every aspect ratio (16:9
+  // live, 2:3 VOD/series) and never shows a wrong-aspect random photo.
+  var art = getChannelArt(item);
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -189,16 +209,24 @@ function CatalogCard(props) {
           position: 'relative',
           width: '100%',
           aspectRatio: aspectStr,
-          background: 'linear-gradient(135deg, #1f2430, #11151c)',
+          // When no real art is present, use the channelArt gradient so the
+          // tile reads as branded (matching initials overlay below) rather
+          // than a dark void. The neutral grey gradient is only used when
+          // an <img> covers the slot.
+          background: posterUrl
+            ? 'linear-gradient(135deg, #1f2430, #11151c)'
+            : 'linear-gradient(135deg,' + art.gradient[0] + ',' + art.gradient[1] + ')',
           overflow: 'hidden',
           flexShrink: 0,
         }}
       >
-        {posterUrl && (
+        {posterUrl ? (
           <img
             src={posterUrl}
             alt=""
             aria-hidden="true"
+            loading="lazy"
+            decoding="async"
             style={{
               position: 'absolute',
               inset: 0,
@@ -211,6 +239,25 @@ function CatalogCard(props) {
               backgroundColor: isLive ? 'rgba(0,0,0,0.35)' : 'transparent',
             }}
           />
+        ) : (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'rgba(255,255,255,0.95)',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              fontSize: 'clamp(1.4rem, 3.2vw, 2.6rem)',
+              textShadow: '0 2px 12px rgba(0,0,0,0.45)',
+              fontFamily: 'system-ui,-apple-system,sans-serif',
+            }}
+          >
+            {art.initials}
+          </div>
         )}
 
         {/* Heart toggle — sits in the top-right of the poster, doubles as a

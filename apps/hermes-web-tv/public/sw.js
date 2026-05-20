@@ -10,7 +10,7 @@
 //     yesterday's HTML instantly while we fetch fresh in the background.
 //   - /api/*                            → ALWAYS network; never cache the
 //     dynamic backend.
-//   - Cross-origin (Cloudflare, picsum, Wikimedia) → bypass; let the
+//   - Cross-origin (Cloudflare, Wikimedia, TMDb, imgur) → bypass; let the
 //     browser's HTTP cache handle these.
 //
 // Cache version bump (CACHE_NAME) discards the previous cache on next

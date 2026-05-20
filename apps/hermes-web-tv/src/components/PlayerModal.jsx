@@ -999,6 +999,8 @@ function PlayerModal(props) {
               <img
                 src={item.logo_url}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 style={{ width: (momMode ? '52px' : '40px'), height: (momMode ? '52px' : '40px'), borderRadius: '10px', objectFit: 'contain', background: 'rgba(255,255,255,0.06)', padding: '4px', flexShrink: 0 }}
                 onError={function(e) { e.currentTarget.style.display = 'none'; }}
               />
@@ -1140,7 +1142,7 @@ function PlayerModal(props) {
                         onMouseLeave={function(e) { if (!active) { e.currentTarget.style.background = 'transparent'; } }}
                       >
                         {ch.logo_url && (
-                          <img src={ch.logo_url} alt="" style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} onError={function(e) { e.currentTarget.style.display = 'none'; }} />
+                          <img src={ch.logo_url} alt="" loading="lazy" decoding="async" style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} onError={function(e) { e.currentTarget.style.display = 'none'; }} />
                         )}
                         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ch.title || ch.name || 'Channel ' + ch.id}</span>
                       </button>
