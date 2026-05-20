@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import ZeroHero from '../components/zero/ZeroHero.jsx';
 import ZeroNowNext from '../components/zero/ZeroNowNext.jsx';
@@ -70,9 +71,9 @@ function _formatStar(rating) {
 function _buildSidebarSections(catalog, momMode) {
   var counts = { live: 0, movies: 0, series: 0 };
   (catalog || []).forEach(function(it) {
-    if (it.type === 'live') { counts.live++; }
-    else if (it.type === 'movies' || it.type === 'movie') { counts.movies++; }
-    else if (it.type === 'series') { counts.series++; }
+    if (isLive(it)) { counts.live++; }
+    else if (isMovie(it)) { counts.movies++; }
+    else if (isSeries(it)) { counts.series++; }
   });
   if (momMode) {
     // Three rails, one icon each, big counts. No Trakt, no downloads, no
@@ -237,11 +238,11 @@ function ZeroShell(props) {
 
   var displayItems = filtered;
   if (activeTab === 'live') {
-    displayItems = displayItems.filter(function(i) { return i.type === 'live'; });
+    displayItems = displayItems.filter(function(i) { return isLive(i); });
   } else if (activeTab === 'movies') {
-    displayItems = displayItems.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
+    displayItems = displayItems.filter(function(i) { return isMovie(i); });
   } else if (activeTab === 'series') {
-    displayItems = displayItems.filter(function(i) { return i.type === 'series'; });
+    displayItems = displayItems.filter(function(i) { return isSeries(i); });
   }
   // catchup tab: same list for now — actual TV-archive endpoint lands when
   // operator wires a catch-up source. The tab is visible regardless so users
@@ -310,13 +311,13 @@ function ZeroShell(props) {
   var dateLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   // Live channels list — fed to the ZeroChannelStrip when on the Live tab.
-  var liveChannels = filtered.filter(function(i) { return i.type === 'live'; });
+  var liveChannels = filtered.filter(function(i) { return isLive(i); });
   // Now/next placeholder — when the API surfaces EPG-window per channel
   // we'll feed those programs in; for now we render the empty-state row so
   // the layout reserves the right vertical space.
   var nowProgram = null;
   var nextProgram = null;
-  if (focusedItem && focusedItem.type === 'live') {
+  if (focusedItem && isLive(focusedItem)) {
     nowProgram = (focusedItem.epg && focusedItem.epg.now) || null;
     nextProgram = (focusedItem.epg && focusedItem.epg.next) || null;
   }

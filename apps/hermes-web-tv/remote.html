@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:3001 http://localhost:5173 http://hermestv.local https://hermestv.local; connect-src 'self' http://localhost:3001 http://hermestv.local https://hermestv.local http://192.168.0.0/16; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-inline'">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>DaveTV Remote</title>
+  <style>
+    /* Inline boot styles so a slow JS chunk doesn't flash a white screen on
+       the operator's phone — full dark background is up before Vite mounts. */
+    html, body, #root {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #0d1117;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body { touch-action: manipulation; }
+  </style>
+</head>
+<body><div id="root"></div><script type="module" src="/src/remote/main-remote.jsx"></script></body>
+</html>
