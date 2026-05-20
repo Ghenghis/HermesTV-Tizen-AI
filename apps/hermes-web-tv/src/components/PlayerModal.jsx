@@ -31,6 +31,10 @@ import playbackPositionStore from '../store/playbackPositionStore.js';
 
 var IDLE_MS = 3000;
 
+// Wave-15 — auto-retry on 503 stream_temporarily_unavailable.
+var MAX_RETRIES = 3;
+var RETRY_DELAY_MS = 5000;
+
 // Media type from URL — feeds the Chromecast receiver so the right
 // HLS / progressive pipeline is selected on the cast device.
 function mediaTypeFromUrl(url) {
@@ -233,10 +237,26 @@ function PlayerModal(props) {
   var streamUrl = streamUrlState[0];
   var setStreamUrl = streamUrlState[1];
 
+  // Wave-15: auto-retry counter (0..MAX_RETRIES). Bumped on each 503 with
+  // status === "stream_temporarily_unavailable", reset whenever the active
+  // ticket changes.
+  var retryCountState = React.useState(0);
+  var retryCount = retryCountState[0];
+  var setRetryCount = retryCountState[1];
+
+  // Wave-15: forcibly advance to the next source when the user clicks
+  // "Try another source". Increments a counter that re-triggers the
+  // stream-resolution effect with a `?source_index=N+1` hint.
+  var manualSourceIndexState = React.useState(-1);
+  var manualSourceIndex = manualSourceIndexState[0];
+  var setManualSourceIndex = manualSourceIndexState[1];
+
   // ── Refs ──────────────────────────────────────────────────────────────
   var videoRef = React.useRef(null);
   var containerRef = React.useRef(null);
   var idleTimerRef = React.useRef(null);
+  // Holds the active retry setTimeout id so a re-mount can cancel it.
+  var retryTimerRef = React.useRef(null);
 
   var item = (ticket && ticket.item) || {};
   var provider = (ticket && ticket.provider) || {};
@@ -268,7 +288,15 @@ function PlayerModal(props) {
   // (item, profile) pairing gets a fresh chance to resume.
   React.useEffect(function() {
     seekedItemIdRef.current = null;
-  }, [item && item.id, profileId]);
+    // Also reset the wave-15 auto-retry counter + manual source override
+    // so a fresh ticket starts with a clean attempt budget.
+    setRetryCount(0);
+    setManualSourceIndex(-1);
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, [item && item.id, profileId]); // eslint-disable-line
 
   // Flush any pending throttled position writes when the modal closes so the
   // user's last frame survives, e.g., when they hit Close right after a seek.
@@ -288,42 +316,97 @@ function PlayerModal(props) {
   }, [isOpen]);
 
   // ── Stream resolution ─────────────────────────────────────────────────
+  // Wave-15: the /api/play/:ticket/stream endpoint may return:
+  //   - 302 → public URL (iptv-org HLS) — we let the browser follow it
+  //   - 200 → rewritten HLS playlist (operator-proxy mode)
+  //   - 503 status:"stream_temporarily_unavailable" → ALL sources tried
+  //     and failed. We auto-retry up to MAX_RETRIES with a RETRY_DELAY_MS
+  //     pause between attempts and show "Trying alternate stream..." UI
+  //     instead of the old "Operator must wire credentials" text.
+  //   - Other 4xx/5xx → hard error.
+  //
+  // The retry budget resets when ticket changes (handled in the earlier
+  // effect that also resets the resume-seek flag).
   React.useEffect(function() {
     if (!ticket || !ticket.stream_endpoint) { return undefined; }
     var cancelled = false;
-    setStreamState({ status: 'loading', message: 'Connecting to stream...' });
+
+    // If a manual source advance was requested, append ?source_index=N to
+    // the stream endpoint so the server pins that source first. We keep
+    // the .m3u8/.mpd suffix when present.
+    var endpoint = ticket.stream_endpoint;
+    if (manualSourceIndex >= 0) {
+      var sep = endpoint.indexOf('?') === -1 ? '?' : '&';
+      endpoint = endpoint + sep + 'source_index=' + manualSourceIndex;
+    }
+
+    var attemptMsg = 'Connecting to stream...';
+    if (retryCount > 0) {
+      attemptMsg = 'Trying alternate stream... (attempt ' + (retryCount + 1) + ' of ' + (MAX_RETRIES + 1) + ')';
+    } else if (manualSourceIndex >= 0) {
+      attemptMsg = 'Trying alternate stream...';
+    }
+    setStreamState({ status: 'loading', message: attemptMsg });
     setStreamUrl('');
-    // The /api/play/:ticket/stream endpoint either:
-    //   - 302-redirects to a public URL (iptv-org HLS),
-    //   - returns 200 with the bytes (operator-proxy mode),
-    //   - returns 503 with a "pipeline not configured" message,
-    //   - returns 4xx/5xx with a JSON error envelope.
-    // For HLS we cannot wire the redirected URL into hls.js by following
-    // it ourselves (CORS preflight + 302 = headache). Instead we just
-    // hand the proxy URL directly to the <video>/hls.js — the redirect
-    // will be followed transparently by the browser/MSE engine.
-    fetch(ticket.stream_endpoint, { method: 'HEAD' }).then(function(r) {
+
+    // Helper — schedule another /api/play call after the gap.
+    function scheduleAutoRetry() {
+      if (cancelled) { return; }
+      if (retryCount >= MAX_RETRIES) {
+        setStreamState({
+          status: 'error',
+          message: 'All upstream sources are unreachable right now. Try another channel, or use "Try another source" to attempt a different server.',
+        });
+        return;
+      }
+      if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); }
+      retryTimerRef.current = setTimeout(function() {
+        retryTimerRef.current = null;
+        if (cancelled) { return; }
+        setRetryCount(function(n) { return n + 1; });
+      }, RETRY_DELAY_MS);
+    }
+
+    // The HEAD probe gives us the redirect target without downloading the
+    // playlist. For HLS we cannot wire the redirected URL into hls.js by
+    // following it ourselves (CORS preflight + 302 = headache). Instead
+    // we just hand the proxy URL directly to the <video>/hls.js — the
+    // redirect will be followed transparently by the browser/MSE engine.
+    fetch(endpoint, { method: 'HEAD' }).then(function(r) {
       if (cancelled) { return; }
       if (r.ok || r.status === 200 || (r.status >= 200 && r.status < 400)) {
         // Use the redirect target URL if HEAD followed it, else the
         // original endpoint. r.url is the final URL after redirects.
-        var resolved = (r.url && r.url !== ticket.stream_endpoint) ? r.url : ticket.stream_endpoint;
+        var resolved = (r.url && r.url !== endpoint) ? r.url : endpoint;
         setStreamUrl(resolved);
         setStreamState({ status: 'streaming', message: 'Stream ready' });
         if (isLive) { setLiveStartedAt(Date.now()); }
         return;
       }
       // Try GET to get the JSON error body
-      fetch(ticket.stream_endpoint).then(function(r2) {
+      fetch(endpoint).then(function(r2) {
         if (cancelled) { return; }
         r2.json().then(function(j) {
           if (cancelled) { return; }
+          var transient = r2.status === 503 &&
+            j && j.status === 'stream_temporarily_unavailable';
+          if (transient) {
+            // Friendly transient state — keep "loading" status so the UI
+            // doesn't flash an error, and schedule the auto-retry.
+            setStreamState({
+              status: 'loading',
+              message: 'Trying alternate stream... we will keep trying.',
+            });
+            scheduleAutoRetry();
+            return;
+          }
           if (r2.status === 503) {
             setStreamState({
               status: 'pending_operator',
               message: (j && j.message) ||
-                'Player pipeline is being wired. Paste provider credentials per docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md',
+                'No source is currently available for this channel. We will try again automatically.',
             });
+            scheduleAutoRetry();
           } else {
             setStreamState({ status: 'error', message: (j && j.message) || ('HTTP ' + r2.status) });
           }
@@ -340,12 +423,18 @@ function PlayerModal(props) {
       // HEAD often blocked on cross-origin redirects — fall back to
       // optimistic stream and let the <video>/hls.js engine report errors.
       if (cancelled) { return; }
-      setStreamUrl(ticket.stream_endpoint);
+      setStreamUrl(endpoint);
       setStreamState({ status: 'streaming', message: 'Stream ready' });
       if (isLive) { setLiveStartedAt(Date.now()); }
     });
-    return function() { cancelled = true; };
-  }, [ticket, isLive]); // eslint-disable-line
+    return function() {
+      cancelled = true;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, [ticket, isLive, retryCount, manualSourceIndex]); // eslint-disable-line
 
   // ── EPG fetch (live channels only) ─────────────────────────────────────
   React.useEffect(function() {
@@ -921,10 +1010,10 @@ function PlayerModal(props) {
                 {(streamState.status === 'pending_operator' || streamState.status === 'error') && (
                   <div style={{ textAlign: 'center', maxWidth: '560px' }}>
                     <div style={{ fontSize: '2.25rem', color: streamState.status === 'pending_operator' ? '#e3b341' : 'var(--accent, #1f6feb)', marginBottom: '0.75rem' }}>
-                      {streamState.status === 'pending_operator' ? '🔧' : '⚠'}
+                      {streamState.status === 'pending_operator' ? 'Retry' : 'Unable'}
                     </div>
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
-                      {streamState.status === 'pending_operator' && 'Stream pipeline pending'}
+                      {streamState.status === 'pending_operator' && 'Trying alternate stream...'}
                       {streamState.status === 'error' && 'Stream unavailable'}
                     </div>
                     <div style={{ color: 'var(--muted, #8b949e)', fontSize: '0.9rem', lineHeight: 1.5 }}>
@@ -933,9 +1022,61 @@ function PlayerModal(props) {
                   </div>
                 )}
                 {(streamState.status === 'loading' || streamState.status === 'idle') && (
-                  <div role="status" aria-live="polite" style={{ color: 'var(--muted, #8b949e)', fontSize: '0.9rem', textAlign: 'center' }}>
-                    {streamState.status === 'loading' ? (streamState.message || 'Preparing stream…') : 'Requesting playback ticket…'}
+                  <div role="status" aria-live="polite" style={{ color: 'var(--muted, #8b949e)', fontSize: '0.9rem', textAlign: 'center', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: '14px', height: '14px',
+                        border: '2px solid rgba(255,255,255,0.18)',
+                        borderTopColor: 'var(--accent, #1f6feb)',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: reducedMotion ? 'none' : 'hermes-spin 0.8s linear infinite',
+                      }}
+                    />
+                    <span>
+                      {streamState.status === 'loading' ? (streamState.message || 'Preparing stream…') : 'Requesting playback ticket…'}
+                    </span>
                   </div>
+                )}
+                {/* Wave-15 — "Try another source" button. Visible whenever a
+                    retry would help: while loading after a retry, while in
+                    the transient pending_operator state, or after the
+                    hard-error fallback. We surface it as long as the
+                    ticket has >1 source the user could pick from. */}
+                {ticket && Array.isArray(ticket.sources) && ticket.sources.length > 1 && streamState.status !== 'streaming' && (
+                  <button
+                    type="button"
+                    onClick={function(e) {
+                      e.stopPropagation();
+                      bumpActivity();
+                      // Cancel any pending auto-retry — the user is taking
+                      // manual control.
+                      if (retryTimerRef.current) {
+                        clearTimeout(retryTimerRef.current);
+                        retryTimerRef.current = null;
+                      }
+                      var sourcesLen = (ticket && ticket.sources) ? ticket.sources.length : 1;
+                      var base = manualSourceIndex >= 0 ? manualSourceIndex : 0;
+                      var next = (base + 1) % sourcesLen;
+                      setManualSourceIndex(next);
+                      setRetryCount(0);
+                    }}
+                    style={{
+                      marginTop: '0.4rem',
+                      padding: '0.6rem 1.1rem',
+                      borderRadius: '999px',
+                      border: '1px solid rgba(255,255,255,0.22)',
+                      background: 'rgba(255,255,255,0.10)',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 'calc(0.85rem * ' + fontScale + ')',
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    Try another source
+                  </button>
                 )}
               </div>
             </div>
@@ -1323,10 +1464,10 @@ function PlayerModal(props) {
           </div>
         </div>
 
-        {/* Inline keyframes for pulse */}
+        {/* Inline keyframes for pulse + spin */}
         {!reducedMotion && (
           <style>
-            {'@keyframes hermes-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }'}
+            {'@keyframes hermes-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } } @keyframes hermes-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'}
           </style>
         )}
       </div>
