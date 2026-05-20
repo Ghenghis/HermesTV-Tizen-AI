@@ -80,6 +80,26 @@ const ACTORS = [
 // client) replaces this seed at runtime.
 const CATALOG_ITEMS = SEED_CATALOG;
 
+// Seed `live-NNN` items (live-100..live-219 today, see data/seedCatalog.js
+// liveItem()) point at fake `source_id` values that no real provider has.
+// They exist purely so a fresh VPS with no provider credentials still
+// renders a populated catalog. Once a real provider (iptv-org public CDN
+// or operator-pasted M3U) loads channels, the seed live items become
+// unplayable noise — clicking them lands at /api/play with 503 stream_unresolved
+// because streamResolver has no branch for the bare `live-NNN` ID.
+//
+// We keep `live-demo-*` (real iptv-org demo channels — NASA TV, France 24)
+// and we keep VOD + series (real movie content) regardless. Only the
+// `live-NNN` placeholders are dropped, and only when a real provider's
+// channels are available to fill in for them.
+function isUnplayableSeedLive(item) {
+  if (!item || typeof item.id !== 'string') { return false; }
+  if (item.type !== 'live') { return false; }
+  if (item.id.indexOf('live-') !== 0) { return false; }
+  if (item.id.indexOf('live-demo-') === 0) { return false; }
+  return true;
+}
+
 // Resolution sort order for quality-aware sorting (higher index = higher quality)
 const RESOLUTION_ORDER = {
   '4K': 4,
@@ -196,6 +216,24 @@ async function resolveCatalog() {
     }
   }
 
+  // Wave-11: dedupe the seed `live-NNN` placeholders once a real provider
+  // has loaded its channels. Those seed items reference fake source_id
+  // values (`apo-live-...` / `xtr-live-...`) that no real provider has,
+  // so /api/play returns 503 stream_unresolved when clicked. Hiding them
+  // when real channels exist means Mom + Dave only see playable channels.
+  //
+  // Safety net: if BOTH real-provider fetches yielded zero items (Apollo
+  // unreachable AND iptv-org disabled), we leave the seeds in so the
+  // catalog still has content — better an unplayable channel than a
+  // blank shelf during a provider outage.
+  var realProviderCount = m3uCount + iptvOrgCount;
+  var seedDeduped = 0;
+  if (realProviderCount > 0) {
+    var before = baseItems.length;
+    baseItems = baseItems.filter(function(it) { return !isUnplayableSeedLive(it); });
+    seedDeduped = before - baseItems.length;
+  }
+
   return {
     items: baseItems,
     source: baseSource,
@@ -203,6 +241,7 @@ async function resolveCatalog() {
     iptv_org_data_age_h: iptvOrgAge,
     m3u_count: m3uCount,
     m3u_providers: m3uProviders,
+    seed_deduped: seedDeduped,
   };
 }
 
@@ -292,6 +331,7 @@ router.get('/api/catalog', async (req, res) => {
     iptv_org_count: resolved.iptv_org_count,
     m3u_count: resolved.m3u_count,
     m3u_providers: resolved.m3u_providers,
+    seed_deduped: resolved.seed_deduped || 0,
   };
 
   res.json({ catalog: items, total: items.length, _meta });

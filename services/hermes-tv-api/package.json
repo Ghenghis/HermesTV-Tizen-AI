@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node ../../tools/schema-validate.js && node ./test/playlists.smoke.js && node ./test/xmltv.smoke.js"
+    "test": "node ../../tools/schema-validate.js && node ./test/playlists.smoke.js && node ./test/xmltv.smoke.js && node ./test/hlsProxy.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

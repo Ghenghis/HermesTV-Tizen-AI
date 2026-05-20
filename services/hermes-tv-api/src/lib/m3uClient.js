@@ -253,18 +253,74 @@ function _getFreshCached(providerId) {
  * opts.limit (default 600) caps the total returned items to keep the
  * /api/catalog payload reasonable for the QN85 over LAN.
  */
+// Returns the cache entry for providerId regardless of TTL freshness.
+// Used by the stale-while-revalidate path so we can always answer the
+// catalog request instantly, even if every provider's data is stale.
+function _getAnyCached(providerId) {
+  return _cache[providerId] || null;
+}
+
 async function fetchCatalog(opts) {
   opts = opts || {};
   var limit = (typeof opts.limit === 'number' && opts.limit > 0) ? opts.limit : 600;
   var providerIds = Object.keys(PROVIDER_DEFS).filter(_providerUrl);
   if (providerIds.length === 0) { return []; }
-  var results = await Promise.all(providerIds.map(function(pid) {
-    var c = _getFreshCached(pid);
-    return c ? Promise.resolve(c) : _fetchProvider(pid);
-  }));
+
+  // Stale-while-revalidate. Live measurement on 2026-05-20 showed that when
+  // the 5-min TTL expired, the next /api/catalog request blocked ~30 s waiting
+  // for apollo's broken upstream to time out (15 s) + xtremehd's full re-parse.
+  // The user-visible symptom was a 1-minute page load.
+  //
+  // The new contract:
+  //   - If we have ANY cache for a provider (fresh or stale), use it now.
+  //   - If the cache is stale or absent, kick off a refresh in the background
+  //     so the next call sees fresh data — but never await it on the request
+  //     path.
+  //   - If a provider has no cache at all (cold boot, first request), we
+  //     still need real data, so we await up to 2 s and then bail to whatever
+  //     other providers responded. The pre-warm at server start (index.js)
+  //     populates the cold cache before user traffic typically arrives.
+  var results = [];
+  var coldFetches = [];
+  for (var k = 0; k < providerIds.length; k++) {
+    var pid = providerIds[k];
+    var any = _getAnyCached(pid);
+    var fresh = _getFreshCached(pid);
+    if (any) { results.push(any); }
+    if (!fresh) {
+      // Kick off refresh, but never await on the request path.
+      var p = _fetchProvider(pid);
+      if (!any) {
+        // Cold cache — race the fetch against a 2 s hedge so the first
+        // request after boot can still return SOMETHING if pre-warm hasn't
+        // landed yet.
+        coldFetches.push(p);
+      }
+      // Detach so unhandled-rejection telemetry stays clean.
+      if (p && typeof p.catch === 'function') { p.catch(function() {}); }
+    }
+  }
+
+  if (results.length === 0 && coldFetches.length > 0) {
+    try {
+      var raced = await Promise.race([
+        Promise.all(coldFetches),
+        new Promise(function(resolve) { setTimeout(function() { resolve(null); }, 2000); }),
+      ]);
+      if (Array.isArray(raced)) {
+        for (var rr = 0; rr < raced.length; rr++) {
+          if (raced[rr] && Array.isArray(raced[rr].items)) { results.push(raced[rr]); }
+        }
+      }
+    } catch (_) {
+      // race never throws (each fetch swallows its own errors), but be safe.
+    }
+  }
+
   var out = [];
   for (var i = 0; i < results.length && out.length < limit; i++) {
     var items = results[i].items;
+    if (!Array.isArray(items)) { continue; }
     for (var j = 0; j < items.length && out.length < limit; j++) {
       out.push(items[j]);
     }
