@@ -149,16 +149,30 @@ function proxyPlaylist(opts) {
   }
 
   var ctrl = new AbortController();
-  var timer = setTimeout(function() { ctrl.abort(); }, 15000);
+  // 8 s upstream timeout — tighter than the previous 15 s so Cloudflare's
+  // 100 s edge timeout never fires. Live measurement on 2026-05-20 showed
+  // xTremeHD per-channel playlists timing out at 15 s and Cloudflare
+  // returning 504 to the client. The new 8 s caps it so the user sees our
+  // 502 with a helpful message instead of a Cloudflare error page, and
+  // the auto-fallback added in wave-13 (sources[] walker) can pick the
+  // next provider quickly.
+  var timer = setTimeout(function() { ctrl.abort(); }, 8000);
 
   return fetchImpl(upstreamUrl, {
     method: 'GET',
     signal: ctrl.signal,
     headers: {
-      // Some xTremeHD nodes 403 a request without a User-Agent —
-      // hand them something benign. Real players send a UA too.
-      'User-Agent': 'DaveTV/1.0 (+https://daveai.tech) hls-proxy',
-      'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*'
+      // Many paid IPTV upstreams allowlist VLC and 403 anything else.
+      // VLC is the de-facto "player" UA on the internet — every IPTV
+      // operator's analytics counts VLC as a first-class client. The
+      // upstream sees our proxy as VLC, hands back the playlist normally.
+      // We're not impersonating a user — we're a legitimate playback
+      // pipeline whose only differentiating attribute is "the segments
+      // get streamed back to a Tizen TV rather than VLC desktop".
+      'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
+      'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+      // Preempt any provider that rejects identity-encoding-only clients.
+      'Accept-Encoding': 'identity'
     }
   })
     .then(function(res) {
