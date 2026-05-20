@@ -46,6 +46,12 @@ import ProfileManagementModal from './components/ProfileManagementModal.jsx';
 // so unlocks made in MediaDetailPanel apply at App level and vice versa.
 import ParentalLockOverlay from './components/ParentalLockOverlay.jsx';
 import useParentalGate from './hooks/useParentalGate.js';
+// Wave-4 standalone components shipped in PR #134; mount them here so they
+// actually render. Screensaver activates after N minutes idle; SleepTimer
+// fires a CustomEvent we listen for to close the active player.
+import Screensaver from './components/Screensaver.jsx';
+import useScreensaverIdle from './hooks/useScreensaverIdle.js';
+import SleepTimer, { useSleepTimer } from './components/SleepTimer.jsx';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -471,6 +477,33 @@ function App() {
   // the App level. See the import comment for why this duplicates the gate
   // already mounted inside MediaDetailPanel.
   var parentalGate = useParentalGate();
+
+  // ── Screensaver + Sleep Timer (wave-4 components) ──────────────────────────
+  // Activate the ambient screensaver after N minutes of no input. Default
+  // 10 min, override per-profile via profile.screensaver_min_idle. Both the
+  // hook and the overlay component were shipped in PR #134.
+  var screensaverIdleMin = (state.profile && state.profile.screensaver_min_idle) || 10;
+  var screensaverIdle = useScreensaverIdle(screensaverIdleMin);
+
+  // Head-less sleep-timer ticker — fires window CustomEvent on expiry. The
+  // SleepTimer modal (rendered at the bottom of this component) is the
+  // user-facing surface to set/cancel.
+  // eslint-disable-next-line no-unused-vars
+  var sleepTimer = useSleepTimer(state.profile);
+
+  var sleepTimerOpenResult = React.useState(false);
+  var sleepTimerOpen = sleepTimerOpenResult[0];
+  var setSleepTimerOpen = sleepTimerOpenResult[1];
+
+  // When the sleep timer fires, gracefully close any open player so the
+  // stream is released and the screen quiets down.
+  React.useEffect(function() {
+    function onSleepFire() {
+      patchState({ player: Object.assign({}, state.player || {}, { open: false }) });
+    }
+    window.addEventListener('hermes:sleep-timer-fire', onSleepFire);
+    return function() { window.removeEventListener('hermes:sleep-timer-fire', onSleepFire); };
+  }, []);
 
   React.useEffect(function() {
     function onGlobalKey(e) {
@@ -1295,7 +1328,12 @@ function App() {
 
   var profile = state.profile || {};
 
-  // Apply all four filters (provider + content + quality + actor) to the catalog
+  // Apply all four filters (provider + content + quality + actor) to the catalog.
+  // NOTE: We INTENTIONALLY don't useMemo this. There are conditional early
+  // returns above (loading + error branches) so a hook here would violate
+  // Rules of Hooks. The lazy-shells split (PR #135) already cut the boot
+  // bundle by 49%; this filter runs in <10 ms even on the full 1000+ item
+  // catalog and isn't a meaningful re-render cost.
   var filteredCatalog = applyFilters(
     state.catalog,
     state.providerFilter,
@@ -2010,6 +2048,27 @@ function App() {
             click, handlePlay, handleStartDownload). The overlay is eager-
             imported, so no Suspense wrap is needed. */}
         <ParentalLockOverlay {...parentalGate.overlayProps} />
+
+        {/* Sleep timer modal — toggled open via chatbot command or a future
+            header button. The head-less `useSleepTimer` hook above keeps the
+            countdown ticking even when this modal is closed. */}
+        {state.profile ? (
+          <SleepTimer
+            profile={state.profile}
+            isOpen={sleepTimerOpen}
+            onClose={function() { setSleepTimerOpen(false); }}
+          />
+        ) : null}
+
+        {/* Ambient screensaver — fades in after `screensaver_min_idle` minutes
+            of no input. Auto-dismisses on any keydown / mousemove / touch.
+            Sits at the very end of the tree so it covers every other modal. */}
+        {screensaverIdle.idle && state.profile ? (
+          <Screensaver
+            profile={state.profile}
+            onResume={function() { /* idle hook auto-resets on input */ }}
+          />
+        ) : null}
 
       </LayoutShell>
     </ThemeProvider>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,9 +83,9 @@ function DavePowerShell(props) {
     ? filtered.filter(function(i) { return (i.title || '').toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1; })
     : filtered;
 
-  var liveCount = (catalog || []).filter(function(i) { return i.type === 'live'; }).length;
-  var movieCount = (catalog || []).filter(function(i) { return i.type === 'movies' || i.type === 'movie'; }).length;
-  var seriesCount = (catalog || []).filter(function(i) { return i.type === 'series'; }).length;
+  var liveCount = (catalog || []).filter(function(i) { return isLive(i); }).length;
+  var movieCount = (catalog || []).filter(function(i) { return isMovie(i); }).length;
+  var seriesCount = (catalog || []).filter(function(i) { return isSeries(i); }).length;
   var qualityBreakdown = {};
   (catalog || []).forEach(function(i) {
     var q = (i.quality || 'Unknown').split(' ')[0];

@@ -3,6 +3,7 @@ import QualityBadge from './QualityBadge.jsx';
 import ProviderBadge from './ProviderBadge.jsx';
 import * as watchHistoryStore from '../store/watchHistoryStore.js';
 import useFavorites from '../hooks/useFavorites.js';
+import WatchlistButton from './WatchlistButton.jsx';
 
 var CONTENT_TYPE_LABELS = {
   live: 'LIVE',
@@ -239,6 +240,29 @@ function CatalogCard(props) {
               </svg>
             )}
           </button>
+        )}
+
+        {/* Watchlist (Save for Later) toggle — sits left-of the heart so the
+            user has two distinct affordances: heart = "love it" (synced to
+            favorites store), plus = "watch later" (per-profile watchlist).
+            Wrap in a span that stops propagation so click/keyboard activation
+            on the inner button doesn't bubble to the card's outer onClick. */}
+        {item && item.id && (
+          <span
+            onClick={function(e) { e.stopPropagation(); }}
+            onKeyDown={function(e) {
+              if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); }
+            }}
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '42px',
+              zIndex: 3,
+              display: 'inline-flex',
+            }}
+          >
+            <WatchlistButton profile={profile} item={item} />
+          </span>
         )}
       </div>
 

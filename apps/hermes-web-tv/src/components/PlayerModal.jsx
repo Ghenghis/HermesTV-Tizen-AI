@@ -1,6 +1,7 @@
 import React from 'react';
 import { SkeletonBlock } from './Skeleton.jsx';
 import ChromecastButton from './ChromecastButton.jsx';
+import TimeShiftOverlay from './TimeShiftOverlay.jsx';
 import useWatchProgress from '../hooks/useWatchProgress.js';
 import useHlsStream from '../hooks/useHlsStream.js';
 import { fetchEPG } from '../api/epgClient.js';
@@ -832,22 +833,27 @@ function PlayerModal(props) {
         {/* ── Video surface ──────────────────────────────────────────── */}
         <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
           {!error && streamState.status === 'streaming' && (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onPlay={function() { setPlaying(true); }}
-              onPause={function() { setPlaying(false); }}
-              onVolumeChange={function() {
-                var v = videoRef.current;
-                if (!v) { return; }
-                setVolume(v.volume);
-                setMuted(v.muted);
-              }}
-              style={{ width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}
-            />
+            <React.Fragment>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onPlay={function() { setPlaying(true); }}
+                onPause={function() { setPlaying(false); }}
+                onVolumeChange={function() {
+                  var v = videoRef.current;
+                  if (!v) { return; }
+                  setVolume(v.volume);
+                  setMuted(v.muted);
+                }}
+                style={{ width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}
+              />
+              {ticket && ticket.item && ticket.item.type === 'live' && (
+                <TimeShiftOverlay videoRef={videoRef} isLive={ticket.item.type === 'live'} profile={profile} />
+              )}
+            </React.Fragment>
           )}
           {!error && streamState.status !== 'streaming' && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>

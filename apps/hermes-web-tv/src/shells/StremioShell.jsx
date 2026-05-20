@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
+import WatchlistRail from '../components/WatchlistRail.jsx';
 import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -673,6 +674,7 @@ function StremioShell(props) {
                 as the first board, above the legacy placeholder row. Returns
                 null when the profile has no playback history yet. */}
             <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
+            <WatchlistRail profile={profile} items={filtered} onItemSelect={onItemSelect} fontScale={fontScale} />
             <StremioBoardRow
               title="Continue Watching"
               items={continueWatching}

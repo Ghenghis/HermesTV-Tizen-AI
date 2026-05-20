@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ function _pickHeroItem(items) {
   if (!items || items.length === 0) { return null; }
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
-    if (!it || it.type === 'live') { continue; }
+    if (!it || isLive(it)) { continue; }
     if (it.poster_url || it.poster || it.thumb || (it.metadata && it.metadata.poster_url)) {
       return it;
     }
@@ -416,10 +417,10 @@ function NuvioShell(props) {
     return typeof i.progress === 'number' && i.progress > 0;
   });
   var movies = visible.filter(function(i) {
-    return i.type === 'movies' || i.type === 'movie';
+    return isMovie(i);
   });
   var series = visible.filter(function(i) {
-    return i.type === 'series';
+    return isSeries(i);
   });
 
   // Initial focus → first card so the Tizen remote starts in a sensible spot.

@@ -1,5 +1,6 @@
 import React from 'react';
 import { applyShellFilters, posterBg } from './shellHelpers.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,8 +139,8 @@ function AppleTVShell(props) {
 
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
   var featured = filtered[0] || null;
-  var liveItems = filtered.filter(function(i) { return i.type === 'live'; });
-  var movies = filtered.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
+  var liveItems = filtered.filter(function(i) { return isLive(i); });
+  var movies = filtered.filter(function(i) { return isMovie(i); });
   var fontScale = (profile && profile.font_scale) || 1;
   // Single source of truth for whether hero CTAs lift on hover/focus.
   var allowMotion = tier === 'enhanced' && !(profile && profile.reduced_motion);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, posterBg, useGridVirtualizer } from './shellHelpers.js';
 import { debounce } from '../utils/debounce.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // YnotvShell — HermesTV's "Lean TV" layout (13th layout).
@@ -101,7 +102,7 @@ function _buildReleaseMap(items, anchor) {
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
     if (!it) { continue; }
-    if (it.type === 'live') { continue; } // live channels don't have releases
+    if (isLive(it)) { continue; } // live channels don't have releases
     // Prefer a real release_date if present (ISO-ish "YYYY-MM-DD" or full ISO).
     var dateStr = null;
     if (typeof it.release_date === 'string' && it.release_date.length >= 10) {
@@ -164,7 +165,7 @@ function _upNextLabel(item) {
 
 function _nowPlayingLabel(item) {
   if (!item) { return 'Browse the catalog'; }
-  if (item.type === 'live') {
+  if (isLive(item)) {
     return item.title || 'Live channel';
   }
   return item.title || 'Featured';
@@ -267,15 +268,15 @@ function YnotvShell(props) {
   // ── Compute the visible display set ───────────────────────────────────────
   var displayItems = filtered;
   if (activeTab === 'live') {
-    displayItems = displayItems.filter(function(i) { return i.type === 'live'; });
+    displayItems = displayItems.filter(function(i) { return isLive(i); });
   } else if (activeTab === 'movies') {
-    displayItems = displayItems.filter(function(i) { return i.type === 'movies' || i.type === 'movie'; });
+    displayItems = displayItems.filter(function(i) { return isMovie(i); });
   } else if (activeTab === 'series') {
-    displayItems = displayItems.filter(function(i) { return i.type === 'series'; });
+    displayItems = displayItems.filter(function(i) { return isSeries(i); });
   } else if (activeTab === 'watchlist') {
     // Watchlist: movies + series. Live channels aren't watchlisted.
     displayItems = displayItems.filter(function(i) {
-      return i.type === 'movies' || i.type === 'movie' || i.type === 'series';
+      return isMovie(i) || isSeries(i);
     });
   }
   // calendar tab handles its own list rendering below.
@@ -334,7 +335,7 @@ function YnotvShell(props) {
   var watchlistCount = 0;
   for (var wi = 0; wi < filtered.length; wi++) {
     var fi = filtered[wi];
-    if (fi && (fi.type === 'movies' || fi.type === 'movie' || fi.type === 'series')) {
+    if (fi && (isMovie(fi) || isSeries(fi))) {
       watchlistCount++;
     }
   }
@@ -348,7 +349,7 @@ function YnotvShell(props) {
   // tab when the focused item is a series. Visual hint that the player will
   // queue the next episode when the current one ends.
   var showAutoplayChip = activeTab === 'watchlist'
-    && focusedItem && focusedItem.type === 'series';
+    && focusedItem && isSeries(focusedItem);
 
   // ── Calendar derived ──────────────────────────────────────────────────────
   // Pre-compute the release map + grid so the render path stays straight.
