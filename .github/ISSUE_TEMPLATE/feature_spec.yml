@@ -1,0 +1,44 @@
+name: DaveTV Feature Spec
+description: Capture business intent before agents plan or code.
+title: "[Spec]: "
+labels: ["spec"]
+body:
+  - type: textarea
+    id: what-why
+    attributes:
+      label: What and why
+      description: What should DaveTV do, and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: journeys
+    attributes:
+      label: User journeys
+      description: Who uses it, what do they click/say/do, and what should happen?
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: How will we know this is complete and real?
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: Required proof
+      description: Tests, screenshots, live provider proof, VPS checks, or TV checks.
+    validations:
+      required: true
+  - type: checkboxes
+    id: hard-rules
+    attributes:
+      label: Hard rules
+      options:
+        - label: No fake, mocked, placeholder, or stub production behavior.
+          required: true
+        - label: No credential, token, stream URL, username, password, or API key leaks.
+          required: true
+        - label: Agents must follow AGENTS.md and .agents/constitution.md.
+          required: true

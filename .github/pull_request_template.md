@@ -1,5 +1,5 @@
 <!--
-HermesTV — Pull Request template.
+DaveTV — Pull Request template.
 Keep it short. The reviewer is the operator; the audience is also future-you.
 -->
 
@@ -9,11 +9,15 @@ Keep it short. The reviewer is the operator; the audience is also future-you.
 
 ## Scope
 
+- [ ] Spec exists or change is small enough to not need one
+- [ ] Plan/tasks were followed for non-trivial work
 - [ ] Repo-only change (no VPS contact)
 - [ ] No `.env*` file added, modified, or staged
 - [ ] No provider credentials (Apollo, XtremeHD, Azure TTS, etc.) in the diff
 - [ ] No `docker compose`, `apt`, or remote SSH commands executed for this PR
 - [ ] No deploy artifacts shipped (Tizen `.wgt`, Caddy/nginx live configs)
+- [ ] No fake/mocked/placeholder/stub production behavior added
+- [ ] User-visible DaveTV behavior is real or honestly blocked/empty
 
 ## Test plan
 
