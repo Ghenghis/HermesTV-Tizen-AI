@@ -34,24 +34,50 @@ function ShellRenderer(props) {
     return null;
   }
 
+  // Shells are React.lazy chunks (see layoutRegistry.js — boot bundle no
+  // longer carries all 14 shells eagerly). Suspense holds a thin skeleton
+  // for the ~50-200 ms it takes to fetch the chunk on first use. Vite
+  // caches it so subsequent re-renders of the same shell are instant, and
+  // switching between two already-visited shells is also instant.
   return (
     <div
       data-layout={layout}
       style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
     >
-      <ShellComponent
-        catalog={catalog}
-        profile={profile}
-        tier={tier}
-        providers={providers}
-        onItemSelect={onItemSelect}
-        onItemFocus={onItemFocus}
-        focusedItem={focusedItem}
-        contentFilter={contentFilter}
-        providerFilter={providerFilter}
-        qualityFilter={qualityFilter}
-        onOpenSettings={onOpenSettings}
-      />
+      <React.Suspense
+        fallback={
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label={'Loading ' + layout + ' layout'}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--muted, #8b95a3)',
+              fontSize: 'calc(0.95rem * var(--font-scale, 1))',
+            }}
+          >
+            <span aria-hidden="true" style={{ marginRight: '0.5rem' }}>◌</span>
+            Loading layout…
+          </div>
+        }
+      >
+        <ShellComponent
+          catalog={catalog}
+          profile={profile}
+          tier={tier}
+          providers={providers}
+          onItemSelect={onItemSelect}
+          onItemFocus={onItemFocus}
+          focusedItem={focusedItem}
+          contentFilter={contentFilter}
+          providerFilter={providerFilter}
+          qualityFilter={qualityFilter}
+          onOpenSettings={onOpenSettings}
+        />
+      </React.Suspense>
     </div>
   );
 }
