@@ -14,8 +14,9 @@
  *     deferring to the in-API HLS proxy or returning 503.
  *
  * This module is the ONLY audited consumer of:
- *   lib/iptvOrg.js   → internal.resolveStreamUrl(channelId)
- *   lib/m3uClient.js → internal.resolveStreamUrl(channelId)
+ *   lib/iptvOrg.js     → internal.resolveStreamUrl(channelId)
+ *   lib/m3uClient.js   → internal.resolveStreamUrl(channelId)
+ *   lib/xtreamClient.js → internal.resolveStreamUrl(channelId)
  *
  * It is NOT mounted as a route and never appears in module.exports of
  * any router. The single test that this module never leaks a URL into
@@ -27,13 +28,15 @@
  * resolver now only dispatches against real provider caches.
  *
  * Channel/item ID dispatch table:
- *   "m3u-<provider>-<localId>"       → m3uClient
- *   "iptv-<iptvOrgChannelId>"        → iptvOrg
- *   anything else                    → null (handled upstream as 503)
+ *   "m3u-<provider>-<localId>"         → m3uClient
+ *   "iptv-<iptvOrgChannelId>"          → iptvOrg
+ *   "xtream-<type>-<stream_id>"        → xtreamClient (Xtream Codes panels)
+ *   anything else                      → null (handled upstream as 503)
  */
 
 var iptvOrg = require('./iptvOrg');
 var m3uClient = require('./m3uClient');
+var xtreamClient = require('./xtreamClient');
 
 // Credential-bearing URL patterns — mirror lib/sanitizeLog.js FORBIDDEN_PATTERNS.
 // If a resolved URL matches any of these we MUST NOT 302 the client at it,
@@ -85,6 +88,13 @@ function resolveStreamUrl(channelId) {
     try { url = m3uClient.internal.resolveStreamUrl(channelId); }
     catch (_) { url = null; }
     alwaysCredBearing = true; // paid operator providers — never 302
+  } else if (channelId.indexOf('xtream-') === 0) {
+    // Xtream Codes panel — operator-paid IPTV. Stream URLs ALWAYS embed
+    // user/pass in the path (`/live/<u>/<p>/<id>.m3u8`), so treated as
+    // credential-bearing and routed through the HLS proxy.
+    try { url = xtreamClient.internal.resolveStreamUrl(channelId); }
+    catch (_) { url = null; }
+    alwaysCredBearing = true;
   } else if (channelId.indexOf('iptv-') === 0) {
     // iptvOrg uses bare channel.id (no "iptv-" prefix) internally.
     var iptvId = channelId.slice('iptv-'.length);

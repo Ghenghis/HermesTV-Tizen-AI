@@ -17,6 +17,7 @@ var Router = require('express').Router;
 var jellyfin = require('../lib/jellyfin');
 var iptvOrg = require('../lib/iptvOrg');
 var m3uClient = require('../lib/m3uClient');
+var xtreamClient = require('../lib/xtreamClient');
 var catalogMerge = require('../lib/catalogMerge');
 var sanitizeLog = require('../lib/sanitizeLog').sanitizeForLog;
 
@@ -146,6 +147,47 @@ async function resolveCatalog() {
     }
   }
 
+  // Xtream Codes panel (the de-facto paid-IPTV REST API). Activates when the
+  // operator sets XTREAM_URL + XTREAM_USERNAME + XTREAM_PASSWORD. Pulls live +
+  // VOD + series in parallel, each shaped through xtreamClient.toHermesItem
+  // into the standard catalog shape. Items get a `sources` entry pointing at
+  // 'xtream' so the wave-13 cross-provider merge collapses ESPN duplicates
+  // across xTreme + m3u + iptv-org.
+  var xtreamCount = 0;
+  var xtreamStatus = null;
+  if (xtreamClient.isEnabled()) {
+    try {
+      var live = await xtreamClient.getLiveStreams();
+      var vod = await xtreamClient.getVodStreams();
+      var series = await xtreamClient.getSeriesList();
+      var xtreamItems = [];
+      var addBatch = function(arr, type) {
+        if (!Array.isArray(arr)) { return; }
+        for (var xi = 0; xi < arr.length; xi++) {
+          try {
+            var shaped = xtreamClient.toHermesItem(arr[xi], type);
+            if (shaped) { xtreamItems.push(shaped); }
+          } catch (_) { /* malformed — skip */ }
+        }
+      };
+      addBatch(live, 'live');
+      addBatch(vod, 'vod');
+      addBatch(series, 'series');
+      if (xtreamItems.length > 0) {
+        xtreamCount = xtreamItems.length;
+        baseItems = baseItems.concat(xtreamItems);
+        if (baseSource === SRC_NONE) {
+          baseSource = SRC_PROVIDERS_ONLY;
+        } else {
+          baseSource = SRC_MERGED;
+        }
+      }
+      try { xtreamStatus = xtreamClient.getProviderStatus(); } catch (_) { xtreamStatus = null; }
+    } catch (err) {
+      console.warn('[catalog] xtream merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
+    }
+  }
+
   // Cross-provider title merge. If three providers all carry "ESPN" the user
   // sees ONE card with three sources; /api/play walks sources[] on resolve.
   var beforeMerge = baseItems.length;
@@ -181,6 +223,8 @@ async function resolveCatalog() {
     iptv_org_data_age_h: iptvOrgAge,
     m3u_count: m3uCount,
     m3u_providers: m3uProviders,
+    xtream_count: xtreamCount,
+    xtream_status: xtreamStatus,
     merged_duplicates: mergedItemCount,
   };
 }
