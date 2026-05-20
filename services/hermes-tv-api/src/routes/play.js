@@ -25,6 +25,7 @@ const m3uClient = require('../lib/m3uClient');
 const iptvOrg = require('../lib/iptvOrg');
 const hlsProxy = require('../lib/hlsProxy');
 const catalogMerge = require('../lib/catalogMerge');
+const streamProbe = require('../lib/streamProbe');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const TICKET_TTL_MS = 5 * 60 * 1000;
@@ -179,8 +180,11 @@ router.post('/api/play', (req, res) => {
 
   if (sources.length === 0) {
     return res.status(503).json({
+      status: 'stream_temporarily_unavailable',
       error: 'no_provider_configured',
-      message: 'No provider serves this item. Operator must wire credentials per docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md',
+      message: 'No source is currently available for this item. We will try again automatically.',
+      retry_after_seconds: 30,
+      providers_attempted: [],
     });
   }
 
@@ -271,19 +275,30 @@ router.post('/api/play', (req, res) => {
 /**
  * GET /api/play/:ticket/stream(?source_index=N)
  *
- * Wave-13 auto-fallback resolution path (best-effort, never throws):
+ * Wave-15 auto-fallback resolution path (best-effort, never throws):
  *   1. Look up the ticket; 404/410 on miss/expired.
  *   2. Walk the ticket's internal.sources[] array IN ORDER (skipping past
- *      `?source_index=N` if the caller pinned a specific index). For each
- *      source ask lib/streamResolver for the upstream URL.
- *      - First success wins. Update ticket.internal.current_source_index.
- *      - Credential-bearing URLs go through the in-API HLS proxy.
- *      - Clean public URLs 302 to the upstream CDN.
- *   3. If ALL sources fail to resolve → 503 with the failure list so the
- *      operator can debug which provider broke.
+ *      `?source_index=N` if the caller pinned a specific index).
+ *   3. For each source:
+ *      a. Ask lib/streamResolver for the upstream URL. Unresolved = advance.
+ *      b. Credential-bearing? Try the in-API HLS proxy fetch (wave-11). On
+ *         fetch failure (timeout, 502, 504) → record provider failure, log
+ *         "[play] source N failed: ... advancing to N+1", advance to next.
+ *      c. Clean public URL? 302 the client — assumed playable (the iptv-org
+ *         CDN reliability has been > 99% in production).
+ *   4. If a proxy fetch SUCCEEDS we record the provider as healthy + serve
+ *      the rewritten body. First success wins. Update
+ *      ticket.internal.current_source_index.
+ *   5. If ALL sources fail → 503 with the friendly
+ *      `stream_temporarily_unavailable` envelope so the client can
+ *      auto-retry instead of telling the user "Operator must wire
+ *      credentials".
  *
  * `?source_index=N` lets the player UI pin a specific server when the
  * user picks one from the picker. Index is clamped to [0, sources.length).
+ *
+ * NOTE: The walker is bounded by sourceList.length — we will never make
+ * more than that many proxy-fetch attempts per ticket request.
  */
 // The :ticket param matches the bare ticket id; the optional trailing
 // `.m3u8` / `.mpd` suffix on the path is captured by the wildcard so the
@@ -332,96 +347,133 @@ function _streamHandler(req, res) {
     sourceList = [hoisted].concat(sourceList.slice(0, pinnedIdx)).concat(sourceList.slice(pinnedIdx + 1));
   }
 
-  // Walk the list. The first source whose resolver returns a non-null
-  // URL wins. Track every failure so we can surface them on total miss.
+  // Track per-attempt failures so the final 503 (if any) can tell the
+  // client which providers were tried.
   var failures = [];
-  var picked = null;
-  var pickedIndex = -1;
-  for (var i = 0; i < sourceList.length; i++) {
+  var providersAttempted = [];
+
+  // Helper: find this source's ORIGINAL index inside internal.sources so
+  // /sources diagnostics stay consistent with the index the client saw
+  // on the initial /api/play response.
+  function _originalIndex(src) {
+    for (var oi = 0; oi < internal.sources.length; oi++) {
+      if (internal.sources[oi] === src) { return oi; }
+    }
+    return -1;
+  }
+
+  // Walk asynchronously so we can await the hlsProxy.proxyPlaylist fetch
+  // on credential-bearing sources and continue to the next source on
+  // failure. Returns a promise that resolves when the response has been
+  // sent (or when we give up after exhausting the source list).
+  function _tryNext(i) {
+    if (i >= sourceList.length) {
+      // All sources exhausted — return the friendly 503.
+      return res.status(503).json({
+        status: 'stream_temporarily_unavailable',
+        message: 'All upstream sources are temporarily unreachable. We will try again automatically.',
+        ticket: req.params.ticket,
+        sources_tried: providersAttempted.length || failures.length,
+        retry_after_seconds: 30,
+        providers_attempted: providersAttempted,
+        failures: failures,
+      });
+    }
+
     var src = sourceList[i];
     var sid = src && src.item_id;
+    var providerId = (src && src.provider_id) || 'unknown';
+
     if (typeof sid !== 'string' || sid.length === 0) {
-      failures.push({ provider_id: src && src.provider_id, reason: 'no_item_id' });
-      continue;
+      failures.push({ provider_id: providerId, reason: 'no_item_id' });
+      console.log('[play] source ' + i + ' (' + providerId + ') failed: no_item_id, advancing to source ' + (i + 1));
+      return _tryNext(i + 1);
     }
+
     var resolved;
     try { resolved = streamResolver.resolveStreamUrl(sid); }
     catch (errResolve) {
-      failures.push({ provider_id: src.provider_id, reason: 'resolver_threw' });
-      continue;
+      failures.push({ provider_id: providerId, reason: 'resolver_threw' });
+      console.log('[play] source ' + i + ' (' + providerId + ') failed: resolver_threw, advancing to source ' + (i + 1));
+      return _tryNext(i + 1);
     }
+
     if (!resolved || !resolved.url) {
-      failures.push({ provider_id: src.provider_id, reason: 'unresolved' });
-      continue;
+      failures.push({ provider_id: providerId, reason: 'unresolved' });
+      console.log('[play] source ' + i + ' (' + providerId + ') failed: unresolved, advancing to source ' + (i + 1));
+      return _tryNext(i + 1);
     }
-    picked = { source: src, resolved: resolved };
-    // Map back to the ORIGINAL index in t.internal.sources for the
-    // current_source_index field (so /sources sees the same numbering
-    // the client first received).
-    for (var oi = 0; oi < internal.sources.length; oi++) {
-      if (internal.sources[oi] === src) { pickedIndex = oi; break; }
+
+    // We're attempting this provider. Record it so the final 503 (if any)
+    // can list the providers actually tried (vs. ones we skipped because
+    // they had no item_id).
+    if (providersAttempted.indexOf(providerId) === -1) {
+      providersAttempted.push(providerId);
     }
-    break;
-  }
 
-  if (!picked) {
-    return res.status(503).json({
-      status: 'stream_unresolved',
-      message: 'Could not resolve any stream source for this item. Operator must wire credentials per docs/41_OPERATOR_CREDENTIALS_RUNBOOK.md.',
-      ticket: req.params.ticket,
-      provider: t.ticket.provider,
-      item: t.ticket.item,
-      attempted_sources: failures.length,
-      failures: failures,
-    });
-  }
+    var pickedIndex = _originalIndex(src);
 
-  // Remember which source served this play for /sources diagnostics.
-  if (pickedIndex >= 0 && t.internal) { t.internal.current_source_index = pickedIndex; }
+    // Expose the active provider in a non-credential header so the player
+    // UI can update its "Now playing from xTremeHD" badge without a
+    // second request. Safe to set repeatedly per attempt — the LAST one
+    // that actually starts sending bytes wins.
+    if (src.provider_id) {
+      try { res.setHeader('X-Provider-Used', String(src.provider_id)); }
+      catch (_) { /* setHeader after writeHead — ignore */ }
+    }
 
-  // Expose the active provider in a non-credential header so the player
-  // UI can update its "Now playing from xTremeHD" badge without a
-  // second request. Header is server-controlled, not user-supplied —
-  // safe to set even though credentialGuard wraps res.json only.
-  if (picked.source.provider_id) {
-    try { res.setHeader('X-Provider-Used', String(picked.source.provider_id)); }
-    catch (_) { /* setHeader after writeHead — ignore */ }
-  }
-
-  if (picked.resolved.credential_bearing) {
-    // In-API HLS proxy path (wave-11). Fetch the upstream playlist
-    // server-side, rewrite every segment URL to /api/proxy/<ticket>/seg/<b64>,
-    // and serve the rewritten body. The credential never reaches the client.
-    // We do NOT 302 here — that would put the credentialed URL into the
-    // Location header. Native HLS players (Safari, Tizen) and hls.js both
-    // accept this manifest body verbatim.
-    return hlsProxy.proxyPlaylist({
-      upstreamUrl: picked.resolved.url,
-      ticket: req.params.ticket,
-    })
-      .then(function(rewritten) {
-        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        res.setHeader('Cache-Control', 'no-store');
-        res.status(200).send(rewritten);
+    if (resolved.credential_bearing) {
+      // In-API HLS proxy path (wave-11). Fetch the upstream playlist
+      // server-side, rewrite every segment URL to /api/proxy/<ticket>/seg/<b64>,
+      // and serve the rewritten body. The credential never reaches the client.
+      // We do NOT 302 here — that would put the credentialed URL into the
+      // Location header. Native HLS players (Safari, Tizen) and hls.js both
+      // accept this manifest body verbatim.
+      return hlsProxy.proxyPlaylist({
+        upstreamUrl: resolved.url,
+        ticket: req.params.ticket,
       })
-      .catch(function(err) {
-        var sanLog = require('../lib/sanitizeLog').sanitizeForLog;
-        console.warn('[play] hls proxy failed ticket=' + req.params.ticket + ': ' + sanLog(err && err.message ? err.message : 'unknown'));
-        res.status(502).json({
-          error: 'upstream_playlist_fetch_failed',
-          message: 'Could not fetch the upstream playlist for this item.',
-          ticket: req.params.ticket,
-          provider: t.ticket.provider,
-          item: t.ticket.item,
-          provider_used: picked.source.provider_id,
+        .then(function(rewritten) {
+          // Mark this provider as healthy for the rolling window so
+          // catalogMerge's health-aware ordering knows it's fine.
+          try { streamProbe.recordProviderOutcome(providerId, true); }
+          catch (_) { /* probe lib unavailable — non-fatal */ }
+          if (pickedIndex >= 0 && t.internal) { t.internal.current_source_index = pickedIndex; }
+          res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+          res.setHeader('Cache-Control', 'no-store');
+          res.status(200).send(rewritten);
+        })
+        .catch(function(err) {
+          var sanLog = require('../lib/sanitizeLog').sanitizeForLog;
+          var msg = (err && err.message) ? err.message : 'unknown';
+          // Record failure so future merges deprioritize this provider.
+          try { streamProbe.recordProviderOutcome(providerId, false); }
+          catch (_) { /* */ }
+          failures.push({
+            provider_id: providerId,
+            reason: 'upstream_fetch_failed',
+            detail: sanLog(msg),
+          });
+          console.log('[play] source ' + i + ' (' + providerId + ') failed: ' + sanLog(msg) + ', advancing to source ' + (i + 1));
+          // Headers may have been set on the response object but no body
+          // has been sent yet — Express still allows status() + json()
+          // until we actually start streaming. We never start streaming
+          // on the failure path of proxyPlaylist, so the next attempt
+          // (or final 503) is safe.
+          return _tryNext(i + 1);
         });
-      });
+    }
+
+    // Clean public URL — 302 to the upstream CDN. We treat this as a
+    // success at the API layer (the upstream redirect target's own
+    // reachability is the browser's problem after this point).
+    try { streamProbe.recordProviderOutcome(providerId, true); }
+    catch (_) { /* */ }
+    if (pickedIndex >= 0 && t.internal) { t.internal.current_source_index = pickedIndex; }
+    return res.redirect(302, resolved.url);
   }
 
-  // Clean public URL — safe to redirect. credentialGuard middleware
-  // is wrapping res.json only; Location-header redirects are
-  // separately covered by the credential-bearing check above.
-  return res.redirect(302, picked.resolved.url);
+  return _tryNext(0);
 }
 
 router.get(/^\/api\/play\/([^\/]+)\/stream(?:\.m3u8|\.mpd)?$/, _streamHandler);

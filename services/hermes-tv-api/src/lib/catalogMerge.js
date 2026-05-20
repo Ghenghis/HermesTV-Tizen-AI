@@ -33,6 +33,27 @@ var PROVIDER_PRIORITY = {
 };
 var UNKNOWN_PROVIDER_PRIORITY = 99;
 
+// Wave-15: when a provider's recent stream-fetch error rate is above
+// PROVIDER_UNHEALTHY_PCT (see lib/streamProbe), we add this constant to its
+// nominal priority so it sinks BEHIND any provider in healthy / unknown
+// status. Picked large enough to push xtremehd (1) below iptv-org (3) and
+// even below seed (5) when xtremehd is timing out, but small enough that
+// two unhealthy providers still sort by their static priority relative to
+// each other.
+var UNHEALTHY_PROVIDER_PENALTY = 100;
+
+// Lazy require — streamProbe pulls in Node fetch + AbortController so we
+// only load it when actually called. Keeps cold start cheap.
+var _streamProbe = null;
+function _getProviderHealth(providerId) {
+  if (!_streamProbe) {
+    try { _streamProbe = require('./streamProbe'); }
+    catch (_) { _streamProbe = { getProviderHealth: function() { return null; } }; }
+  }
+  try { return _streamProbe.getProviderHealth(providerId); }
+  catch (_) { return null; }
+}
+
 // Higher = better quality.
 var RESOLUTION_RANK = {
   '4K':     5,
@@ -284,12 +305,25 @@ function mergeByTitle(items) {
     var group = groups[gkey];
 
     // Sort variants by (priority asc, resolutionRank desc, isSeedPlaceholder last).
+    // Wave-15: providers whose recent stream-fetch error rate exceeds
+    // PROVIDER_UNHEALTHY_PCT get UNHEALTHY_PROVIDER_PENALTY added to their
+    // nominal priority — so a currently-timing-out xtremehd (priority 1)
+    // falls behind a healthy iptv-org (priority 3) until the rolling
+    // 10-min window recovers. Falls back to the static order when no
+    // health data has been recorded yet (e.g. first request post-restart).
     var variants = group.items.slice().sort(function(a, b) {
-      var pa = providerPriority(detectProviderId(a));
-      var pb = providerPriority(detectProviderId(b));
+      var aPid = detectProviderId(a);
+      var bPid = detectProviderId(b);
+      var pa = providerPriority(aPid);
+      var pb = providerPriority(bPid);
       // Seed placeholders sink to the bottom regardless of nominal provider.
       if (isSeedPlaceholder(a)) { pa = Math.max(pa, PROVIDER_PRIORITY.seed); }
       if (isSeedPlaceholder(b)) { pb = Math.max(pb, PROVIDER_PRIORITY.seed); }
+      // Health-aware demotion.
+      var ha = _getProviderHealth(aPid);
+      var hb = _getProviderHealth(bPid);
+      if (ha && ha.unhealthy) { pa += UNHEALTHY_PROVIDER_PENALTY; }
+      if (hb && hb.unhealthy) { pb += UNHEALTHY_PROVIDER_PENALTY; }
       if (pa !== pb) { return pa - pb; }
       var ra = resolutionRank((a.metadata && a.metadata.resolution) || a.quality);
       var rb = resolutionRank((b.metadata && b.metadata.resolution) || b.quality);

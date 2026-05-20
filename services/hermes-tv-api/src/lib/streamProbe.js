@@ -213,6 +213,78 @@ function _clearCache() {
   cache = Object.create(null);
 }
 
+// ---------------------------------------------------------------------------
+// Provider-health sliding window (wave-15).
+//
+// Each call to /api/play/:ticket/stream that completes (either as a successful
+// proxy fetch or as a failed upstream) reports the outcome here. We keep a
+// 10-minute sliding window per provider_id and expose the recent error rate
+// so catalogMerge.js can demote currently-flaky providers behind healthier
+// ones at source-list build time.
+//
+// The window is in-process / non-persistent: a process restart clears it.
+// That matches the rest of the lib — we trust the next round of probes to
+// re-establish reality within 10 minutes.
+//
+// Shape:  _providerEvents[pid] = [{ ts, ok }, ...]  (newest at end)
+// ---------------------------------------------------------------------------
+var PROVIDER_WINDOW_MS = 10 * 60 * 1000;
+var PROVIDER_MIN_SAMPLES = 3;                  // need at least this many events
+                                               // before the error-rate is
+                                               // considered statistically real
+var PROVIDER_UNHEALTHY_PCT = 0.5;              // > 50% errors in window = flaky
+
+var _providerEvents = Object.create(null);
+
+function _pruneProviderEvents(pid, nowMs) {
+  var arr = _providerEvents[pid];
+  if (!arr) { return; }
+  var cutoff = nowMs - PROVIDER_WINDOW_MS;
+  var i = 0;
+  while (i < arr.length && arr[i].ts < cutoff) { i++; }
+  if (i > 0) { _providerEvents[pid] = arr.slice(i); }
+}
+
+function recordProviderOutcome(providerId, ok) {
+  if (typeof providerId !== 'string' || providerId.length === 0) { return; }
+  var n = now();
+  if (!_providerEvents[providerId]) { _providerEvents[providerId] = []; }
+  _providerEvents[providerId].push({ ts: n, ok: !!ok });
+  _pruneProviderEvents(providerId, n);
+}
+
+/**
+ * Recent stream-fetch health for a provider over the last 10 minutes.
+ * Returns:
+ *   { samples: <int>, errors: <int>, error_rate: <float 0..1>,
+ *     unhealthy: <bool>, has_data: <bool> }
+ *
+ * `has_data` is false when fewer than PROVIDER_MIN_SAMPLES events have
+ * been recorded for this provider — callers should fall back to the
+ * static priority order in that case rather than trust a 1-of-1 sample.
+ */
+function getProviderHealth(providerId) {
+  var empty = { samples: 0, errors: 0, error_rate: 0, unhealthy: false, has_data: false };
+  if (typeof providerId !== 'string' || providerId.length === 0) { return empty; }
+  _pruneProviderEvents(providerId, now());
+  var arr = _providerEvents[providerId] || [];
+  if (arr.length === 0) { return empty; }
+  var errs = 0;
+  for (var i = 0; i < arr.length; i++) { if (!arr[i].ok) { errs += 1; } }
+  var rate = errs / arr.length;
+  return {
+    samples: arr.length,
+    errors: errs,
+    error_rate: rate,
+    unhealthy: (arr.length >= PROVIDER_MIN_SAMPLES) && (rate > PROVIDER_UNHEALTHY_PCT),
+    has_data: arr.length >= PROVIDER_MIN_SAMPLES,
+  };
+}
+
+function _clearProviderHealth() {
+  _providerEvents = Object.create(null);
+}
+
 module.exports = {
   probeStream: probeStream,
   inferQuality: inferQuality,
@@ -220,4 +292,11 @@ module.exports = {
   _clearCache: _clearCache,
   PROBE_TIMEOUT_MS: PROBE_TIMEOUT_MS,
   CACHE_TTL_MS: CACHE_TTL_MS,
+  // Wave-15 provider-health window.
+  recordProviderOutcome: recordProviderOutcome,
+  getProviderHealth: getProviderHealth,
+  _clearProviderHealth: _clearProviderHealth,
+  PROVIDER_WINDOW_MS: PROVIDER_WINDOW_MS,
+  PROVIDER_UNHEALTHY_PCT: PROVIDER_UNHEALTHY_PCT,
+  PROVIDER_MIN_SAMPLES: PROVIDER_MIN_SAMPLES,
 };
