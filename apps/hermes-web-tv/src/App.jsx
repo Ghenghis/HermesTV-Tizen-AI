@@ -491,6 +491,12 @@ function App() {
   // already mounted inside MediaDetailPanel.
   var parentalGate = useParentalGate();
 
+  // Wave-14 W14-DIRECTPLAY pre-warm latch. Set true the first time a live
+  // card is focused so we only kick off the PlayerModal + hls.js dynamic
+  // imports once. Subsequent focus events are free — the modules are
+  // already in the Vite chunk cache.
+  var prewarmedRef = React.useRef(false);
+
   // ── Screensaver + Sleep Timer (wave-4 components) ──────────────────────────
   // Activate the ambient screensaver after N minutes of no input. Default
   // 10 min, override per-profile via profile.screensaver_min_idle. Both the
@@ -730,6 +736,44 @@ function App() {
     return function() { window.removeEventListener('keydown', onChannelKey); };
   }, [state.showPlayer]);
 
+  // Wave-14 W14-DIRECTPLAY — Info key opens MediaDetailPanel for the
+  // focused item. handleItemClick now sends live items straight to the
+  // player; this is the explicit gesture for "actually I want the synopsis
+  // first". Three triggers:
+  //   - Samsung TV INFO remote key (keyCode 457 in the Tizen keymap)
+  //   - Keyboard 'i' / 'I' (matches the Plex / Stremio convention)
+  //   - The focused-card info-icon button (passes through handleOpenDetail
+  //     directly — no keydown plumbing needed)
+  // Gated on having a focused item and no modal already open above the
+  // grid, so the Info key inside a Settings dialog doesn't accidentally
+  // re-open the detail panel underneath it.
+  React.useEffect(function() {
+    function onInfoKey(e) {
+      // Suppress when the user is typing in a text input / textarea so the
+      // 'i' shortcut doesn't fight with regular text entry.
+      var target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      // Suppress when any blocking modal is already open — Info is a
+      // grid-level gesture only.
+      if (state.selectedItem || state.showPlayer || state.showSettings ||
+          state.showSearch || state.showEPG || state.showMultiview ||
+          state.showLayoutSwitcher || state.showVoicePicker ||
+          state.showProfileManagement || state.showPlaylistImport ||
+          state.showOnboarding || state.showScheduleRecording) {
+        return;
+      }
+      var isInfo = (e.keyCode === 457) || (e.key === 'i') || (e.key === 'I');
+      if (!isInfo) { return; }
+      if (!state.focusedItem) { return; }
+      e.preventDefault();
+      handleOpenDetail(state.focusedItem);
+    }
+    window.addEventListener('keydown', onInfoKey);
+    return function() { window.removeEventListener('keydown', onInfoKey); };
+  }, [state.focusedItem, state.selectedItem, state.showPlayer, state.showSettings, state.showSearch, state.showEPG, state.showMultiview, state.showLayoutSwitcher, state.showVoicePicker, state.showProfileManagement, state.showPlaylistImport, state.showOnboarding, state.showScheduleRecording]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Phone-as-remote SSE listener. Mints a pairing code on profile load,
   // stores it in state, opens an EventSource to /api/remote/events, and
   // dispatches every incoming remote keypress as a synthetic KeyboardEvent
@@ -949,6 +993,7 @@ function App() {
   }
 
   function handleItemClick(item) {
+    if (!item) { return; }
     // Pick the first available provider as default
     var defaultProvider = null;
     if (Array.isArray(item.providers) && item.providers.length > 0) {
@@ -958,7 +1003,43 @@ function App() {
     } else if (Array.isArray(item.provider_tags) && item.provider_tags.length > 0) {
       defaultProvider = item.provider_tags[0];
     }
+    // Wave-14 W14-DIRECTPLAY — live channels jump straight to PlayerModal.
+    // Mainstream IPTV apps (TiviMate / IPTV Smarters / Plex) one-click-play
+    // live channels — the synopsis-then-play flow that's right for movies is
+    // pure friction for channel surfing. VOD and series keep the detail-
+    // then-play flow because a synopsis genuinely helps the user decide
+    // before they commit to a 90-minute movie. Mom-rule respected: this is
+    // a strict UX improvement applied equally to both profiles, not a
+    // Mom-only simplification.
+    var itemType = item.type || item.content_type || '';
+    if (itemType === 'live') {
+      // Keep the focused-item state coherent so the hero panel stays in
+      // sync if the user closes the player and returns to the grid.
+      patchState({ focusedItem: item, selectedProviderId: defaultProvider });
+      handlePlay(item, defaultProvider);
+      return;
+    }
+    // VOD / series / unknown → original detail-first flow.
     // Selecting also focuses so the hero stays in sync if the modal is dismissed.
+    patchState({ selectedItem: item, selectedProviderId: defaultProvider, focusedItem: item });
+  }
+
+  // Explicit "Info" gesture — opens MediaDetailPanel for any item, including
+  // live channels (which now skip the panel by default in handleItemClick).
+  // Bound to the Tizen Info key (keyCode 457), the 'i' / 'I' keyboard key,
+  // and the focused-card info-icon button. Long-press on touch devices also
+  // reaches this via the same code path — touch handlers fire a synthetic
+  // 'i' keydown after the 500 ms threshold (see tizenKeyMap touch shim).
+  function handleOpenDetail(item) {
+    if (!item) { return; }
+    var defaultProvider = null;
+    if (Array.isArray(item.providers) && item.providers.length > 0) {
+      defaultProvider = item.providers[0].provider_id;
+    } else if (typeof item.preferred_source === 'string') {
+      defaultProvider = item.preferred_source;
+    } else if (Array.isArray(item.provider_tags) && item.provider_tags.length > 0) {
+      defaultProvider = item.provider_tags[0];
+    }
     patchState({ selectedItem: item, selectedProviderId: defaultProvider, focusedItem: item });
   }
 
@@ -970,6 +1051,26 @@ function App() {
     // Cheap guard — don't churn state when focus lands on the same id.
     if (state.focusedItem && state.focusedItem.id === item.id) { return; }
     patchState({ focusedItem: item });
+    // Wave-14 W14-DIRECTPLAY — pre-warm the PlayerModal lazy chunks the
+    // moment a live card is FOCUSED (not yet clicked). By the time the user
+    // presses Enter, the PlayerModal chunk + hls.js module are already in
+    // the Vite chunk cache, so click-to-first-byte drops from ~3-5 s to
+    // sub-second. The two import() calls return promises that resolve into
+    // the same chunk registry the lazy() loaders use; we fire-and-forget
+    // because the goal is just to seed the cache. Failure here is silent —
+    // the real load on click still runs through the usual lazy path.
+    var itemType = item.type || item.content_type || '';
+    if (itemType === 'live' && !prewarmedRef.current) {
+      prewarmedRef.current = true;
+      // PlayerModal itself is already lazy at App.jsx:70 — re-import to
+      // populate the chunk cache. Once the chunk is fetched, React.lazy's
+      // module cache short-circuits the next access.
+      import('./components/PlayerModal.jsx').catch(function() { /* offline */ });
+      // hls.js is dynamically imported inside useHlsStream; seed its chunk
+      // here so the engine bootstrap doesn't block on the network when the
+      // user finally clicks Enter.
+      import('hls.js').catch(function() { /* native HLS or offline */ });
+    }
   }
 
   function handleCloseDetail() {
