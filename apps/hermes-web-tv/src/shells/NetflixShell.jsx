@@ -9,9 +9,9 @@ import useFavorites from '../hooks/useFavorites.js';
 import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NetflixShell — HermesTV's cinematic horizontal-rail layout, inspired by the
+// NetflixShell — DaveTV's cinematic horizontal-rail layout, inspired by the
 // streaming-service visual vocabulary (bold red accent, dark canvas, hero
-// banner, dense card rows). All copy is HermesTV branding — never reference
+// banner, dense card rows). All copy is DaveTV branding — never reference
 // "Netflix" in user-visible strings. Polish pass mirrors the SOTA shared
 // vocabulary from index.css + design/tokens.js:
 //   - Radii consume var(--radius-sm/md/lg/xl/pill) for parity with other shells.

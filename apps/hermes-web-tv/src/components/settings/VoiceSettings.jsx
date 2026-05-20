@@ -2,6 +2,7 @@ import React from 'react';
 import * as voicePrefStore from '../../store/voicePrefStore.js';
 import * as voiceClient from '../../api/azureVoiceClient.js';
 import VoicePickerModal from '../VoicePickerModal.jsx';
+import { resolveAssistantName } from '../../utils/assistantName.js';
 import {
   CARD_STYLE, CARD_HEADER_STYLE, CARD_TAGLINE_STYLE,
   LABEL_STYLE, BUTTON_STYLE,
@@ -300,7 +301,7 @@ function VoiceSettings(props) {
         isOpen={pickerOpen}
         profileId={profileId}
         currentVoiceId={prefs.voice_id}
-        agentName={profile.agent_name || 'Hermes'}
+        agentName={resolveAssistantName(profile)}
         onClose={closePicker}
         onVoiceChange={handleVoiceChange}
       />

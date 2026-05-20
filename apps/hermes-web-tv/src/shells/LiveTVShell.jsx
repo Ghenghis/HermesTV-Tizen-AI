@@ -6,7 +6,7 @@ import CategorySidebar from '../components/CategorySidebar.jsx';
 import CatchupRail from '../components/CatchupRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LiveTVShell — HermesTV's live-first layout shell.
+// LiveTVShell — DaveTV's live-first layout shell.
 //
 // The existing shells treat live TV as a side-tab. This one inverts the
 // hierarchy: live channels are the entire page. The design takes the

@@ -2,6 +2,7 @@ import React from 'react';
 import * as profileStore from '../store/profileStore.js';
 import * as voicePrefStore from '../store/voicePrefStore.js';
 import * as hermesApi from '../api/hermesApi.js';
+import { resolveAssistantName } from '../utils/assistantName.js';
 
 // Lazy so the management modal doesn't pull the full voice catalog list code
 // + Azure preview client until the user opens the voice picker. Keeps the
@@ -77,7 +78,7 @@ function _emptyFormState() {
     reduced_motion: false,
     mom_mode: false,
     tier_override: 'auto',
-    agent_name: 'Hermes',
+    agent_name: 'DaveTV',
     audio_feedback: false,
     preferred_voice_id: ''
   };
@@ -102,7 +103,7 @@ function _formFromProfile(p) {
     reduced_motion: !!p.reduced_motion,
     mom_mode: !!p.mom_mode,
     tier_override: p.tier_override || 'auto',
-    agent_name: typeof p.agent_name === 'string' && p.agent_name.length > 0 ? p.agent_name : 'Hermes',
+    agent_name: resolveAssistantName(p),
     audio_feedback: !!p.audio_feedback,
     preferred_voice_id: storedVoiceId || p.preferred_voice_id || ''
   };
@@ -536,7 +537,7 @@ function ProfileForm(props) {
           placeholder="What should we call you?"
           style={_inputStyle()}
         />
-        <div style={_hintStyle()}>Hermes will use this name when speaking to you. Leave blank to use the display name.</div>
+        <div style={_hintStyle()}>DaveTV will use this name when speaking to you. Leave blank to use the display name.</div>
       </div>
 
       {/* Agent name — what the user calls the assistant */}
@@ -550,10 +551,10 @@ function ProfileForm(props) {
           value={form.agent_name}
           onChange={function(e) { updateField('agent_name', e.target.value); }}
           maxLength={30}
-          placeholder="Hermes"
+          placeholder="DaveTV"
           style={_inputStyle()}
         />
-        <div style={_hintStyle()}>What you&apos;d like to call your assistant (default: Hermes).</div>
+        <div style={_hintStyle()}>What you&apos;d like to call your assistant (default: DaveTV).</div>
       </div>
 
       {/* Voice picker launcher — opens VoicePickerModal which writes back into
@@ -963,8 +964,7 @@ function ProfileManagementModal(props) {
       setStatusTone('error');
       return;
     }
-    var agentName = (form.agent_name || '').trim();
-    if (agentName.length === 0) { agentName = 'Hermes'; }
+    var agentName = resolveAssistantName(form.agent_name);
 
     var payload = {
       display_name: name,
@@ -1272,7 +1272,7 @@ function ProfileManagementModal(props) {
                   </span>
                 </label>
                 <div style={Object.assign({}, _hintStyle(), { marginLeft: '1.65rem' })}>
-                  When on, Hermes will respond to commands like "switch to Mom mode" or "switch to Dave".
+                  When on, DaveTV will respond to commands like "switch to Mom mode" or "switch to Dave".
                 </div>
               </div>
 
@@ -1359,7 +1359,7 @@ function ProfileManagementModal(props) {
             <VoicePickerModal
               isOpen={voicePickerOpen}
               profileId={form.id}
-              agentName={form.agent_name || 'Hermes'}
+              agentName={resolveAssistantName(form.agent_name)}
               currentVoiceId={form.preferred_voice_id}
               onClose={function() { setVoicePickerOpen(false); }}
               onVoiceChange={handleVoiceChange}

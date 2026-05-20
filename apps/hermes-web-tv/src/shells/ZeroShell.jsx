@@ -10,7 +10,7 @@ import ZeroChannelStrip from '../components/zero/ZeroChannelStrip.jsx';
 import { installZeroShellTizenHandler } from '../utils/zeroTizenKeyMap.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ZeroShell — HermesTV's clone of the IPTV Player Zero look (8th layout).
+// ZeroShell — DaveTV's IPTV Player Zero-inspired look (8th layout).
 //
 // Cloned design language (NOT cloned assets):
 //   - Left rail: pinnable section toolbar with Favorite Movies, Trakt
@@ -32,7 +32,7 @@ import { installZeroShellTizenHandler } from '../utils/zeroTizenKeyMap.js';
 //     Live / Movies / Series — Trakt / Downloads / Categories are hidden so
 //     the rail isn't overwhelming).
 //
-// All copy is HermesTV branding — never reference "IPTV Player Zero" in
+// All copy is DaveTV branding — never reference "IPTV Player Zero" in
 // user-visible strings. The visual language is inspired by the public
 // screenshots; no proprietary assets are bundled.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -385,7 +385,7 @@ function ZeroShell(props) {
           </span>
         </div>
 
-        {/* Centre: Z logo wordmark — placeholder gradient text, no asset */}
+        {/* Centre: Zero View wordmark */}
         <button
           tabIndex={0}
           aria-label="DaveTV Zero look"
@@ -407,7 +407,7 @@ function ZeroShell(props) {
           onFocus={function(e) { e.currentTarget.style.outline = '2px solid var(--accent)'; e.currentTarget.style.outlineOffset = '4px'; }}
           onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
         >
-          Hermes<span style={{ marginLeft: '0.1em' }}>Z</span>
+          DaveTV<span style={{ marginLeft: '0.1em' }}>Z</span>
         </button>
 
         {/* Right cluster: All playlists / bell / settings */}

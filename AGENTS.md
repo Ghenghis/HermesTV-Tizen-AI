@@ -49,6 +49,11 @@ auth, playback, VPS, QR, remote-navigation, or user-visible UI changes.
   proof artifacts.
 - Playback UX is instant-play by default. Do not add "choose action" popups to
   watch Live, Movies, or Series. Options belong in settings or explicit menus.
+- DaveTV's voice agent must be natural-language and voice-first. Exact phrase
+  command tables are allowed only as a fast path, not as the agent brain.
+- The default assistant name and wake phrase are DaveTV / "Hey DaveTV"; users
+  may change or disable the trigger phrase when a real supported trigger path
+  exists.
 - Remote navigation must be smooth, focusable, scrollable, and usable on Samsung
   TV remotes before a UI is called complete.
 - DaveTV auth is invite-only family access. Anonymous bots must not access
@@ -76,6 +81,7 @@ mock proof for live-provider proof.
 - `docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md`
 - `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md`
 - `docs/49_TRUTH_AUDIT_RELEASE_READINESS_CONTRACT.md`
+- `docs/50_NATURAL_VOICE_AGENT_CONTRACT.md`
 - `docs/07_PROVIDER_CATALOG_AND_QR_ONBOARDING_CONTRACT.md`
 - `docs/10_ACCEPTANCE_GATES_VISUAL_RUNTIME_SECURITY.md`
 - `.agents/constitution.md`

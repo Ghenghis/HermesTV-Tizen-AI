@@ -5,7 +5,7 @@ import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NuvioShell — HermesTV's cinematic, hero-driven layout (9th layout).
+// NuvioShell — DaveTV's cinematic, hero-driven layout (9th layout).
 //
 // Visual language:
 //   - Full-bleed featured hero at the top (50vh), gradient fade into content.
@@ -15,12 +15,12 @@ import { capForProfile } from '../utils/isSystemLimited.js';
 //       3. Series
 //   - Cards are 2:3 portrait posters on the rails, 16:9 landscape on the hero.
 //   - Deep blacks (#0a0a0a base / #16161a raised) with `var(--accent)` highlights.
-//   - Top bar is minimal: HermesTV wordmark, search, settings — no sidebar.
+//   - Top bar is minimal: DaveTV wordmark, search, settings — no sidebar.
 //   - Rails are scrolled by horizontal `scrollLeft`. Left/right arrow buttons
 //     fade in on rail-hover and use the shared `var(--gradient-accent)` chip.
 //
-// All copy is HermesTV-branded — the "Nuvio" project name never appears in
-// user-visible strings; this is HermesTV's own cinematic layout.
+// All copy is DaveTV-branded — the "Nuvio" project name never appears in
+// user-visible strings; this is DaveTV's own cinematic layout.
 //
 // Tizen 6.5 / Chrome 76 safe: no arrow funcs, no destructuring, no template
 // strings, no optional chaining. We rely only on transform + opacity for
@@ -40,7 +40,7 @@ var HERO_GRADIENT =
   ' #0a0a0a 100%)';
 
 // One-line subtitle for the hero. Prefer the item's own description; fall back
-// to genre + year; final fallback is a neutral "Featured on HermesTV" so we
+// to genre + year; final fallback is a neutral "Featured on DaveTV" so we
 // never render an empty meta line. Hero already grabs attention from the
 // poster alone, so we keep this short and informative.
 function _heroSubtitle(item) {
@@ -187,7 +187,7 @@ function NuvioRail(props) {
                   outline: 'none',
                   // transform-only animation honours the QN85 60 fps budget.
                   // Duration + easing pulled from index.css tokens so this
-                  // shell matches the rest of HermesTV's motion design.
+                  // shell matches the rest of DaveTV's motion design.
                   transition: allowMotion
                     ? 'transform 220ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))'
                     : 'none',

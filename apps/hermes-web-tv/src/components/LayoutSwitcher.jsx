@@ -11,7 +11,7 @@ var CAT_ORDER = ['Live TV', 'IPTV Players', 'Classic Players', 'Streaming Servic
 
 // Some shell IDs differ from their display names (e.g. ynotv → "Lean TV",
 // extreme-infinitv → "Power user"). Showing the ID as a small subtitle in
-// the modal keeps developers and Hermes (chat) able to grep / refer to the
+// the modal keeps developers and DaveTV (voice/chat) able to grep / refer to the
 // internal name while users see the friendly label.
 var ID_SUBTITLE_OVERRIDES = {
   'ynotv': 'ynotv',
@@ -339,7 +339,7 @@ function LayoutSwitcher(props) {
                           <span style={{ fontWeight: 700, fontSize: 'calc(0.9rem * var(--font-scale, 1))', color: isActive ? layout.accent : '#c8d0db' }}>
                             {layout.name}
                             {idSubtitle && (
-                              <span style={{ fontWeight: 500, fontSize: 'calc(0.65rem * var(--font-scale, 1))', color: '#6b7280', marginLeft: '6px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} title="Internal layout id (also accepted by Hermes voice)">
+                              <span style={{ fontWeight: 500, fontSize: 'calc(0.65rem * var(--font-scale, 1))', color: '#6b7280', marginLeft: '6px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} title="Internal layout id (also accepted by DaveTV voice)">
                               {idSubtitle}
                               </span>
                             )}
@@ -419,7 +419,7 @@ function LayoutSwitcher(props) {
         {/* Footer */}
         <div style={{ padding: '12px 24px 16px', borderTop: '1px solid #2a2b3a', flexShrink: 0 }}>
           <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#8a8f9b', textAlign: 'center' }}>
-            Tip: Ask Hermes to change your View anytime — try &quot;switch to Netflix view&quot;
+            Tip: Ask DaveTV to change your View anytime — try &quot;switch to Netflix view&quot;
           </div>
         </div>
       </div>

@@ -129,7 +129,7 @@ function validateCandidate(candidate) {
 // ---------------------------------------------------------------------------
 function buildSystemPrompt() {
   var lines = [
-    'You are a strict intent parser for HermesTV, a Samsung TV streaming UI.',
+    'You are a strict intent parser for DaveTV, a Samsung TV streaming UI.',
     'Map the user request to exactly ONE of the allowed actions below, or return null if no confident match.',
     '',
     'Allowed actions and their parameter values:',

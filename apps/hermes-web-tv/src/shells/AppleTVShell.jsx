@@ -5,9 +5,9 @@ import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AppleTVShell — HermesTV's clean, glass-blur, big-typography layout, inspired
+// AppleTVShell — DaveTV's clean, glass-blur, big-typography layout, inspired
 // by streaming-service visual vocabulary (cool blue accent, near-black canvas,
-// wide spacious rows, glass nav, large pill CTAs). All copy is HermesTV
+// wide spacious rows, glass nav, large pill CTAs). All copy is DaveTV
 // branding — never reference "Apple TV" in user-visible strings. Polish pass
 // mirrors the SOTA shared vocabulary from index.css + design/tokens.js:
 //   - Radii consume var(--radius-md/lg/xl/pill) so the chunky rounded look

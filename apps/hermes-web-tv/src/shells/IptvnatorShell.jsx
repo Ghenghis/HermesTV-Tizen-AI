@@ -4,7 +4,7 @@ import * as watchHistoryStore from '../store/watchHistoryStore.js';
 import CategorySidebar from '../components/CategorySidebar.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IptvnatorShell — HermesTV's 13th layout shell, a "Classic 3-pane" surface.
+// IptvnatorShell — DaveTV's 13th layout shell, a "Classic 3-pane" surface.
 //
 // Cloned design language (NOT cloned assets):
 //   - Three-column CSS grid: 220px navigation rail | flexible channel list
@@ -32,7 +32,7 @@ import CategorySidebar from '../components/CategorySidebar.jsx';
 //     buttons console.log for now — wiring into the player surface is a
 //     follow-up task because it touches the playback layer outside the shell.
 //
-// All copy is HermesTV branding — never reference "iptvnator" in user-visible
+// All copy is DaveTV branding — never reference "iptvnator" in user-visible
 // strings.
 //
 // Tizen 6.5 / Chrome 76 safe: ES5-style declarations, no arrow funcs in body,

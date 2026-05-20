@@ -202,7 +202,7 @@ function MomModeShell(props) {
         <WatchlistRail profile={profile} items={filtered} onItemSelect={onItemSelect} fontScale={fontScale} />
         {displayItems.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', fontSize: 'calc(18px * ' + fontScale + ')', color: '#c8b8e8', lineHeight: 1.6 }}>
-            Nothing here yet.<br />Try another category or ask Hermes!
+            Nothing here yet.<br />Try another category or ask DaveTV!
           </div>
         ) : (
           <React.Fragment>
@@ -308,7 +308,7 @@ function MomModeShell(props) {
       <div style={{ background: '#16213e', borderTop: '1px solid #2a2a4a', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ fontSize: 'calc(22px * ' + fontScale + ')', fontWeight: 700, color: MOM_ACCENT }}>{currentTime}</div>
         <div style={{ fontSize: 'calc(13px * ' + fontScale + ')', color: '#c8b8e8', textAlign: 'right' }}>
-          Hermes is here to help — just ask! 💬
+          DaveTV is here to help — just ask! 💬
         </div>
       </div>
     </div>

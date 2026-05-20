@@ -5,7 +5,7 @@ import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ExtremeInfiniTVShell — HermesTV's "Power user" 3-pane shell (11th layout).
+// ExtremeInfiniTVShell — DaveTV's "Power user" 3-pane shell (11th layout).
 //
 // Design language inspiration (not asset clones):
 //   - Dense, data-rich dashboard for technical viewers.
@@ -25,7 +25,7 @@ import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 //     button, and tab gets `var(--shadow-focus)` on focus. Hover is
 //     decorative only.
 //
-// HermesTV branding — never reference "Extreme-InfiniTV" or "InfiniTV" in
+// DaveTV branding — never reference "Extreme-InfiniTV" or "InfiniTV" in
 // any user-visible string.
 // ─────────────────────────────────────────────────────────────────────────────
 

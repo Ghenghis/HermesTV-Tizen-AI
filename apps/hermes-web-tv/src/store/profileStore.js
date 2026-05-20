@@ -26,7 +26,7 @@
 //   reduced_motion: boolean — when true, body.motion-reduced is added
 //   mom_mode:       boolean — when true, font_scale is clamped to >= 1.25
 //   tier_override:  string  — 'auto' | 'enhanced' | 'degraded'
-//   agent_name:     string  — what the user calls the agent (default 'Hermes')
+//   agent_name:     string  — what the user calls the agent (default 'DaveTV')
 //   audio_feedback: boolean — Azure TTS greeting on boot
 //   preferred_voice_id: string — Azure voice id, mirrors voicePrefStore record
 //   tv_model:       string  — TV model string (Tizen detection seed)
@@ -54,7 +54,7 @@ var DEFAULT_PROFILES = [
     reduced_motion: false,
     mom_mode: false,
     tier_override: 'auto',
-    agent_name: 'Hermes',
+    agent_name: 'DaveTV',
     audio_feedback: false,
     tv_model: 'UN55CU8000BXZA'
   },
@@ -68,7 +68,7 @@ var DEFAULT_PROFILES = [
     reduced_motion: true,
     mom_mode: true,
     tier_override: 'auto',
-    agent_name: 'Hermes',
+    agent_name: 'DaveTV',
     audio_feedback: true,
     tv_model: 'QN85Q7FAAFXZA'
   }
@@ -92,7 +92,7 @@ var PROFILE_DEFAULTS = {
   reduced_motion: false,
   mom_mode:       false,
   tier_override:  'auto',
-  agent_name:         'Hermes',
+  agent_name:         'DaveTV',
   audio_feedback:     false,
   preferred_voice_id: '',
   tv_model:       'QN85Q7FAAFXZA'
@@ -144,9 +144,11 @@ function _normaliseProfile(raw) {
   if (out.tier_override !== 'auto' && out.tier_override !== 'enhanced' && out.tier_override !== 'degraded') {
     out.tier_override = 'auto';
   }
-  // agent_name: clamp empty / non-string back to default 'Hermes', max 30 chars
+  // agent_name: clamp empty / non-string back to default 'DaveTV', max 30 chars
   if (typeof out.agent_name !== 'string' || out.agent_name.trim().length === 0) {
-    out.agent_name = 'Hermes';
+    out.agent_name = 'DaveTV';
+  } else if (out.agent_name.trim().toLowerCase() === 'hermes') {
+    out.agent_name = 'DaveTV';
   } else if (out.agent_name.length > 30) {
     out.agent_name = out.agent_name.substring(0, 30);
   }

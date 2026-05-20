@@ -130,9 +130,9 @@ These open the **Schedule Recording** dialog for whatever live channel is on scr
 
 ## 3. Notes for Sherri
 
-- **Text size is always protected.** Hermes will never shrink your text below 1.35x (about 35% larger than the default). If you type a command that would reduce font size below this level, the app ignores that part of the command and keeps your text at a safe size. The minimum the system will ever go is 1.25x, even if Dave switches to your profile and adjusts settings.
+- **Text size is always protected.** DaveTV will never shrink your text below 1.35x (about 35% larger than the default). If you type a command that would reduce font size below this level, the app ignores that part of the command and keeps your text at a safe size. The minimum the system will ever go is 1.25x, even if Dave switches to your profile and adjusts settings.
 - **"Mom mode" always restores your full setup.** If something looks wrong — tiles are too small, the colors changed, or the content list seems off — just type `mom mode` and everything snaps back to your saved preferences.
-- **Audio confirmation is coming.** In the next update (B3), after you type or say a command, Hermes will speak a short confirmation out loud through your TV's speakers using Azure voice — for example: *"OK, switching to Hallmark now."* In the current version, commands work silently (the screen changes but there is no voice reply yet).
+- **Audio confirmation is coming.** In the next update (B3), after you type or say a command, DaveTV will speak a short confirmation out loud through your TV's speakers using Azure voice — for example: *"OK, switching to Hallmark now."* In the current version, commands work silently (the screen changes but there is no voice reply yet).
 
 ---
 
@@ -170,7 +170,7 @@ The chatbot keeps working even when the backend server is temporarily unreachabl
 
 The next major update adds:
 
-- **Voice confirmation from Hermes.** After you type or say a command, Hermes will speak a brief confirmation through the TV speakers using Azure voice. For example: *"OK, switching to Hallmark now."* or *"Done — dark theme applied."* This uses Azure Cognitive Services voice only (not Samsung Bixby or any built-in TV voice).
+- **Voice confirmation from DaveTV.** After you type or say a command, DaveTV will speak a brief confirmation through the TV speakers using Azure voice. For example: *"OK, switching to Hallmark now."* or *"Done — dark theme applied."* This uses Azure Cognitive Services voice only (not Samsung Bixby or any built-in TV voice).
 - **More commands.** The B3 command set is being expanded. Additional genre filters, layout presets, and personalization shortcuts are planned.
 - **Walkie-talkie voice input.** The microphone button in the chatbot header will accept real push-to-talk input using the Samsung mic, with the spoken query transcribed and matched to the command list.
 

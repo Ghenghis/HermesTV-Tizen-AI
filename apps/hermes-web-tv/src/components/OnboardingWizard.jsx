@@ -93,8 +93,8 @@ var STEP_TOUR_CARDS = [
   },
   {
     icon: '🎙️', // 🎙️
-    headline: 'Say "Hey Hermes" or type in the chat',
-    body: 'Voice and text control the whole TV — filter by provider, change layouts, switch themes, jump straight to a movie. Hermes listens.',
+    headline: 'Say "Hey DaveTV" or press the voice button',
+    body: 'Voice controls the whole TV — filter by provider, change Views, switch themes, jump straight to a movie. DaveTV listens when a real voice path is active.',
     accent: '#22c55e',
   },
 ];

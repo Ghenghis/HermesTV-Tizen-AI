@@ -65,6 +65,7 @@ import SleepTimer, { useSleepTimer } from './components/SleepTimer.jsx';
 // hermes-vp-{landscape|portrait} + hermes-vp-narrow/wide on <body> so shells
 // + CSS can react to Samsung tablets/phones rotating without per-shell hooks.
 import { installViewportClasses } from './utils/viewportClass.js';
+import { resolveAssistantName } from './utils/assistantName.js';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -1160,7 +1161,7 @@ function App() {
           // Speak a short "Welcome back, Sherri" line through the user's
           // last-picked Azure voice (or the server-side profile default
           // when nothing has been persisted yet). The agent's chosen name
-          // (profile.agent_name, e.g. "Nova" or "Hermes") is the implicit
+          // (profile.agent_name, e.g. "Nova" or "DaveTV") is the implicit
           // narrator — display_name is the user we're greeting. Skipped when:
           //   - profile.audio_feedback is false (Dave's default — silent)
           //   - the API is unreachable (mock fallback paths)
@@ -2585,7 +2586,7 @@ function App() {
             <VoicePickerModal
               isOpen={state.showVoicePicker}
               profileId={profile.profile_id || 'mom_tv'}
-              agentName={profile.agent_name || 'Hermes'}
+              agentName={resolveAssistantName(profile)}
               currentVoiceId={state.activeVoiceId}
               onClose={function() { patchState({ showVoicePicker: false }); }}
               onVoiceChange={function(voiceId) {

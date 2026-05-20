@@ -6,10 +6,10 @@ import CategorySidebar from '../components/CategorySidebar.jsx';
 import CatchupRail from '../components/CatchupRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TiviMateShell — HermesTV's IPTV / EPG-style layout.
+// TiviMateShell — DaveTV's IPTV / EPG-style layout.
 //
 // Visual identity: narrow channel rail on the left, EPG time grid on the right
-// with the orange sunset accent reading "live event guide." HermesTV branding
+// with the orange sunset accent reading "live event guide." DaveTV branding
 // only — never reference upstream IPTV-player names in user-visible strings.
 //
 // SOTA polish per PR #75: design tokens (--radius-*, --shadow-*, --ease-out,

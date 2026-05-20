@@ -7,6 +7,7 @@ import * as voiceClient from '../api/azureVoiceClient.js';
 import * as voicePrefStore from '../store/voicePrefStore.js';
 import { getResponseText } from '../utils/commandResponseText.js';
 import { matchGreeting } from '../utils/chatbotGreetings.js';
+import { resolveAssistantName } from '../utils/assistantName.js';
 import CommandChips from './CommandChips.jsx';
 import CommandHelpModal from './CommandHelpModal.jsx';
 import { SkeletonBlock } from './Skeleton.jsx';
@@ -82,7 +83,7 @@ function FloatingChatbot(props) {
   var profile = props.profile || {};
   var online = props.online !== false;
 
-  var agentName = profile.agent_name || 'Hermes';
+  var agentName = resolveAssistantName(profile);
   var profileId = profile.profile_id || 'dave_tv';
   // Mom-mode flag — bumps font scale, widens spacing, swaps to the warmer
   // theme-mom-calm accent so the panel matches Sherri's catalog look when

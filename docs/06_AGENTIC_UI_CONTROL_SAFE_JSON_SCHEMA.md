@@ -8,6 +8,11 @@ This document is the binding contract for how agents (and the floating chatbot) 
 
 > Schema-key note: the JSONSchema namespace `hermestv.ui.v1` and the action `$id` URIs (e.g. `hermestv.ui.v1/commands/update_layout.json`) are technical identifiers. They remain as `hermestv.*` even though the product is now branded **DaveTV** in the UI — these keys are wire-compatibility names, not user-facing strings.
 
+> Natural voice note: this schema is the safe execution layer, not the natural
+> language brain. The voice-first DaveTV agent contract lives in
+> `docs/50_NATURAL_VOICE_AGENT_CONTRACT.md`. Exact phrase command tables may be
+> used as fast paths only; they do not satisfy the agent product requirement.
+
 ## Hard rules
 
 1. Agents may change UI state **only** by emitting validated JSON commands from the allowlist in this document.

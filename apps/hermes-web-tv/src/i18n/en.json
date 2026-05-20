@@ -44,7 +44,7 @@
   "settings.tabs.parental": "Parental",
 
   "settings.language.header": "Language",
-  "settings.language.tagline": "Pick the language used across menus, modals, and Hermes replies.",
+  "settings.language.tagline": "Pick the language used across menus, modals, and DaveTV replies.",
   "settings.language.english": "English",
   "settings.language.spanish": "Español",
   "settings.language.french": "Français",
@@ -141,13 +141,13 @@
   "settings.about.credit": "Built for Sherri (Mom mode) and Dave. Design language inspired by IPTV Player Zero — no copied assets.",
 
   "settings.voice.header": "Voice",
-  "settings.voice.tagline": "Pick the synthesized voice Hermes uses to speak.",
+  "settings.voice.tagline": "Pick the synthesized voice DaveTV uses to speak.",
   "settings.voice.pick_voice": "Pick a voice",
   "settings.voice.tts_engine": "TTS engine",
   "settings.voice.tts_engine_value": "Azure Speech",
   "settings.voice.tts_engine_note": "Bixby AI is not used. Voice output is Azure-only.",
   "settings.voice.mic_input": "Microphone input",
-  "settings.voice.mic_input_tagline": "Use the Samsung remote mic to send voice commands to Hermes.",
+  "settings.voice.mic_input_tagline": "Use the Samsung remote mic to send voice commands to DaveTV.",
   "settings.voice.mic_input_detail": "Capture only — speech recognition runs on the server. Mic input never bypasses Azure for output.",
 
   "settings.sleep.header": "Sleep timer",
@@ -160,7 +160,7 @@
   "settings.sleep.set": "Set sleep timer",
   "settings.sleep.cancel": "Cancel sleep timer",
 
-  "chatbot.greeting": "Hi! I'm Hermes. Type a command or tap a Suggestion below. Try: show movies, mom mode, dark theme, show 4K.",
+  "chatbot.greeting": "Hi, I'm DaveTV. Press the voice button or say what you want to watch.",
   "chatbot.placeholder": "Message {name}...",
   "chatbot.send": "Send",
   "chatbot.thinking_aria": "{name} is thinking",

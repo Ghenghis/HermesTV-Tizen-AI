@@ -32,28 +32,34 @@ Playback is instant by default. Remote navigation must be smooth, focusable,
 scrollable, and usable without mouse-like precision. Extra options belong in
 settings, not blocking watch popups.
 
-## 6. Contracts Before Code
+## 6. Voice Is Natural And DaveTV-Branded
+
+The user-facing assistant is DaveTV. Family users should be able to speak
+natural language through the remote voice path. Hard-coded exact command tables
+are allowed only as fast paths; they are not the product experience.
+
+## 7. Contracts Before Code
 
 For non-trivial work, define API/data/UI contracts before implementation. Use
 OpenAPI, schemas, test fixtures, or Markdown contracts as appropriate.
 
-## 7. Proof Is Required
+## 8. Proof Is Required
 
 Every completed task needs evidence. The proof must match the claim: unit tests
 for helpers, integration tests for routes, browser screenshots for UI, live
 provider proof for provider readiness, and VPS checks for deployment.
 
-## 8. Minimal, Reversible Changes
+## 9. Minimal, Reversible Changes
 
 Keep edits scoped. Avoid unrelated refactors. Preserve existing user work. Do
 not deploy without rollback and env preflight.
 
-## 9. License-Safe Reference Use
+## 10. License-Safe Reference Use
 
 Reference IPTV apps may inform behavior, UX, and test contracts. Do not paste
 large source sections or import incompatible licensed code.
 
-## 10. Release Definition
+## 11. Release Definition
 
 Release-ready means:
 

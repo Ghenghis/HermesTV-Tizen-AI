@@ -4,7 +4,7 @@ import { debounce } from '../utils/debounce.js';
 import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// YnotvShell — HermesTV's "Lean TV" layout (13th layout).
+// YnotvShell — DaveTV's "Lean TV" layout (13th layout).
 //
 // Cloned design language (NOT cloned assets):
 //   - Windows 11-style fluent surface: slate-on-electric-blue, mica-feeling
@@ -33,7 +33,7 @@ import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 //     mock catalog) get a small accent dot. Arrow keys move between days;
 //     Enter clicks into "today's releases" list below.
 //
-// All copy is HermesTV branding — "ynotv" never appears in user-visible
+// All copy is DaveTV branding — "ynotv" never appears in user-visible
 // strings. The visual language is inspired by the public screenshots; no
 // proprietary assets are bundled.
 //
@@ -57,7 +57,7 @@ var CHANNEL_OVERLAY_TRANSITION_MS = 200;
 var AUTOPLAY_COUNTDOWN_S = 5;
 
 // Days of week for the calendar header. Mon-first feels Windows-y; Sun-first
-// is the US default. We go Sun-first to match Hermes's English-US base locale.
+// is the US default. We go Sun-first to match DaveTV's English-US base locale.
 var WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 var MONTH_LABELS = [

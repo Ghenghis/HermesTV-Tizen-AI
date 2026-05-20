@@ -12,6 +12,7 @@ Always follow:
 - `docs/HANDOFF_FOR_CODEX.md`
 - `docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md`
 - `docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md`
+- `docs/50_NATURAL_VOICE_AGENT_CONTRACT.md`
 
 Hard rules:
 
