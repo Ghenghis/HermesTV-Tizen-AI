@@ -175,7 +175,7 @@
   "chatbot.voice_title": "Walkie-talkie mode",
   "chatbot.voice_aria": "Switch to voice mode",
   "chatbot.voice_header": "{name} — Voice",
-  "chatbot.voice_listening": "Listening... (mock mode — Azure TTS only)",
+  "chatbot.voice_listening": "Listening…",
   "chatbot.voice_switch_text": "Switch to text",
   "chatbot.no_match_known": "I didn't understand \"{text}\". Try \"show movies\", \"show 4K\", \"mom mode\", or \"dark theme\" — or tap a Suggestion below.",
   "chatbot.no_match_generic": "I didn't understand that. Try \"show movies\", \"show 4K\", \"mom mode\", or \"dark theme\" — or tap a Suggestion below.",

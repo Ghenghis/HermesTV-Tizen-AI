@@ -111,17 +111,18 @@ function _writeFeatureFlag(key, value) {
 }
 
 function _DataBadge(props) {
-  var src = props.catalogSource || 'unknown';
+  // Post-wave-17: server only emits 'jellyfin' | 'iptv-org' | 'providers' |
+  // 'merged' | 'no-providers'. No more 'mock-*' values — those were dropped
+  // when seedCatalog.js was purged. Anything else is treated as 'unknown'
+  // and displayed verbatim so an upstream value drift is visible.
+  var src = props.catalogSource || 'no-providers';
   var label;
   var color;
-  if (src === 'jellyfin' || src === 'threadfin-merged' || src === 'merged-with-iptv-org' || src === 'merged-with-providers') {
+  if (src === 'jellyfin' || src === 'iptv-org' || src === 'providers' || src === 'merged'
+      || src === 'merged-with-iptv-org' || src === 'merged-with-providers') {
     label = 'Live · ' + src; color = '#22c55e';
-  } else if (src === 'mock-fallback' || src === 'mock-threadfin-failed') {
-    label = 'Mock fallback (provider error)'; color = '#ef4444';
-  } else if (src === 'dev-mock') {
-    label = 'Dev mock (API offline)'; color = '#ef4444';
-  } else if (src === 'mock-no-jellyfin' || src === 'unknown') {
-    label = 'Mock seed (no providers configured)'; color = '#e3b341';
+  } else if (src === 'no-providers') {
+    label = 'No provider configured'; color = '#e3b341';
   } else {
     label = src; color = '#8b949e';
   }
