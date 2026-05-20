@@ -37,6 +37,14 @@ router.get('/api/layouts', (req, res) => {
   }
 
   manifests.sort((a, b) => (a.id < b.id ? -1 : 1));
+  // Layouts only change on deploy (manifests are bundled into the image), so
+  // we can cache aggressively at the edge. 5 min hard, 1 hour stale-while-
+  // revalidate. Browser cache stays short so dev iteration is immediate.
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=60, s-maxage=300, stale-while-revalidate=3600'
+  );
+  res.setHeader('Vary', 'Accept-Encoding');
   res.json({ layouts: manifests, count: manifests.length });
 });
 
