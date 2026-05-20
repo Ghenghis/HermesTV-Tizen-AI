@@ -6,8 +6,9 @@ plus an accepted host key — neither of which the operator had on
 2026-05-18, which blocked that day's deploy.
 
 The laptop script (`tools/redeploy-vps.sh`) is still here as a fallback. Both
-paths do the same thing: pull `main` on the VPS, rebuild + restart the two
-HermesTV containers, wait for healthchecks, then run five smoke probes.
+paths do the same thing: pull the requested ref on the VPS, rebuild + restart
+the two HermesTV containers, wait for healthchecks, then run auth-aware smoke
+probes.
 
 > Companion runbook: `docs/29_HERMESTV_DEPLOY_RUNBOOK.md` covers the
 > manual / loopback steps when neither path is usable.
@@ -16,31 +17,49 @@ HermesTV containers, wait for healthchecks, then run five smoke probes.
 
 ## 1 · One-time setup — GitHub repo secrets
 
-The workflow needs three secrets. Create them in:
+The workflow needs these repository secrets. Create them in:
 
 **GitHub → Settings → Secrets and variables → Actions → New repository secret.**
 
 | Name | What it holds | How to find it |
 | --- | --- | --- |
-| `VPS_SSH_KEY` | The **full private key** of the deploy keypair, including the `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----` lines and the blank line at the end. | On your workstation, `cat ~/.ssh/id_ed25519` (or whichever key matches the `IdentityFile` line for `srv1376124` in `~/.ssh/config`). If you don't have one yet, generate `ssh-keygen -t ed25519 -C "github-actions-vps-deploy"`, then `ssh-copy-id -i ~/.ssh/id_ed25519.pub operator@<vps>` to authorize the public half. |
 | `VPS_HOST` | Hostname or IPv4 of the Hostinger VPS. | Hostinger panel → VPS → your server → Overview. Either `srv1376124.hstgr.cloud` or the raw IP works; the public side of the workflow uses the canonical `tv.daveai.tech`, so this secret only affects SSH-target resolution. |
 | `VPS_USER` | The username to log in as (typically `operator`). | See `docs/22_CREATE_OPERATOR_USER_RUNBOOK.md`. If you SSH today with `ssh operator@srv1376124`, the value is `operator`. |
+| `VPS_PASS` | The password for `VPS_USER`. | Hostinger/operator credentials. The workflow passes it through `sshpass -e`, not on the process command line. |
+| `VPS_PORT` | Optional SSH port. | Leave unset for `22`, or set the custom Hostinger SSH port. |
+| `DAVETV_PROOF_EMAIL` | Optional, required only when `run_provider_live=true`. | A real invited DaveTV account email used for provider proof. Prefer a normal viewer account, not Dave's admin. |
+| `DAVETV_PROOF_PASSWORD` | Optional, required only when `run_provider_live=true`. | Password for `DAVETV_PROOF_EMAIL`. Never commit it. |
 
 **No secret value belongs in `.github/workflows/deploy-vps.yml` or in any
 markdown file.** The workflow reads them by name from `${{ secrets.* }}`.
 
-### Verifying the deploy key works
+### Verifying VPS login works
 
-Before triggering the workflow, confirm the keypair actually opens the
-operator account:
+Before triggering the workflow, confirm the operator account works:
 
 ```sh
-# On your workstation, with the matching private key in the SSH agent:
-ssh -o BatchMode=yes -o ConnectTimeout=10 operator@<vps-host> 'echo ok'
+ssh -o ConnectTimeout=10 operator@<vps-host> 'echo ok'
 ```
 
-If that prints `ok`, the same key plus a fresh `ssh-keyscan` (which the
-workflow runs for you) will work from the runner.
+If that prints `ok`, the same host/user/password values should work from the
+runner.
+
+### Required private VPS `.env`
+
+Before deploying the auth-gated DaveTV build, the private file
+`/home/operator/hermestv/.env` on the VPS must contain real values:
+
+```env
+DAVETV_AUTH_REQUIRED=true
+DAVETV_AUTH_ENFORCE_API=true
+DAVETV_PUBLIC_APP_URL=https://tv.daveai.tech
+DAVETV_ADMIN_EMAIL=<Dave real email>
+DAVETV_ADMIN_PASSWORD=<Dave real initial password>
+```
+
+The deploy workflow checks these keys before rebuilding. It prints only key
+names, never the values. If any are missing, deploy stops before the running
+site is changed.
 
 ---
 
@@ -51,7 +70,9 @@ workflow runs for you) will work from the runner.
 3. Click **Run workflow** (top-right of the run list).
 4. Leave `Branch: main` selected, leave the `ref` input at `main`, click
    the green **Run workflow** button.
-5. The run appears in the list within a few seconds. Click it to watch
+5. For provider-live proof, set `run_provider_live=true` only after
+   `DAVETV_PROOF_EMAIL` and `DAVETV_PROOF_PASSWORD` secrets exist.
+6. The run appears in the list within a few seconds. Click it to watch
    the live log.
 
 The workflow is **manual only** — there is no `push: main` trigger. You
@@ -75,15 +96,17 @@ Inside the log, the **Smoke-probe public HTTPS edge** step prints:
 
 ```text
   PASS: /health -> 200
-  PASS: /api/layouts count=8
-  PASS: /api/download exact_size_human='12.4 GB'   # value varies
-  PASS: /api/pair pairing_code='HRM-AB1C'          # value varies
-  PASS: /api/catalog _meta.source='m3u'            # source varies
+  PASS: /api/version git_sha=<deployed sha>
+  PASS: /api/auth/me configured=true required=true api_enforced=true
+  PASS: /api/providers anonymous request blocked with 401
+  PASS: web root -> 200
 === VPS redeploy complete — 5 PASS, 0 FAIL ===
 ```
 
-The job is green only when **all five probes** report PASS **and** the
-SSH redeploy step exited zero. Any FAIL turns the run red.
+The blocking deploy gate is the SSH redeploy step plus container health. The
+public smoke step can be informational because Cloudflare may block GitHub
+runner IPs; when the edge is reachable, the five probes above should report
+`PASS`.
 
 ---
 
@@ -91,14 +114,13 @@ SSH redeploy step exited zero. Any FAIL turns the run red.
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| Job stops in **Start SSH agent**. | `VPS_SSH_KEY` secret is empty, malformed, or missing the trailing newline. | Re-paste the full file contents including header, footer, and final newline. |
 | Job stops in **Pre-seed known_hosts** with `Secret VPS_HOST is empty`. | `VPS_HOST` secret is unset. | Add the hostname/IP and re-run. |
-| Job stops in **SSH to VPS and redeploy** with `Permission denied (publickey)`. | The public half of `VPS_SSH_KEY` is not in `~operator/.ssh/authorized_keys` on the VPS. | On the VPS, append the matching public key to `/home/operator/.ssh/authorized_keys`. |
+| Job stops in **SSH to VPS and redeploy** with `Permission denied`. | `VPS_USER`, `VPS_PASS`, host, or port is wrong. | Correct the repo secrets and confirm `ssh operator@<vps-host> 'echo ok'` from a workstation. |
 | SSH step hangs to timeout. | VPS firewall is dropping inbound from the GitHub runner IP. | Confirm port 22 (or the configured port) accepts global inbound. Hostinger panel → Firewall. |
+| SSH step reports `.env missing required DAVETV_*`. | Auth-gated build would lock the site because the private VPS env is incomplete. | SSH to the VPS and set the required keys in `/home/operator/hermestv/.env`, mode `0600`. |
 | `containers did not reach healthy within 60s`. | Bad build, missing env var, or the API/web image crashed on boot. | SSH manually and run `docker compose -p hermestv-vps logs --tail=200 hermes-tv-api hermes-web-tv`. |
-| Smoke probe 2 reports `count='7'`. | The deployed build predates PR #58. | The redeploy ran but the ref didn't include #58. Pass a newer commit to the `ref` input and re-run. |
-| Smoke probe 3 reports `exact_size_human missing`. | The deployed build predates PR #59. | Same as above. |
-| Smoke probe 4 reports `pairing_code` empty or wrong shape. | The deployed build predates PR #67. | Same as above. |
+| Smoke probe reports `/api/auth/me` not configured. | Dave admin bootstrap env was missing or the auth store has no admin. | Set `DAVETV_ADMIN_EMAIL` and `DAVETV_ADMIN_PASSWORD`, then redeploy/restart before inviting users. |
+| Smoke probe reports `/api/providers` did not return 401. | Public API auth gate is not enabled. | Set `DAVETV_AUTH_ENFORCE_API=true` on the VPS. |
 
 The full container logs are not echoed into the job log (they would leak
 unrelated detail). If a probe fails after a clean SSH step, SSH manually

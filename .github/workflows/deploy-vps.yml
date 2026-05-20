@@ -3,7 +3,7 @@ name: Deploy VPS
 # ============================================================================
 # Manual VPS redeploy — pull main on the Hostinger VPS, rebuild + restart the
 # two HermesTV containers (hermes-tv-api and hermes-web-tv), wait for
-# healthchecks, then run five smoke probes against the public HTTPS edge.
+# healthchecks, then run auth-aware smoke probes against the public HTTPS edge.
 #
 # This is the click-button replacement for `tools/redeploy-vps.sh` so that an
 # operator without a working local SSH config can still ship. Both code paths
@@ -179,6 +179,35 @@ jobs:
           NEW_SHA=\$(git rev-parse HEAD)
           echo "  remote: HEAD is now \$NEW_SHA"
 
+          echo "  remote: verifying DaveTV production auth env in ${REPO_DIR}/.env"
+          if [ ! -f .env ]; then
+            echo "  remote: ERROR — ${REPO_DIR}/.env is missing. Refusing to deploy an auth-gated build." >&2
+            exit 3
+          fi
+          missing=0
+          require_env_key() {
+            key="\$1"
+            if ! grep -Eq "^\${key}=.+" .env; then
+              echo "  remote: ERROR — .env missing required \${key}" >&2
+              missing=1
+            fi
+          }
+          require_env_key DAVETV_AUTH_REQUIRED
+          require_env_key DAVETV_AUTH_ENFORCE_API
+          require_env_key DAVETV_PUBLIC_APP_URL
+          require_env_key DAVETV_ADMIN_EMAIL
+          require_env_key DAVETV_ADMIN_PASSWORD
+          app_url=\$(grep -E '^DAVETV_PUBLIC_APP_URL=' .env | tail -n1 | cut -d= -f2-)
+          if [ "\$app_url" != "https://tv.daveai.tech" ]; then
+            echo "  remote: ERROR — DAVETV_PUBLIC_APP_URL must be https://tv.daveai.tech (value redacted)" >&2
+            missing=1
+          fi
+          if [ "\$missing" -ne 0 ]; then
+            echo "  remote: Auth env preflight failed. Set real values in ${REPO_DIR}/.env; never commit them." >&2
+            exit 3
+          fi
+          echo "  remote: DaveTV auth env preflight passed (values redacted)"
+
           # Embed the deploy SHA + build time into the api image so
           # /api/version no longer reports git_sha=unknown. The api
           # Dockerfile accepts ARG GIT_SHA/BUILD_TIME; compose forwards
@@ -219,10 +248,8 @@ jobs:
 
       # ---------------------------------------------------------------------
       # 5) Smoke probes against the public HTTPS edge (Cloudflare → nginx →
-      # container). Mirrors the five probes in tools/redeploy-vps.sh lines
-      # 162-249 byte-for-byte; the only addition is `tv.daveai.tech` as
-      # primary host. hermestv.daveai.tech remains a compatibility fallback
-      # while external links and older QR codes migrate to tv.daveai.tech.
+      # container). These probes are auth-aware: protected API routes are
+      # expected to reject anonymous requests after DaveTV auth is enabled.
       #
       # NOTE: continue-on-error is true because Cloudflare returns 403 to
       # GitHub Actions runner CIDR ranges, so this step structurally cannot
@@ -282,60 +309,44 @@ jobs:
             probe_fail "/health -> ${HEALTH_CODE} (expected 200)"
           fi
 
-          # Probe 2: /api/layouts count >= 9 — flexible because the layout
-          # surface grows as new shells land (8 baseline, +Zero=9, +Nuvio,
-          # +ExtremeInfiniTV, +Stremio, +LiveTV, +Iptvnator, +Ynotv...).
-          # Hard-coding the count couples deploys to PR sequence; we just
-          # require the canary "zero" entry is present in the list.
-          echo "probe 2: GET /api/layouts -> expect count>=9 and includes 'zero'"
-          LAYOUTS_JSON=$(curl -sf "https://${HOST}/api/layouts" 2>/dev/null || echo "{}")
-          LAYOUTS_COUNT=$(echo "$LAYOUTS_JSON" | jq -r '.count // 0')
-          HAS_ZERO=$(echo "$LAYOUTS_JSON" | jq -r '[.layouts[]?.id] | index("zero") // "missing"')
-          if [ "$LAYOUTS_COUNT" -ge 9 ] && [ "$HAS_ZERO" != "missing" ]; then
-            probe_pass "/api/layouts count=${LAYOUTS_COUNT} (>=9), 'zero' shell present"
+          # Probe 2: /api/version is open and should carry a deployed SHA.
+          echo "probe 2: GET /api/version -> expect git_sha"
+          VERSION_JSON=$(curl -sf "https://${HOST}/api/version" 2>/dev/null || echo "{}")
+          VERSION_SHA=$(echo "$VERSION_JSON" | jq -r '.git_sha // empty')
+          if [ -n "$VERSION_SHA" ] && [ "$VERSION_SHA" != "unknown" ]; then
+            probe_pass "/api/version git_sha=${VERSION_SHA}"
           else
-            probe_fail "/api/layouts count='${LAYOUTS_COUNT}' has_zero='${HAS_ZERO}' (expected count>=9 with zero shell)"
+            probe_fail "/api/version git_sha missing or unknown"
           fi
 
-          # Probe 3: POST /api/download returns exact_size_human (PR #59)
-          echo "probe 3: POST /api/download -> expect exact_size_human"
-          DOWNLOAD_SIZE=$(
-            curl -sf -X POST "https://${HOST}/api/download" \
-              -H "Content-Type: application/json" \
-              -d '{"item_id":"live-100","profile_id":"mom_tv"}' 2>/dev/null \
-            | jq -r '.exact_size_human // empty' || echo ""
-          )
-          if [ -n "$DOWNLOAD_SIZE" ]; then
-            probe_pass "/api/download exact_size_human='${DOWNLOAD_SIZE}'"
+          # Probe 3: /api/auth/me proves the production auth gate is configured.
+          echo "probe 3: GET /api/auth/me -> expect configured auth gate"
+          AUTH_JSON=$(curl -sf "https://${HOST}/api/auth/me" 2>/dev/null || echo "{}")
+          AUTH_CONFIGURED=$(echo "$AUTH_JSON" | jq -r '.auth.configured // false')
+          AUTH_REQUIRED=$(echo "$AUTH_JSON" | jq -r '.auth.required // false')
+          API_ENFORCED=$(echo "$AUTH_JSON" | jq -r '.auth.api_enforced // false')
+          if [ "$AUTH_CONFIGURED" = "true" ] && [ "$AUTH_REQUIRED" = "true" ] && [ "$API_ENFORCED" = "true" ]; then
+            probe_pass "/api/auth/me configured=true required=true api_enforced=true"
           else
-            probe_fail "/api/download exact_size_human missing (PR #59 not deployed?)"
+            probe_fail "/api/auth/me auth state configured=${AUTH_CONFIGURED} required=${AUTH_REQUIRED} api_enforced=${API_ENFORCED}"
           fi
 
-          # Probe 4: POST /api/pair -> HRM-XXXX (PR #67)
-          echo "probe 4: POST /api/pair -> expect 'HRM-XXXX'"
-          PAIRING_CODE=$(
-            curl -sf -X POST "https://${HOST}/api/pair" 2>/dev/null \
-            | jq -r '.pairing_code // empty' || echo ""
-          )
-          case "$PAIRING_CODE" in
-            HRM-*)
-              probe_pass "/api/pair pairing_code='${PAIRING_CODE}'"
-              ;;
-            *)
-              probe_fail "/api/pair pairing_code='${PAIRING_CODE}' (expected HRM-* — PR #67 not deployed?)"
-              ;;
-          esac
-
-          # Probe 5: /api/catalog _meta.source — log only (no fail on value).
-          # Pass condition: field is reachable. The actual value (jellyfin,
-          # m3u, iptv-org, mock) is environment-dependent and not a deploy
-          # canary, but a missing field would indicate a deeper API break.
-          echo "probe 5: GET /api/catalog -> log _meta.source"
-          CATALOG_SOURCE=$(curl -sf "https://${HOST}/api/catalog" 2>/dev/null | jq -r '._meta.source // empty' || echo "")
-          if [ -n "$CATALOG_SOURCE" ]; then
-            probe_pass "/api/catalog _meta.source='${CATALOG_SOURCE}'"
+          # Probe 4: protected API routes must reject anonymous bots.
+          echo "probe 4: GET /api/providers without cookie -> expect 401"
+          PROVIDERS_CODE=$(curl -s -o /tmp/davetv-providers.json -w "%{http_code}" "https://${HOST}/api/providers" 2>/dev/null || echo "000")
+          if [ "$PROVIDERS_CODE" = "401" ]; then
+            probe_pass "/api/providers anonymous request blocked with 401"
           else
-            probe_fail "/api/catalog _meta.source missing"
+            probe_fail "/api/providers anonymous status=${PROVIDERS_CODE} (expected 401)"
+          fi
+
+          # Probe 5: web root remains reachable for the login shell.
+          echo "probe 5: GET / -> expect 200"
+          ROOT_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${HOST}/" 2>/dev/null || echo "000")
+          if [ "$ROOT_CODE" = "200" ]; then
+            probe_pass "web root -> 200"
+          else
+            probe_fail "web root -> ${ROOT_CODE} (expected 200)"
           fi
 
           echo
@@ -391,9 +402,15 @@ jobs:
           FALLBACK_HOST: ${{ env.FALLBACK_HOST }}
           HERMES_PROVIDER_E2E_BASE: https://${{ env.PRIMARY_HOST }}
           PROVIDER_E2E_MODE: 'live'
+          DAVETV_PROOF_EMAIL: ${{ secrets.DAVETV_PROOF_EMAIL }}
+          DAVETV_PROOF_PASSWORD: ${{ secrets.DAVETV_PROOF_PASSWORD }}
         run: |
           set -euo pipefail
           echo "Provider-live proof: target=https://${PRIMARY_HOST}"
+          if [ -z "${DAVETV_PROOF_EMAIL:-}" ] || [ -z "${DAVETV_PROOF_PASSWORD:-}" ]; then
+            echo "::error::Provider-live proof now requires DAVETV_PROOF_EMAIL and DAVETV_PROOF_PASSWORD secrets for an invited DaveTV account."
+            exit 1
+          fi
 
           # Sanity-check the host before we hand it to the proof runner.
           # If the public edge isn't reachable from the runner (Cloudflare 403
@@ -411,6 +428,7 @@ jobs:
             FALLBACK_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${FALLBACK_HOST}/health" 2>/dev/null || echo "000")
             if [ "$FALLBACK_CODE" = "200" ] && is_hermes_host "$FALLBACK_HOST"; then
               echo "::warning::Primary ${PRIMARY_HOST} returned ${PRIMARY_CODE} or wrong service; using fallback ${FALLBACK_HOST}"
+              export HERMES_PROVIDER_E2E_BASE="https://${FALLBACK_HOST}"
               echo "HERMES_PROVIDER_E2E_BASE=https://${FALLBACK_HOST}" >> "$GITHUB_ENV"
             else
               echo "::error::Neither host reachable as HermesTV for provider-live proof (${PRIMARY_CODE} / ${FALLBACK_CODE})"

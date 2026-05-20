@@ -7,8 +7,8 @@
 # Hostinger VPS, fast-forwards /home/operator/hermestv to origin/main,
 # rebuilds and restarts ONLY the two HermesTV containers (hermes-tv-api
 # and hermes-web-tv), waits for both healthchecks to flip to "healthy",
-# and then runs five smoke probes against https://hermestv.daveai.tech.
-# tv.daveai.tech is kept as an alias probe until DNS/nginx is corrected.
+# and then runs smoke probes against https://tv.daveai.tech. The older
+# hermestv.daveai.tech host stays as a compatibility alias.
 #
 # Why this exists:
 #   On 2026-05-18 the agent triaging prod confirmed hermestv.daveai.tech
@@ -55,11 +55,10 @@ set -euo pipefail
 # no env vars. Anyone else exports OPERATOR_HOST=operator@<their-host>.
 OPERATOR_HOST="${OPERATOR_HOST:-srv1376124}"
 
-# Active HermesTV public domain we smoke-probe after the deploy. tv.daveai.tech
-# currently serves a different DaveAI app, so keep it as an alias probe only
-# until its DNS/nginx route is corrected.
-PUBLIC_HOST="hermestv.daveai.tech"
-ALIAS_HOST="tv.daveai.tech"
+# Active DaveTV public domain we smoke-probe after the deploy.
+PUBLIC_HOST="tv.daveai.tech"
+ALIAS_HOST="hermestv.daveai.tech"
+DEPLOY_REF="${DEPLOY_REF:-main}"
 
 # Compose project + file paths, mirroring docs/29 exactly. If these drift,
 # rollback / log-grep instructions in the runbook stop matching reality.
@@ -86,6 +85,7 @@ echo "Operator host : $OPERATOR_HOST"
 echo "Public domain : https://$PUBLIC_HOST  (alias: https://$ALIAS_HOST)"
 echo "Repo on VPS   : $REPO_DIR"
 echo "Compose file  : $COMPOSE_FILE (project: $COMPOSE_PROJECT)"
+echo "Deploy ref    : $DEPLOY_REF"
 echo
 
 # --- Step 1: pull + rebuild + up over SSH ---------------------------------
@@ -105,12 +105,45 @@ cd "$REPO_DIR"
 echo "  remote: git fetch origin"
 git fetch origin
 
-echo "  remote: git checkout main && git pull --ff-only"
-git checkout main
-git pull --ff-only
+echo "  remote: git checkout $DEPLOY_REF && git pull --ff-only (if branch)"
+git checkout "$DEPLOY_REF"
+if git symbolic-ref -q HEAD >/dev/null; then
+  git pull --ff-only
+else
+  echo "  remote: detached HEAD on $DEPLOY_REF — skipping pull"
+fi
 
 NEW_SHA=\$(git rev-parse HEAD)
 echo "  remote: HEAD is now \$NEW_SHA"
+
+echo "  remote: verifying DaveTV production auth env in $REPO_DIR/.env"
+if [ ! -f .env ]; then
+  echo "  remote: ERROR — $REPO_DIR/.env is missing. Refusing to deploy an auth-gated build." >&2
+  exit 3
+fi
+missing=0
+require_env_key() {
+  key="\$1"
+  if ! grep -Eq "^\${key}=.+" .env; then
+    echo "  remote: ERROR — .env missing required \${key}" >&2
+    missing=1
+  fi
+}
+require_env_key DAVETV_AUTH_REQUIRED
+require_env_key DAVETV_AUTH_ENFORCE_API
+require_env_key DAVETV_PUBLIC_APP_URL
+require_env_key DAVETV_ADMIN_EMAIL
+require_env_key DAVETV_ADMIN_PASSWORD
+app_url=\$(grep -E '^DAVETV_PUBLIC_APP_URL=' .env | tail -n1 | cut -d= -f2-)
+if [ "\$app_url" != "https://tv.daveai.tech" ]; then
+  echo "  remote: ERROR — DAVETV_PUBLIC_APP_URL must be https://tv.daveai.tech (value redacted)" >&2
+  missing=1
+fi
+if [ "\$missing" -ne 0 ]; then
+  echo "  remote: Auth env preflight failed. Set real values in $REPO_DIR/.env; never commit them." >&2
+  exit 3
+fi
+echo "  remote: DaveTV auth env preflight passed (values redacted)"
 
 echo "  remote: docker compose build $API_CONTAINER+$WEB_CONTAINER (this can take 3-6 min)"
 docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" \\
@@ -190,68 +223,44 @@ else
   probe_fail "/health → $HEALTH_CODE (expected 200)"
 fi
 
-# --- Probe 2: /api/layouts count == 9 (Nuvio shell ships as the 9th) ------
-# Pre-PR-#58 the manifest dir held 7 layouts (apple-tv, dave-power, mom-mode,
-# netflix, plex, samsung-tizen, tivimate). PR #58 added zero.json (8th). The
-# Nuvio shell PR adds nuvio.json (9th). A count of 9 is the canary that
-# "git pull && rebuild" actually shipped both follow-on PRs.
-echo "  probe 2: GET /api/layouts → expect count=9"
-LAYOUTS_COUNT=$(curl -sf "https://$PUBLIC_HOST/api/layouts" 2>/dev/null | jq -r '.count // empty' || echo "")
-if [ "$LAYOUTS_COUNT" = "9" ]; then
-  probe_pass "/api/layouts count=9"
+# --- Probe 2: /api/version carries deployed SHA --------------------------
+echo "  probe 2: GET /api/version → expect git_sha"
+VERSION_JSON=$(curl -sf "https://$PUBLIC_HOST/api/version" 2>/dev/null || echo "{}")
+VERSION_SHA=$(echo "$VERSION_JSON" | jq -r '.git_sha // empty')
+if [ -n "$VERSION_SHA" ] && [ "$VERSION_SHA" != "unknown" ]; then
+  probe_pass "/api/version git_sha=$VERSION_SHA"
 else
-  probe_fail "/api/layouts count='$LAYOUTS_COUNT' (expected 9 — Nuvio shell missing?)"
+  probe_fail "/api/version git_sha missing or unknown"
 fi
 
-# --- Probe 3: POST /api/download returns exact_size_human (PR #59) --------
-# Body uses live-100 (a known seed channel id) and mom_tv as the profile.
-# We don't care WHAT exact size the API picks — only that the field is
-# present and non-empty, which proves the PR #59 download envelope shipped.
-echo "  probe 3: POST /api/download → expect exact_size_human"
-DOWNLOAD_SIZE=$(
-  curl -sf -X POST "https://$PUBLIC_HOST/api/download" \
-    -H "Content-Type: application/json" \
-    -d '{"item_id":"live-100","profile_id":"mom_tv"}' 2>/dev/null \
-  | jq -r '.exact_size_human // empty' || echo ""
-)
-if [ -n "$DOWNLOAD_SIZE" ]; then
-  probe_pass "/api/download exact_size_human='$DOWNLOAD_SIZE'"
+# --- Probe 3: auth gate configured ---------------------------------------
+echo "  probe 3: GET /api/auth/me → expect configured auth gate"
+AUTH_JSON=$(curl -sf "https://$PUBLIC_HOST/api/auth/me" 2>/dev/null || echo "{}")
+AUTH_CONFIGURED=$(echo "$AUTH_JSON" | jq -r '.auth.configured // false')
+AUTH_REQUIRED=$(echo "$AUTH_JSON" | jq -r '.auth.required // false')
+API_ENFORCED=$(echo "$AUTH_JSON" | jq -r '.auth.api_enforced // false')
+if [ "$AUTH_CONFIGURED" = "true" ] && [ "$AUTH_REQUIRED" = "true" ] && [ "$API_ENFORCED" = "true" ]; then
+  probe_pass "/api/auth/me configured=true required=true api_enforced=true"
 else
-  probe_fail "/api/download exact_size_human missing (PR #59 not deployed?)"
+  probe_fail "/api/auth/me auth state configured=$AUTH_CONFIGURED required=$AUTH_REQUIRED api_enforced=$API_ENFORCED"
 fi
 
-# --- Probe 4: POST /api/pair returns HRM-XXXX (PR #67) --------------------
-# Pairing codes are minted fresh on every call and live in-memory. The
-# format is fixed: 'HRM-' + 4 alphanumerics. We accept the looser regex
-# 'HRM-.+' so a future format bump (e.g. 5 chars) doesn't break the smoke
-# without an actual regression.
-echo "  probe 4: POST /api/pair → expect 'HRM-XXXX'"
-PAIRING_CODE=$(
-  curl -sf -X POST "https://$PUBLIC_HOST/api/pair" 2>/dev/null \
-  | jq -r '.pairing_code // empty' || echo ""
-)
-case "$PAIRING_CODE" in
-  HRM-*)
-    probe_pass "/api/pair pairing_code='$PAIRING_CODE'"
-    ;;
-  *)
-    probe_fail "/api/pair pairing_code='$PAIRING_CODE' (expected HRM-* — PR #67 not deployed?)"
-    ;;
-esac
-
-# --- Probe 5: /api/catalog _meta.source — log only, no fail --------------
-# The catalog source is environment-dependent (jellyfin if reachable via
-# Tailscale, m3u if Threadfin has a playlist loaded, iptv-org if its 24h
-# cache is warm, mock otherwise). We don't assert a value — we just log
-# what the API resolved to so the operator can spot "still mock" surprises
-# without that being a deploy failure. Counts toward PASS as long as the
-# field is reachable; a missing field would indicate a deeper API break.
-echo "  probe 5: GET /api/catalog → log _meta.source"
-CATALOG_SOURCE=$(curl -sf "https://$PUBLIC_HOST/api/catalog" 2>/dev/null | jq -r '._meta.source // empty' || echo "")
-if [ -n "$CATALOG_SOURCE" ]; then
-  probe_pass "/api/catalog _meta.source='$CATALOG_SOURCE'"
+# --- Probe 4: protected API rejects anonymous bots -----------------------
+echo "  probe 4: GET /api/providers without cookie → expect 401"
+PROVIDERS_CODE=$(curl -s -o /tmp/davetv-providers.json -w "%{http_code}" "https://$PUBLIC_HOST/api/providers" 2>/dev/null || echo "000")
+if [ "$PROVIDERS_CODE" = "401" ]; then
+  probe_pass "/api/providers anonymous request blocked with 401"
 else
-  probe_fail "/api/catalog _meta.source missing"
+  probe_fail "/api/providers anonymous status=$PROVIDERS_CODE (expected 401)"
+fi
+
+# --- Probe 5: web root reachable ----------------------------------------
+echo "  probe 5: GET / → expect 200"
+ROOT_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://$PUBLIC_HOST/" 2>/dev/null || echo "000")
+if [ "$ROOT_CODE" = "200" ]; then
+  probe_pass "web root → 200"
+else
+  probe_fail "web root → $ROOT_CODE (expected 200)"
 fi
 
 # --- Probe 6: alias host /health returns 200 -----------------------------

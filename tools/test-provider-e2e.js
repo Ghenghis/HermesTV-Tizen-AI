@@ -51,6 +51,9 @@ var HAS_EXPLICIT_BASE = typeof process.env.HERMES_PROVIDER_E2E_BASE === 'string'
 var ALLOW_LOCAL_LIVE = String(process.env.PROVIDER_E2E_ALLOW_LOCAL_LIVE || '').toLowerCase() === '1' ||
   String(process.env.PROVIDER_E2E_ALLOW_LOCAL_LIVE || '').toLowerCase() === 'true';
 var BASE = HAS_EXPLICIT_BASE ? process.env.HERMES_PROVIDER_E2E_BASE : 'http://127.0.0.1:3199';
+var AUTH_EMAIL = process.env.DAVETV_PROOF_EMAIL || process.env.HERMES_PROVIDER_E2E_EMAIL || '';
+var AUTH_PASSWORD = process.env.DAVETV_PROOF_PASSWORD || process.env.HERMES_PROVIDER_E2E_PASSWORD || '';
+var authCookie = '';
 
 function nowIso() { return new Date().toISOString(); }
 function fmtTs() {
@@ -109,7 +112,9 @@ function redactString(s) {
 function sensitiveEnvValues() {
   var keys = ['APOLLO_M3U_URL', 'XTREMEHD_M3U_URL',
               'XTREAM_URL', 'XTREAM_USERNAME', 'XTREAM_PASSWORD',
-              'JELLYFIN_URL', 'JELLYFIN_API_KEY'];
+              'JELLYFIN_URL', 'JELLYFIN_API_KEY',
+              'DAVETV_PROOF_EMAIL', 'DAVETV_PROOF_PASSWORD',
+              'HERMES_PROVIDER_E2E_EMAIL', 'HERMES_PROVIDER_E2E_PASSWORD'];
   var vals = [];
   for (var i = 0; i < keys.length; i++) {
     var v = process.env[keys[i]];
@@ -159,7 +164,8 @@ function safeBaseLabel() {
 // Recursively scrub JSON-shaped objects: remove the known credential keys
 // outright; redact strings; pass through everything else.
 var CRED_KEYS = { username: 1, password: 1, api_key: 1, apikey: 1,
-                  token: 1, secret: 1, ticket: 1 };
+                  token: 1, secret: 1, ticket: 1, cookie: 1,
+                  authorization: 1, 'set-cookie': 1 };
 function scrub(v) {
   if (v == null) { return v; }
   if (typeof v === 'string') { return redactString(v); }
@@ -199,6 +205,16 @@ function call(method, p, body, options) {
     var u;
     try { u = new URL(url); } catch (_) { return resolve({ status: 0, error: 'bad-url' }); }
     var headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
+    if (authCookie && !options.noAuth) {
+      try {
+        var baseUrl = new URL(BASE);
+        if (u.protocol === baseUrl.protocol && u.host === baseUrl.host) {
+          headers.Cookie = authCookie;
+        }
+      } catch (_) {
+        // If BASE is malformed the request itself will fail below.
+      }
+    }
     var opts = {
       method: method,
       hostname: u.hostname,
@@ -323,7 +339,9 @@ function writeProof(name, content) {
 function envSummary() {
   var keys = ['APOLLO_M3U_URL', 'XTREMEHD_M3U_URL',
               'XTREAM_URL', 'XTREAM_USERNAME', 'XTREAM_PASSWORD',
-              'JELLYFIN_URL', 'JELLYFIN_API_KEY', 'IPTV_ORG_ENABLED'];
+              'JELLYFIN_URL', 'JELLYFIN_API_KEY', 'IPTV_ORG_ENABLED',
+              'DAVETV_PROOF_EMAIL', 'DAVETV_PROOF_PASSWORD',
+              'HERMES_PROVIDER_E2E_EMAIL', 'HERMES_PROVIDER_E2E_PASSWORD'];
   var out = {};
   for (var i = 0; i < keys.length; i++) {
     var k = keys[i];
@@ -368,6 +386,55 @@ function isMediaProof(resp) {
   return (resp.bytes || 0) > 0 && (mediaCt || hlsBody || tsSync);
 }
 
+function cookieFromSetCookie(header) {
+  if (!header) { return ''; }
+  var first = Array.isArray(header) ? header[0] : String(header);
+  return String(first || '').split(';')[0];
+}
+
+async function authenticateIfRequired(summary) {
+  var me = await call('GET', '/api/auth/me', null, { noAuth: true });
+  if (me.status !== 200 || !me.body || !me.body.auth) {
+    summary.notes.push('auth status unavailable: ' + me.status);
+    return true;
+  }
+  writeProof('auth-status.redacted.json', scrub({
+    required: me.body.auth.required,
+    api_enforced: me.body.auth.api_enforced,
+    configured: me.body.auth.configured,
+    oauth_providers: me.body.auth.oauth_providers,
+    smtp_configured: me.body.auth.smtp_configured
+  }));
+  if (!me.body.auth.api_enforced) {
+    PASS('DaveTV API auth not enforced for this proof target');
+    summary.pass.push('api_auth_not_enforced');
+    return true;
+  }
+  if (!AUTH_EMAIL || !AUTH_PASSWORD) {
+    FAIL('DaveTV proof login credentials missing', 'Set DAVETV_PROOF_EMAIL + DAVETV_PROOF_PASSWORD or HERMES_PROVIDER_E2E_EMAIL + HERMES_PROVIDER_E2E_PASSWORD for authenticated provider proof.');
+    summary.fail.push('auth_credentials_missing');
+    return false;
+  }
+  var login = await call('POST', '/api/auth/login', {
+    email: AUTH_EMAIL,
+    password: AUTH_PASSWORD
+  }, { noAuth: true });
+  if (login.status !== 200 || !login.body || !login.body.user) {
+    FAIL('DaveTV proof login failed', 'status=' + login.status);
+    summary.fail.push('auth_login_failed');
+    return false;
+  }
+  authCookie = cookieFromSetCookie(login.headers && login.headers['set-cookie']);
+  if (!authCookie) {
+    FAIL('DaveTV proof login did not return a session cookie', '');
+    summary.fail.push('auth_cookie_missing');
+    return false;
+  }
+  PASS('DaveTV proof login established session for provider proof');
+  summary.pass.push('auth_session');
+  return true;
+}
+
 async function runLiveProof() {
   var summary = {
     mode: 'live',
@@ -378,6 +445,11 @@ async function runLiveProof() {
     fail: [],
     notes: []
   };
+
+  if (!(await authenticateIfRequired(summary))) {
+    summary.finished_at = nowIso();
+    return summary;
+  }
 
   // 1. /api/providers — must be a real registry
   var providersResp = await call('GET', '/api/providers');
