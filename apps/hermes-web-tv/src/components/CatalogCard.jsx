@@ -4,6 +4,7 @@ import ProviderBadge from './ProviderBadge.jsx';
 import * as watchHistoryStore from '../store/watchHistoryStore.js';
 import useFavorites from '../hooks/useFavorites.js';
 import WatchlistButton from './WatchlistButton.jsx';
+import { installLongPress } from '../utils/touchGestures.js';
 
 var CONTENT_TYPE_LABELS = {
   live: 'LIVE',
@@ -38,6 +39,12 @@ function CatalogCard(props) {
   var fav = useFavorites(profileId);
   var isFavorited = fav.isFavorite(item && item.id);
 
+  // Card root ref — used by the touch long-press handler below so finger
+  // gestures coexist with mouse/click and keyboard onKeyDown (the card
+  // continues to open the detail panel on a normal tap/click; only a
+  // 500ms hold flips the favorite).
+  var cardRef = React.useRef(null);
+
   var progressState = React.useState(0);
   var progressPct = progressState[0];
   var setProgressPct = progressState[1];
@@ -59,6 +66,20 @@ function CatalogCard(props) {
     });
     return function() { cancelled = true; };
   }, [profileId, item.id]);
+
+  // Touch long-press — Samsung tablets + phones. Holding a card for ~500ms
+  // toggles the favorite (mirroring the heart button so users without a
+  // visible heart still have an affordance). Short taps fall through to
+  // the existing onClick, and existing keyDown/click handlers remain
+  // untouched so remote/keyboard navigation continues to work.
+  React.useEffect(function() {
+    var el = cardRef.current;
+    if (!el || !item || !item.id) { return undefined; }
+    var unmount = installLongPress(el, function() {
+      try { fav.toggleFavorite(item); } catch (_e) {}
+    }, { delayMs: 500, tolPx: 10 });
+    return unmount;
+  }, [item && item.id, fav.toggleFavorite]);
 
   var title = item.title || 'Untitled';
   var contentType = item.content_type || item.type || 'live';
@@ -115,9 +136,11 @@ function CatalogCard(props) {
 
   return (
     <div
+      ref={cardRef}
       tabIndex={0}
       role="button"
       aria-label={title + ', ' + typeLabel}
+      aria-description="Long-press to favorite"
       className={cardClasses.join(' ')}
       onClick={function() { if (props.onClick) { props.onClick(item); } }}
       onKeyDown={handleKeyDown}
@@ -138,6 +161,11 @@ function CatalogCard(props) {
         // aspect-ratio poster on top still leaves equal-height text blocks
         // below across the row (works with grid-auto-rows: 1fr).
         height: '100%',
+        // Tablet/phone polish — kills the 300ms double-tap-to-zoom delay
+        // on Samsung tablets so taps register as fast as clicks. Paired
+        // with the global rule in index.css so this works even if the
+        // cascade is overridden by a wrapper.
+        touchAction: 'manipulation',
       }}
       onFocus={function(e) {
         e.currentTarget.classList.add('focus-active');

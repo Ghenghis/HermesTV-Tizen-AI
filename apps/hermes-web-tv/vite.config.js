@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 
 // Tizen 6.5 ships Chromium 76 — keep `target: 'chrome76'` aligned with the
 // rest of the QN85 deployment path. Bumping it later is a coordinated change
@@ -17,6 +18,13 @@ export default defineConfig({
     // and avoids shipping the full identifier set to the operator's TVs.
     sourcemap: false,
     rollupOptions: {
+      // Two entry points: main TV app + phone-as-remote secondary app
+      // served at /remote.html. The remote app is a tiny self-contained
+      // virtual D-pad that pairs with the TV via HRM-XXXX pairing codes.
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        remote: resolve(__dirname, 'remote.html'),
+      },
       output: {
         // Split vendor (React + ReactDOM) into its own chunk so subsequent
         // app-code deploys don't bust the React chunk's cache on every push.

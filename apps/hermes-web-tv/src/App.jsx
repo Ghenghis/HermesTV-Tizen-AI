@@ -52,6 +52,10 @@ import useParentalGate from './hooks/useParentalGate.js';
 import Screensaver from './components/Screensaver.jsx';
 import useScreensaverIdle from './hooks/useScreensaverIdle.js';
 import SleepTimer, { useSleepTimer } from './components/SleepTimer.jsx';
+// Wave-6 viewport classes — drops hermes-vp-{tv|desktop|tablet|phone} +
+// hermes-vp-{landscape|portrait} + hermes-vp-narrow/wide on <body> so shells
+// + CSS can react to Samsung tablets/phones rotating without per-shell hooks.
+import { installViewportClasses } from './utils/viewportClass.js';
 
 // ── Lazy-loaded modal chunks ─────────────────────────────────────────────────
 // Every component below is rendered behind an `isOpen` flag, so their JS
@@ -505,6 +509,14 @@ function App() {
     return function() { window.removeEventListener('hermes:sleep-timer-fire', onSleepFire); };
   }, []);
 
+  // Drop hermes-vp-* body classes that shells + CSS can react to without
+  // each component needing useViewport(). Runs once on mount; the helper
+  // self-installs resize/orientationchange listeners.
+  React.useEffect(function() {
+    var uninstall = installViewportClasses();
+    return uninstall;
+  }, []);
+
   React.useEffect(function() {
     function onGlobalKey(e) {
       // Bail when focus is in an editable field so "/" or Ctrl+K don't hijack
@@ -632,6 +644,74 @@ function App() {
     );
     return cleanup;
   }, [state.online, state.profile, state.showPlayer, state.showVoicePicker, state.showLayoutSwitcher, state.selectedItem, state.showSettings, state.showQR, state.showPlaylistImport, state.showEPG, state.showMultiview, state.showOnboarding, state.showSearch, state.showProfileManagement, state.showScheduleRecording]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Samsung remote color buttons (RED / GREEN / YELLOW / BLUE) wired as
+  // chatbot quick-commands. The Tizen keymap (utils/tizenKeyMap.js) registers
+  // these codes with tizen.tvinputdevice; here we just listen for the keydown
+  // and dispatch a chatbot command so the existing handler chain handles it.
+  React.useEffect(function() {
+    function onColorKey(e) {
+      var kc = e.keyCode;
+      var cmd = null;
+      if (kc === 403) { cmd = 'show live channels'; }      // RED
+      else if (kc === 404) { cmd = 'show movies'; }        // GREEN
+      else if (kc === 405) { cmd = 'show series'; }        // YELLOW
+      else if (kc === 406) { cmd = 'open search'; }        // BLUE
+      if (cmd) {
+        e.preventDefault();
+        // Re-use the validate flow so we honor whatever the chatbot router
+        // maps these utterances to (open_search, filter_content, etc).
+        hermesApi.validateCommand({ command_text: cmd, profile_id: (state.profile && state.profile.profile_id) || 'mom_tv' })
+          .then(function(result) {
+            if (result && result.valid) {
+              handleChatbotCommand({ action: result.action, params: result.params });
+            }
+          }).catch(function() { /* offline — silent */ });
+      }
+    }
+    window.addEventListener('keydown', onColorKey);
+    return function() { window.removeEventListener('keydown', onColorKey); };
+  }, [state.profile, state.online]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Samsung media keys → PlayerModal control. Only active when the player
+  // overlay is open. PlayerModal listens for the CustomEvent on window and
+  // calls the right video element method (play/pause/seek).
+  React.useEffect(function() {
+    function onMediaKey(e) {
+      if (!state.showPlayer) { return; }
+      var kc = e.keyCode;
+      var detail = null;
+      if (kc === 415) { detail = { action: 'play' }; }
+      else if (kc === 19) { detail = { action: 'pause' }; }
+      else if (kc === 10252) { detail = { action: 'toggle' }; }
+      else if (kc === 413) { detail = { action: 'stop' }; }
+      else if (kc === 412) { detail = { action: 'rewind', seconds: 10 }; }
+      else if (kc === 417) { detail = { action: 'fastforward', seconds: 10 }; }
+      if (detail) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('hermes:player-control', { detail: detail }));
+      }
+    }
+    window.addEventListener('keydown', onMediaKey);
+    return function() { window.removeEventListener('keydown', onMediaKey); };
+  }, [state.showPlayer]);
+
+  // Channel up / down — fires bus events for the live tuner to consume.
+  // Only active when the player is open on a live item.
+  React.useEffect(function() {
+    function onChannelKey(e) {
+      if (!state.showPlayer) { return; }
+      if (e.keyCode === 427) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('hermes:channel-up'));
+      } else if (e.keyCode === 428) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('hermes:channel-down'));
+      }
+    }
+    window.addEventListener('keydown', onChannelKey);
+    return function() { window.removeEventListener('keydown', onChannelKey); };
+  }, [state.showPlayer]);
 
   // Boot sequence — runs once on mount
   React.useEffect(function() {

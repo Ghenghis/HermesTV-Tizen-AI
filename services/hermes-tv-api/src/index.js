@@ -33,6 +33,7 @@ const seriesRouter = require('./routes/series');
 const parentalRouter = require('./routes/parental');
 const searchRouter = require('./routes/search');
 const backupRouter = require('./routes/backup');
+const remoteRouter = require('./routes/remote');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -116,6 +117,8 @@ app.use('/', seriesRouter);
 app.use('/', parentalRouter);
 app.use('/', searchRouter);
 app.use('/', backupRouter);
+// Phone-as-remote relay: POST /api/remote/event + GET /api/remote/events (SSE).
+app.use('/', remoteRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {

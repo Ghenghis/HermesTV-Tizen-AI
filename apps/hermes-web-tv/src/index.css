@@ -574,3 +574,27 @@ textarea {
     animation: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Touch / tablet / phone support — Samsung tablets in particular.
+ *
+ *   * Suppress the grey/blue tap-highlight rectangle that mobile Chrome and
+ *     Samsung Internet flash on every tap.
+ *   * `touch-action: manipulation` removes the 300ms double-tap-to-zoom delay
+ *     so taps register as fast as clicks on a coarse pointer.
+ *
+ * The .hermes-focusable / button / [role="button"] rule below is a stricter
+ * re-affirmation for the elements we explicitly want to behave like buttons
+ * on touch (no pan, no pinch-zoom delay on the control itself — page-level
+ * pinch still works because we don't set `touch-action: none`).
+ * ───────────────────────────────────────────────────────────────────── */
+* {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.hermes-focusable,
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
