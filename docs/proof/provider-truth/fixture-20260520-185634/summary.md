@@ -8,7 +8,9 @@ rule 1.
 
 ## Priority 1 — Xtream fixture E2E
 `services/hermes-tv-api/test/xtreamFixture.e2e.test.js`
-**8 PASS / 0 FAIL** (see xtreamFixture-e2e.log).
+**9 PASS / 0 FAIL** on local rerun after Windows-safe harness cleanup.
+The fixture now proves both `HEAD` and `GET` on `/api/play/:ticket/stream`
+return media-safe responses.
 
 ## Priority 2 — M3U parser regression
 `services/hermes-tv-api/test/m3uParser.test.js`

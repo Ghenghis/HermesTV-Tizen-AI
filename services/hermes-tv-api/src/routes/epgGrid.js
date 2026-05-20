@@ -47,29 +47,16 @@ const VALID_PROFILES = new Set(['dave_tv', 'mom_tv']);
 // Maximum permitted window in milliseconds (4 hours)
 const MAX_WINDOW_MS = 4 * 60 * 60 * 1000;
 
-// Mock program data.  Shape is the contract the EPG grid component reads.
-const MOCK_PROGRAMS = [
-  {
-    program_id:         'mock-prog-001',
-    channel_id:         'mock.ch.001',
-    title:              'Mock Program A',
-    start_utc:          '2026-05-17T19:00:00Z',
-    end_utc:            '2026-05-17T19:30:00Z',
-    description:        'A mock live program.',
-    catch_up_available: true,
-    epg_status:         'matched',
-  },
-  {
-    program_id:         'mock-prog-002',
-    channel_id:         'mock.ch.001',
-    title:              'Mock Program B',
-    start_utc:          '2026-05-17T19:30:00Z',
-    end_utc:            '2026-05-17T20:30:00Z',
-    description:        'Another mock program.',
-    catch_up_available: false,
-    epg_status:         'matched',
-  },
-];
+// Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md §"Non-Negotiable Truth Rules"
+// + docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md §"EPG And Catchup":
+//   "epgGrid.js still returns mock programs. EPG is mostly single XMLTV URL
+//    plus static channel map, not multi-source provider-aware waterfall."
+// The mock array was removed; the route now derives programs from the
+// xmltv cache (set up by routes/epg.js + lib/integrations/xmltv.js) and
+// returns an HONEST empty list when no real EPG is configured. Lane 07
+// (EPG mapping) wires the waterfall (lib/epgWaterfall.js, Priority 3) +
+// per-channel mapping to playable catalog IDs in a follow-up.
+var xmltv = (function() { try { return require('../integrations/xmltv'); } catch (_) { return null; } })();
 
 // ── GET /api/epg/grid ─────────────────────────────────────────────────────────
 router.get('/', function(req, res) {
@@ -129,20 +116,56 @@ router.get('/', function(req, res) {
     });
   }
 
-  // Filter mock programs to the requested window
-  var programs = MOCK_PROGRAMS.filter(function(p) {
-    var pStart = Date.parse(p.start_utc);
-    var pEnd   = Date.parse(p.end_utc);
-    // Include programs that overlap the requested window
-    return pStart < endMs && pEnd > startMs;
-  });
+  // Honest empty when no XMLTV is configured. When XMLTV_URL is set + the
+  // xmltv cache holds a parsed result, walk its programmes-by-tvgId into
+  // the grid shape and filter by window. Real-fixture EPG via the Xtream
+  // panel (xmltv.php) populates the same xmltv cache, so the gate keys on
+  // the cache contents rather than a hard-coded provider.
+  var programs = [];
+  var epgMeta = { source: 'no-epg', tvg_ids: 0, programmes_total: 0 };
+  if (xmltv && typeof xmltv.getCachedEpg === 'function' &&
+      typeof process.env.XMLTV_URL === 'string' && process.env.XMLTV_URL.length > 0) {
+    try {
+      var cached = xmltv.getCachedEpg(process.env.XMLTV_URL);
+      if (cached && cached.programmes_by_tvg_id && typeof cached.programmes_by_tvg_id === 'object') {
+        var byId = cached.programmes_by_tvg_id;
+        var ids = Object.keys(byId);
+        epgMeta.source = 'xmltv';
+        epgMeta.tvg_ids = ids.length;
+        for (var i = 0; i < ids.length; i++) {
+          var tvgId = ids[i];
+          var arr = byId[tvgId] || [];
+          epgMeta.programmes_total += arr.length;
+          for (var j = 0; j < arr.length; j++) {
+            var p = arr[j];
+            if (!p) { continue; }
+            var pStart = Date.parse(p.start_utc || p.start || '');
+            var pEnd = Date.parse(p.end_utc || p.stop_utc || p.stop || '');
+            if (isNaN(pStart) || isNaN(pEnd)) { continue; }
+            if (pStart < endMs && pEnd > startMs) {
+              programs.push({
+                program_id: p.program_id || (tvgId + '-' + pStart),
+                channel_id: tvgId,
+                title: p.title || '',
+                start_utc: new Date(pStart).toISOString(),
+                end_utc: new Date(pEnd).toISOString(),
+                description: p.description || p.desc || '',
+                catch_up_available: !!(p.catch_up_available || p.has_archive),
+                epg_status: 'matched'
+              });
+            }
+          }
+        }
+      }
+    } catch (_) { /* fall through to empty */ }
+  }
 
   return res.status(200).json({
     window_start: new Date(startMs).toISOString(),
     window_end:   new Date(endMs).toISOString(),
     server_time:  new Date().toISOString(),
     programs:     programs,
-    _note:        'Mock EPG. Real EPG integration in B3 via Jellyfin Live TV API.',
+    _meta:        epgMeta
   });
 });
 

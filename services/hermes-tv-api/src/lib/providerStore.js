@@ -202,6 +202,39 @@ function _validateInput(input) {
       errors.push('epg_url must be a string <= 2048 chars');
     }
   }
+  // Priority 4 — schema extensions adopted from
+  // docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md §"EPG And Catchup".
+  if (input.additional_epg_urls !== undefined && input.additional_epg_urls !== null) {
+    if (!Array.isArray(input.additional_epg_urls)) {
+      errors.push('additional_epg_urls must be an array');
+    } else if (input.additional_epg_urls.length > 16) {
+      errors.push('additional_epg_urls capped at 16 entries');
+    } else {
+      for (var aei = 0; aei < input.additional_epg_urls.length; aei++) {
+        var ae = input.additional_epg_urls[aei];
+        if (typeof ae !== 'string' || ae.length === 0 || ae.length > 2048) {
+          errors.push('additional_epg_urls[' + aei + '] must be a string <= 2048 chars');
+        }
+      }
+    }
+  }
+  if (input.user_agent !== undefined && input.user_agent !== null && input.user_agent !== '') {
+    if (typeof input.user_agent !== 'string' || input.user_agent.length > 256) {
+      errors.push('user_agent must be a string <= 256 chars');
+    }
+  }
+  if (input.epg_timeshift_hours !== undefined && input.epg_timeshift_hours !== null) {
+    if (typeof input.epg_timeshift_hours !== 'number' ||
+        isNaN(input.epg_timeshift_hours) ||
+        input.epg_timeshift_hours < -24 || input.epg_timeshift_hours > 24) {
+      errors.push('epg_timeshift_hours must be a number in [-24, 24]');
+    }
+  }
+  if (input.disable_provider_epg !== undefined && input.disable_provider_epg !== null) {
+    if (typeof input.disable_provider_epg !== 'boolean') {
+      errors.push('disable_provider_epg must be a boolean');
+    }
+  }
   return errors;
 }
 
@@ -258,6 +291,13 @@ async function add(input) {
     username: (typeof input.username === 'string' && input.username.length > 0) ? input.username : undefined,
     password: (typeof input.password === 'string' && input.password.length > 0) ? input.password : undefined,
     epg_url: (typeof input.epg_url === 'string' && input.epg_url.length > 0) ? input.epg_url : undefined,
+    // Priority 4 schema extensions (additional_epg_urls + user_agent +
+    // epg_timeshift_hours + disable_provider_epg). All optional; persisted
+    // server-side only and never appear in masked responses.
+    additional_epg_urls: Array.isArray(input.additional_epg_urls) ? input.additional_epg_urls.slice(0, 16) : undefined,
+    user_agent: (typeof input.user_agent === 'string' && input.user_agent.length > 0) ? input.user_agent : undefined,
+    epg_timeshift_hours: (typeof input.epg_timeshift_hours === 'number') ? input.epg_timeshift_hours : undefined,
+    disable_provider_epg: (input.disable_provider_epg === true) ? true : undefined,
     enabled: true,
     created_at: _nowIso(),
     last_test: null,
