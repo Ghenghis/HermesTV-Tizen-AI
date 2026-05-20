@@ -4,7 +4,7 @@
 /**
  * Real QR/provider setup proof:
  *   POST /api/pair returns a concrete setup_url with the minted code.
- *   GET /setup/provider?code=... returns a form whose field names match
+ *   GET /api/setup/provider?code=... returns a form whose field names match
  *   providerStore.add().
  *   POST /setup/provider/submit persists the provider and completes pairing.
  *   GET /api/pair/:code returns completed with a durable provider id.
@@ -97,7 +97,7 @@ function closeAppServer() {
     var code = created.body && created.body.pairing_code;
     ok('POST /api/pair returns HRM code', /^HRM-[A-Z0-9]{4}$/.test(code || ''), 'code=' + code);
     ok('POST /api/pair returns real setup_url',
-      created.body && created.body.setup_url === 'https://tv.example.test/setup/provider?code=' + encodeURIComponent(code),
+      created.body && created.body.setup_url === 'https://tv.example.test/api/setup/provider?code=' + encodeURIComponent(code),
       JSON.stringify(created.body));
 
     var fakeComplete = await request(srv, {
@@ -115,12 +115,13 @@ function closeAppServer() {
 
     var page = await request(srv, {
       method: 'GET',
-      path: '/setup/provider?code=' + encodeURIComponent(code),
+      path: '/api/setup/provider?code=' + encodeURIComponent(code),
       headers: { Accept: 'text/html' },
     });
     ok('GET setup page returns HTML', page.status === 200 && /text\/html/.test(String(page.headers['content-type'] || '')));
     ok('setup page contains hidden pairing_code', page.text.indexOf('name="pairing_code" value="' + code + '"') !== -1);
     ok('setup form field names match providerStore', page.text.indexOf('name="type"') !== -1 && page.text.indexOf('name="url"') !== -1);
+    ok('setup form posts through API route', page.text.indexOf('action="/api/setup/provider/submit"') !== -1);
     ok('setup page does not claim encryption', page.text.indexOf('stored encrypted') === -1);
 
     var form = new URLSearchParams();
@@ -131,7 +132,7 @@ function closeAppServer() {
 
     var submitted = await request(srv, {
       method: 'POST',
-      path: '/setup/provider/submit',
+      path: '/api/setup/provider/submit',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded',

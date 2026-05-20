@@ -148,7 +148,7 @@ function renderSetupPage(args) {
     <p class="subtitle">${subtitle}</p>
     ${codeNotice}
 
-    <form method="POST" action="/setup/provider/submit">
+    <form method="POST" action="/api/setup/provider/submit">
       ${codeInput}
       <div class="form-grid">
         <div class="field full">
@@ -272,13 +272,16 @@ function renderSuccessPage(masked) {
 </html>`;
 }
 
-// GET /setup/provider — QR-based provider onboarding page
-router.get('/setup/provider', (req, res) => {
+// GET /setup/provider and /api/setup/provider — QR-based provider onboarding
+// page. The /api-prefixed path is the public VPS route; host nginx proxies
+// only /api/* to this service while the React app owns non-/api paths.
+router.get(['/setup/provider', '/api/setup/provider'], (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(renderSetupPage({ code: req.query && req.query.code }));
 });
 
-// POST /setup/provider/submit — persists a provider config into providerStore.
+// POST /setup/provider/submit and /api/setup/provider/submit — persists a
+// provider config into providerStore.
 // Body: { type, label, url, username?, password?, epg_url? }
 // Response: 201 with masked row.
 //
@@ -287,7 +290,7 @@ router.get('/setup/provider', (req, res) => {
 // survives process restart via providerStore (data/providers.json on the API
 // container's writable volume) and is the SAME store that /api/providers
 // surfaces.
-router.post('/setup/provider/submit', express.urlencoded({ extended: false, limit: '32kb' }), (req, res) => {
+router.post(['/setup/provider/submit', '/api/setup/provider/submit'], express.urlencoded({ extended: false, limit: '32kb' }), (req, res) => {
   var providerStore = require('../lib/providerStore');
   var pairingRouter = require('./pairing');
   var SANITIZE = require('../lib/sanitizeLog').sanitizeForLog;

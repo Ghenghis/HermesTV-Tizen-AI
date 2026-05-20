@@ -41,6 +41,7 @@
 var fs = require('fs');
 var path = require('path');
 var http = require('http');
+var https = require('https');
 
 var BASE = process.env.HERMES_PROVIDER_E2E_BASE || 'http://127.0.0.1:3199';
 var MODE = (process.env.PROVIDER_E2E_MODE || 'live').toLowerCase();
@@ -61,6 +62,7 @@ function fmtTs() {
 
 var TS = fmtTs();
 var PROOF_DIR = path.resolve(__dirname, '..', 'docs', 'proof', 'provider-truth', TS);
+var artifactLeakFailures = [];
 
 // Lazy-create the proof dir only when we actually emit an artifact so a
 // failed boot doesn't leave empty timestamp folders littering the repo.
@@ -100,6 +102,56 @@ function redactString(s) {
   return out;
 }
 
+function sensitiveEnvValues() {
+  var keys = ['APOLLO_M3U_URL', 'XTREMEHD_M3U_URL',
+              'XTREAM_URL', 'XTREAM_USERNAME', 'XTREAM_PASSWORD',
+              'JELLYFIN_URL', 'JELLYFIN_API_KEY'];
+  var vals = [];
+  for (var i = 0; i < keys.length; i++) {
+    var v = process.env[keys[i]];
+    if (typeof v === 'string' && v.length >= 4) { vals.push({ key: keys[i], value: v }); }
+  }
+  return vals;
+}
+
+function redactSensitiveValues(s) {
+  var out = redactString(s);
+  var vals = sensitiveEnvValues();
+  for (var i = 0; i < vals.length; i++) {
+    out = out.split(vals[i].value).join('<redacted-' + vals[i].key.toLowerCase() + '>');
+  }
+  return out;
+}
+
+function credentialLeakReasons(s) {
+  if (typeof s !== 'string' || s.length === 0) { return []; }
+  var reasons = [];
+  var vals = sensitiveEnvValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (s.indexOf(vals[i].value) !== -1) { reasons.push('raw env value ' + vals[i].key); }
+  }
+  if (/https?:\/\/[^\s'"]*\/(?:get|player_api)\.php\?[^\s'"]+/i.test(s)) {
+    reasons.push('credential-bearing provider URL');
+  }
+  if (/[?&](?:username|password|token|api_key|apikey)=(?!<redacted>)[^&\s'"]+/i.test(s)) {
+    reasons.push('unredacted credential query parameter');
+  }
+  if (/"(?:username|password|api_key|apikey|token|secret)"\s*:\s*"(?!<redacted>|<set>|<unset>)[^"]+"/i.test(s)) {
+    reasons.push('unredacted credential JSON field');
+  }
+  return reasons;
+}
+
+function safeBaseLabel() {
+  if (BASE.indexOf('localhost') !== -1 || BASE.indexOf('127.0.0.1') !== -1) { return BASE; }
+  try {
+    var u = new URL(BASE);
+    return u.protocol + '//' + u.host;
+  } catch (_) {
+    return '<base-redacted>';
+  }
+}
+
 // Recursively scrub JSON-shaped objects: remove the known credential keys
 // outright; redact strings; pass through everything else.
 var CRED_KEYS = { username: 1, password: 1, api_key: 1, apikey: 1,
@@ -135,37 +187,95 @@ function scrub(v) {
 
 // ----- HTTP helpers -----------------------------------------------------
 
-function call(method, p, body) {
+function call(method, p, body, options) {
+  options = options || {};
   return new Promise(function(resolve) {
-    var url = BASE + p;
+    var url = /^https?:\/\//i.test(p) ? p : BASE + p;
     var data = body ? JSON.stringify(body) : null;
     var u;
     try { u = new URL(url); } catch (_) { return resolve({ status: 0, error: 'bad-url' }); }
+    var headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
     var opts = {
       method: method,
       hostname: u.hostname,
       port: u.port || (u.protocol === 'https:' ? 443 : 80),
       path: u.pathname + (u.search || ''),
-      headers: { Accept: 'application/json' }
+      headers: headers
     };
     if (data) {
       opts.headers['Content-Type'] = 'application/json';
       opts.headers['Content-Length'] = Buffer.byteLength(data);
     }
-    var req = http.request(opts, function(res) {
+    var client = u.protocol === 'https:' ? https : http;
+    var settled = false;
+    function finish(payload) {
+      if (settled) { return; }
+      settled = true;
+      resolve(payload);
+    }
+    var req = client.request(opts, function(res) {
+      var location = res.headers && res.headers.location;
+      var redirectStatuses = { 301: 1, 302: 1, 303: 1, 307: 1, 308: 1 };
+      var redirectCount = options.redirectCount || 0;
+      if (options.followRedirects && redirectStatuses[res.statusCode] && location && redirectCount < (options.maxRedirects || 3)) {
+        var nextUrl;
+        try { nextUrl = new URL(location, u).toString(); }
+        catch (_) { nextUrl = null; }
+        if (nextUrl) {
+          res.resume();
+          var nextMethod = res.statusCode === 303 ? 'GET' : method;
+          var nextOptions = Object.assign({}, options, { redirectCount: redirectCount + 1 });
+          return call(nextMethod, nextUrl, nextMethod === 'GET' ? null : body, nextOptions).then(function(r) {
+            r.redirected = true;
+            r.redirects = (r.redirects || 0) + 1;
+            finish(r);
+          });
+        }
+      }
       var chunks = [];
-      res.on('data', function(c) { chunks.push(c); });
-      res.on('end', function() {
-        var raw = Buffer.concat(chunks).toString('utf8');
+      var keptBytes = 0;
+      var receivedBytes = 0;
+      var maxBytes = options.maxBytes || 0;
+      function responsePayload(truncated) {
+        var buf = Buffer.concat(chunks);
+        var raw = buf.toString('utf8');
         var parsed = null;
         try { parsed = JSON.parse(raw); } catch (_) { /* not json */ }
         var headers = {};
         Object.keys(res.headers || {}).forEach(function(h) { headers[h] = res.headers[h]; });
-        resolve({ status: res.statusCode, headers: headers, raw: raw, body: parsed });
+        return {
+          status: res.statusCode,
+          headers: headers,
+          raw: raw,
+          body: parsed,
+          bodyBuffer: buf,
+          bytes: keptBytes,
+          receivedBytes: receivedBytes,
+          truncated: !!truncated
+        };
+      }
+      res.on('data', function(c) {
+        receivedBytes += c.length;
+        if (maxBytes && keptBytes >= maxBytes) { return; }
+        var keep = c;
+        if (maxBytes && keptBytes + c.length > maxBytes) {
+          keep = c.slice(0, maxBytes - keptBytes);
+        }
+        chunks.push(keep);
+        keptBytes += keep.length;
+        if (maxBytes && keptBytes >= maxBytes) {
+          finish(responsePayload(true));
+          try { res.destroy(); } catch (_) {}
+          try { req.destroy(); } catch (_) {}
+        }
       });
+      res.on('end', function() { finish(responsePayload(false)); });
     });
-    req.on('error', function(e) { resolve({ status: 0, error: e.message }); });
-    req.setTimeout(15000, function() { try { req.destroy(); } catch (_) {} resolve({ status: 0, error: 'timeout' }); });
+    req.on('error', function(e) { finish({ status: 0, error: e.message }); });
+    req.setTimeout(options.timeoutMs || 15000, function() {
+      finish({ status: 0, error: 'timeout' });
+      try { req.destroy(); } catch (_) {}
+    });
     if (data) { req.write(data); }
     req.end();
   });
@@ -197,7 +307,13 @@ function bootApi() {
 
 function writeProof(name, content) {
   ensureProofDir();
-  fs.writeFileSync(path.join(PROOF_DIR, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2), 'utf8');
+  var text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+  var leakReasons = credentialLeakReasons(text);
+  if (leakReasons.length > 0) {
+    artifactLeakFailures.push(name + ': ' + leakReasons.join(', '));
+    text = redactSensitiveValues(text);
+  }
+  fs.writeFileSync(path.join(PROOF_DIR, name), text, 'utf8');
 }
 
 function envSummary() {
@@ -218,15 +334,41 @@ var pass = 0;
 var fail = 0;
 function PASS(label) { console.log('PASS: ' + label); pass += 1; }
 function FAIL(label, detail) {
-  console.log('FAIL: ' + label + (detail ? ' — ' + redactString(detail) : ''));
+  console.log('FAIL: ' + label + (detail ? ' — ' + redactSensitiveValues(detail) : ''));
   fail += 1;
+}
+
+function assertResponseNoLeak(label, raw, summary) {
+  var reasons = credentialLeakReasons(raw || '');
+  if (reasons.length > 0) {
+    FAIL(label + ' contains zero credential bytes', reasons.join(', '));
+    summary.fail.push(label.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_credential_leak');
+    return false;
+  }
+  PASS(label + ' contains zero credential bytes');
+  summary.pass.push(label.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_no_credential_leak');
+  return true;
+}
+
+function isAllowedStreamStatus(status) {
+  return status === 200 || status === 206 || status === 302;
+}
+
+function isMediaProof(resp) {
+  var ct = String((resp.headers && (resp.headers['content-type'] || resp.headers['Content-Type'])) || '').toLowerCase();
+  var raw = resp.raw || '';
+  var buf = resp.bodyBuffer || Buffer.alloc(0);
+  var mediaCt = /(?:application\/vnd\.apple\.mpegurl|application\/x-mpegurl|audio\/|video\/|application\/octet-stream|binary\/octet-stream|video\/mp2t)/i.test(ct);
+  var hlsBody = raw.indexOf('#EXTM3U') === 0 || raw.indexOf('#EXT-X-') !== -1;
+  var tsSync = buf.length > 0 && buf[0] === 0x47;
+  return (resp.bytes || 0) > 0 && (mediaCt || hlsBody || tsSync);
 }
 
 async function runLiveProof() {
   var summary = {
     mode: 'live',
     started_at: nowIso(),
-    base: BASE.replace(/^https?:\/\/[^/]*/, BASE.indexOf('localhost') !== -1 || BASE.indexOf('127.0.0.1') !== -1 ? BASE : '<base-redacted>'),
+    base: safeBaseLabel(),
     env: envSummary(),
     pass: [],
     fail: [],
@@ -240,6 +382,7 @@ async function runLiveProof() {
     summary.fail.push('providers_status');
     return summary;
   }
+  assertResponseNoLeak('/api/providers response', providersResp.raw, summary);
   var providers = (providersResp.body && Array.isArray(providersResp.body.providers))
     ? providersResp.body.providers : [];
   writeProof('providers.redacted.json', scrub({ providers: providers, _meta: providersResp.body && providersResp.body._meta }));
@@ -263,6 +406,7 @@ async function runLiveProof() {
     summary.fail.push('catalog_status');
     return summary;
   }
+  assertResponseNoLeak('/api/catalog response', catalogResp.raw, summary);
   var catalog = catalogResp.body || {};
   var total = (typeof catalog.total === 'number') ? catalog.total : (Array.isArray(catalog.catalog) ? catalog.catalog.length : 0);
   var source = (catalog._meta && catalog._meta.source) || null;
@@ -307,39 +451,77 @@ async function runLiveProof() {
       writeProof('play-ticket.redacted.json', scrub({ status: playResp.status, body: playResp.body || (playResp.raw || '').slice(0, 200) }));
       return summary;
     }
+    assertResponseNoLeak('/api/play response', playResp.raw, summary);
     var ticket = playResp.body.ticket;
     var streamEndpoint = playResp.body.stream_endpoint || ('/api/play/' + ticket + '/stream');
     writeProof('play-ticket.redacted.json', scrub(playResp.body));
     PASS('POST /api/play returned ticket=' + ticket.slice(0, 12) + '... for item_id=' + pick.id);
     summary.pass.push('play_ticket');
 
-    // 4. Stream endpoint — accept 200 / 206 / 302
-    var streamHeadResp = await call('GET', streamEndpoint);
-    var streamStatus = streamHeadResp.status;
-    var streamCt = (streamHeadResp.headers && (streamHeadResp.headers['content-type'] || streamHeadResp.headers['Content-Type'])) || '';
+    // 4. Stream endpoint — require HEAD plus byte-producing GET proof.
+    var streamHeadResp = await call('HEAD', streamEndpoint);
+    var headStatus = streamHeadResp.status;
+    var headCt = (streamHeadResp.headers && (streamHeadResp.headers['content-type'] || streamHeadResp.headers['Content-Type'])) || '';
     writeProof('stream-head.txt',
-      'HTTP/1.1 ' + streamStatus + '\n' +
-      'Content-Type: ' + streamCt + '\n' +
+      'HTTP/1.1 ' + headStatus + '\n' +
+      'Content-Type: ' + headCt + '\n' +
       'X-Provider-Used: ' + ((streamHeadResp.headers && streamHeadResp.headers['x-provider-used']) || '') + '\n' +
       (streamHeadResp.headers && streamHeadResp.headers['location']
         ? 'Location: <redacted-url>\n' : '') +
-      '\n# body first 200b (redacted):\n' + redactString((streamHeadResp.raw || '').slice(0, 200))
+      '\n# HEAD body bytes: ' + (streamHeadResp.bytes || 0) + '\n'
     );
-    if (streamStatus === 200 || streamStatus === 206 || streamStatus === 302) {
-      PASS('GET stream_endpoint status=' + streamStatus + ' content-type=' + (streamCt || '(none)'));
-      summary.pass.push('stream_status_' + streamStatus);
-    } else if (streamStatus === 503) {
-      FAIL('Stream endpoint returned 503 — upstream unreachable from this host', 'status=' + streamStatus);
-      summary.fail.push('stream_503');
+    if (isAllowedStreamStatus(headStatus)) {
+      PASS('HEAD stream_endpoint status=' + headStatus + ' content-type=' + (headCt || '(none)'));
+      summary.pass.push('stream_head_status_' + headStatus);
     } else {
-      FAIL('Stream endpoint unexpected status', 'status=' + streamStatus);
-      summary.fail.push('stream_status_' + streamStatus);
+      FAIL('HEAD stream_endpoint unexpected status', 'status=' + headStatus);
+      summary.fail.push('stream_head_status_' + headStatus);
+    }
+
+    var streamGetResp = await call('GET', streamEndpoint, null, {
+      headers: { Accept: '*/*', Range: 'bytes=0-4095' },
+      followRedirects: true,
+      maxRedirects: 3,
+      maxBytes: 8192,
+      timeoutMs: 20000
+    });
+    var getStatus = streamGetResp.status;
+    var getCt = (streamGetResp.headers && (streamGetResp.headers['content-type'] || streamGetResp.headers['Content-Type'])) || '';
+    writeProof('stream-get.txt',
+      'HTTP/1.1 ' + getStatus + '\n' +
+      'Content-Type: ' + getCt + '\n' +
+      'Bytes-Proven: ' + (streamGetResp.bytes || 0) + '\n' +
+      'Redirects-Followed: ' + (streamGetResp.redirects || 0) + '\n' +
+      'Truncated-Probe: ' + (streamGetResp.truncated ? 'true' : 'false') + '\n' +
+      'X-Provider-Used: ' + ((streamGetResp.headers && streamGetResp.headers['x-provider-used']) || '') + '\n' +
+      (streamGetResp.headers && streamGetResp.headers['location']
+        ? 'Location: <redacted-url>\n' : '') +
+      '\n# body first 200b (redacted):\n' + redactSensitiveValues((streamGetResp.raw || '').slice(0, 200))
+    );
+    assertResponseNoLeak('stream GET response', streamGetResp.raw, summary);
+    if (getStatus === 200 || getStatus === 206) {
+      PASS('GET stream_endpoint status=' + getStatus + ' content-type=' + (getCt || '(none)'));
+      summary.pass.push('stream_get_status_' + getStatus);
+    } else if (getStatus === 503) {
+      FAIL('GET stream_endpoint returned 503 — upstream unreachable from this host', 'status=' + getStatus);
+      summary.fail.push('stream_get_503');
+    } else {
+      FAIL('GET stream_endpoint unexpected status', 'status=' + getStatus);
+      summary.fail.push('stream_get_status_' + getStatus);
+    }
+    if (isMediaProof(streamGetResp)) {
+      PASS('GET stream_endpoint proved nonzero media/HLS bytes=' + streamGetResp.bytes);
+      summary.pass.push('stream_media_bytes_' + streamGetResp.bytes);
+    } else {
+      FAIL('GET stream_endpoint did not prove nonzero media/HLS bytes', 'status=' + getStatus + ' content-type=' + getCt + ' bytes=' + (streamGetResp.bytes || 0));
+      summary.fail.push('stream_no_media_bytes');
     }
   }
 
   // 5. /api/source-health — informational, doesn't fail the proof
   var healthResp = await call('GET', '/api/source-health');
   if (healthResp.status === 200) {
+    assertResponseNoLeak('/api/source-health response', healthResp.raw, summary);
     writeProof('source-health.redacted.json', scrub(healthResp.body || {}));
     PASS('GET /api/source-health status=200');
   } else {
@@ -354,7 +536,7 @@ async function runLiveProof() {
 (async function main() {
   console.log('# tools/test-provider-e2e.js — Provider Truth E2E');
   console.log('# mode: ' + (IS_EMPTY ? 'NO_PROVIDER_EMPTY_STATE' : 'live'));
-  console.log('# base: ' + BASE);
+  console.log('# base: ' + safeBaseLabel());
   console.log('# proof dir: docs/proof/provider-truth/' + TS + '/');
   console.log('');
 
@@ -391,6 +573,14 @@ async function runLiveProof() {
     Object.keys(summary.env).map(function(k) { return k + '=' + (summary.env[k] || '<unset>'); }).join('\n') + '\n' +
     '\n# Command: node tools/test-provider-e2e.js\n'
   );
+
+  if (artifactLeakFailures.length === 0) {
+    PASS('Proof artifacts contain zero credential leaks');
+    summary.pass.push('proof_artifacts_no_credential_leak');
+  } else {
+    FAIL('Proof artifacts contain zero credential leaks', artifactLeakFailures.join('; '));
+    summary.fail.push('proof_artifact_credential_leak');
+  }
 
   // Summary.md
   var md = '# Provider Truth Proof — ' + TS + '\n\n';

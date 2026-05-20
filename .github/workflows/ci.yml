@@ -70,7 +70,37 @@ jobs:
           echo "Schema validation: ${PASS_COUNT} PASS, 0 FAIL — OK"
 
   # -----------------------------------------------------------------------
-  # 2) Web build — parallel with schema-validation.
+  # 2) API/provider regression suite — release truth gate.
+  # This is the exact local proof command from docs/49:
+  #   npm test --prefix services/hermes-tv-api
+  # It covers provider registry, setup QR, catalog, playback proxy, and the
+  # Xtream fixture path. PR/push CI must fail when any of those regress.
+  # -----------------------------------------------------------------------
+  api-regression-tests:
+    name: API/provider regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            services/hermes-tv-api/package-lock.json
+
+      - name: Install API deps
+        working-directory: services/hermes-tv-api
+        run: npm ci
+
+      - name: Run API/provider regression suite
+        run: npm test --prefix services/hermes-tv-api
+
+  # -----------------------------------------------------------------------
+  # 3) Web build — parallel with schema/API validation.
   # Produces apps/hermes-web-tv/dist/ as an artifact for downstream jobs.
   # -----------------------------------------------------------------------
   web-build:
@@ -114,7 +144,7 @@ jobs:
           retention-days: 7
 
   # -----------------------------------------------------------------------
-  # 3) Chatbot integration — depends on schema-validation passing.
+  # 4) Chatbot integration — depends on schema/API validation passing.
   # Boots the API in background, waits for /health, then runs every case in
   # tools/test-chatbot-commands.js. We gate on "PASS >= 46, FAIL == 0" so
   # adding new commands in future PRs doesn't break this job (same pattern
@@ -123,7 +153,7 @@ jobs:
   chatbot-integration:
     name: Chatbot integration (46+/all)
     runs-on: ubuntu-latest
-    needs: schema-validation
+    needs: [schema-validation, api-regression-tests]
     timeout-minutes: 10
     env:
       PORT: '3001'
@@ -210,7 +240,7 @@ jobs:
           retention-days: 7
 
   # -----------------------------------------------------------------------
-  # 4a) E2E smoke (empty-state honest) — Lane 09 part 1.
+  # 5a) E2E smoke (empty-state honest) — Lane 09 part 1.
   # Per docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md §"20-Agent Work Plan"
   # Agent 09: "Separate no-provider and provider-live jobs. Fail provider-
   # live on skip/no-provider. Keep empty-state test honest."
@@ -290,7 +320,7 @@ jobs:
           retention-days: 7
 
   # -----------------------------------------------------------------------
-  # 4b) Provider-live proof (Lane 09 part 2) — release-gate job.
+  # 5b) Provider-live proof (Lane 09 part 2) — release-gate job.
   # Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md §"Non-Negotiable Truth Rules"
   # rule 1: "No test may report provider playback as passing because no
   # provider items were configured." This job runs tools/test-provider-e2e.js
@@ -314,7 +344,7 @@ jobs:
   provider-live:
     name: Provider-live proof (release-gate)
     runs-on: ubuntu-latest
-    needs: chatbot-integration
+    needs: [chatbot-integration, api-regression-tests]
     timeout-minutes: 12
     # Lane 09 contract: only run when explicitly requested OR when the
     # operator has wired a secret marker indicating live-provider mode.
@@ -389,7 +419,7 @@ jobs:
           retention-days: 30
 
   # -----------------------------------------------------------------------
-  # 5) Secret scan — fast, parallel, no Node deps.
+  # 6) Secret scan — fast, parallel, no Node deps.
   # Inline grep patterns mirror tools/secret-scan.sh PATTERNS array so the
   # CI signal matches what an operator runs locally before opening a PR.
   # -----------------------------------------------------------------------

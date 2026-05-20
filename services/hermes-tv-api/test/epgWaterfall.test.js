@@ -51,7 +51,8 @@ var epg = require(path.resolve(__dirname, '..', 'src', 'lib', 'epgWaterfall.js')
 var FNS = ['buildEpgUrlsFromEntry', 'mergeProgrammeMaps', 'mergeChannelNameMaps',
            'detectGzip', 'resolveTvgId', 'normaliseChannelName',
            'findBestEpgChannelByName', 'buildChannelNameIndex',
-           'findInChannelNameIndex', 'dedupeEpgUrls'];
+           'findInChannelNameIndex', 'dedupeEpgUrls',
+           'buildPlayableEpgIndex', 'resolvePlayableEpgChannel'];
 var missingFn = [];
 for (var fi = 0; fi < FNS.length; fi++) {
   if (typeof epg[FNS[fi]] !== 'function') { missingFn.push(FNS[fi]); }
@@ -336,6 +337,76 @@ var m3uCreds    = { host: 'https://m3u.example.test/list.m3u', port: '', user: '
        epg.findInChannelNameIndex(candidates[k], pureIdx),
        epg.findBestEpgChannelByName(candidates[k], channelNames));
   }
+})();
+
+// ---- playable catalog/source mapping -----------------------------------
+(function playableMapping() {
+  var index = epg.buildPlayableEpgIndex([
+    {
+      id: 'm3u-prov-123-disk-news',
+      type: 'live',
+      title: 'Disk News HD',
+      provider: 'm3u-prov-123',
+      metadata: { tvg_id: 'disk-news' },
+      sources: [{
+        provider_id: 'm3u-prov-123',
+        item_id: 'm3u-prov-123-disk-news',
+        source_id: 'disk-news'
+      }]
+    },
+    {
+      id: 'xtream-prov-abc-live-101',
+      type: 'live',
+      title: 'Xtream News',
+      provider: 'xtream-prov-abc',
+      metadata: { tvg_id: 'xtream-news' },
+      sources: [{
+        provider_id: 'xtream-prov-abc',
+        item_id: 'xtream-prov-abc-live-101',
+        source_id: '101'
+      }]
+    },
+    {
+      id: 'm3u-prov-123-sky-a',
+      type: 'live',
+      title: 'Sky HD',
+      sources: [{ provider_id: 'm3u-prov-123', item_id: 'm3u-prov-123-sky-a', source_id: 'sky-a' }]
+    },
+    {
+      id: 'm3u-prov-456-sky-b',
+      type: 'live',
+      title: 'Sky',
+      sources: [{ provider_id: 'm3u-prov-456', item_id: 'm3u-prov-456-sky-b', source_id: 'sky-b' }]
+    },
+    {
+      id: 'movie-not-live',
+      type: 'movie',
+      title: 'Disk News',
+      metadata: { tvg_id: 'movie-news' }
+    }
+  ]);
+
+  var exact = epg.resolvePlayableEpgChannel('DISK-NEWS', 'Wrong Name', index);
+  truthy('playable map: exact tvg-id resolves', exact && exact.catalog_item_id === 'm3u-prov-123-disk-news', JSON.stringify(exact));
+  if (exact) {
+    eq('playable map: exact source_id carried', exact.source_id, 'disk-news');
+    eq('playable map: exact strategy', exact.match_strategy, 'tvg_id');
+  }
+
+  var xtream = epg.resolvePlayableEpgChannel('xtream-news', 'Wrong Name', index);
+  truthy('playable map: xtream metadata.tvg_id resolves', xtream && xtream.catalog_item_id === 'xtream-prov-abc-live-101', JSON.stringify(xtream));
+  if (xtream) {
+    eq('playable map: xtream keeps provider stream source_id', xtream.source_id, '101');
+  }
+
+  var byName = epg.resolvePlayableEpgChannel('', 'Disk News', index);
+  truthy('playable map: unique name fallback resolves', byName && byName.catalog_item_id === 'm3u-prov-123-disk-news', JSON.stringify(byName));
+  if (byName) { eq('playable map: name strategy', byName.match_strategy, 'name'); }
+
+  eq('playable map: ambiguous name refuses to guess',
+     epg.resolvePlayableEpgChannel('', 'Sky HD', index), null);
+  eq('playable map: missing returns null',
+     epg.resolvePlayableEpgChannel('missing.tvg', 'Missing TV', index), null);
 })();
 
 // ---- Final tally --------------------------------------------------------

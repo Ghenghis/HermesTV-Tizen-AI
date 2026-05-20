@@ -47,19 +47,102 @@ const VALID_PROFILES = new Set(['dave_tv', 'mom_tv']);
 // Maximum permitted window in milliseconds (4 hours)
 const MAX_WINDOW_MS = 4 * 60 * 60 * 1000;
 
-// Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md §"Non-Negotiable Truth Rules"
-// + docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md §"EPG And Catchup":
-//   "epgGrid.js still returns mock programs. EPG is mostly single XMLTV URL
-//    plus static channel map, not multi-source provider-aware waterfall."
-// The mock array was removed; the route now derives programs from the
-// xmltv cache (set up by routes/epg.js + lib/integrations/xmltv.js) and
-// returns an HONEST empty list when no real EPG is configured. Lane 07
-// (EPG mapping) wires the waterfall (lib/epgWaterfall.js, Priority 3) +
-// per-channel mapping to playable catalog IDs in a follow-up.
 var xmltv = (function() { try { return require('../integrations/xmltv'); } catch (_) { return null; } })();
+var catalogMerge = (function() { try { return require('../lib/catalogMerge'); } catch (_) { return null; } })();
+var m3uClient = (function() { try { return require('../lib/m3uClient'); } catch (_) { return null; } })();
+var iptvOrg = (function() { try { return require('../lib/iptvOrg'); } catch (_) { return null; } })();
+var epgWaterfall = require('../lib/epgWaterfall');
+
+function _asArray(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+function _catalogItemsForMapping() {
+  var out = [];
+  try {
+    if (catalogMerge && typeof catalogMerge.getLastMerged === 'function') {
+      var merged = catalogMerge.getLastMerged();
+      if (Array.isArray(merged)) { out = out.concat(merged); }
+    }
+  } catch (_) {}
+  try {
+    if (m3uClient && typeof m3uClient.getCachedCatalog === 'function') {
+      var m3u = m3uClient.getCachedCatalog();
+      if (Array.isArray(m3u)) { out = out.concat(m3u); }
+    }
+  } catch (_) {}
+  try {
+    if (iptvOrg && iptvOrg.isEnabled && iptvOrg.isEnabled() && typeof iptvOrg.fetchCatalog === 'function') {
+      var org = iptvOrg.fetchCatalog({ limit: 500 });
+      if (Array.isArray(org)) { out = out.concat(org); }
+    }
+  } catch (_) {}
+  return out;
+}
+
+function _channelNamesByTvgId(epgData) {
+  var names = {};
+  if (epgData && Array.isArray(epgData.channels)) {
+    for (var i = 0; i < epgData.channels.length; i++) {
+      var c = epgData.channels[i];
+      if (c && typeof c.id === 'string' && c.id.length > 0) {
+        names[c.id] = c.name || c.id;
+      }
+    }
+  }
+  return names;
+}
+
+function _programmesByTvgId(cached) {
+  if (!cached) { return {}; }
+  if (cached.programmes_by_tvg_id && typeof cached.programmes_by_tvg_id === 'object') {
+    return cached.programmes_by_tvg_id;
+  }
+  var epgData = cached.data || cached;
+  var programs = _asArray(epgData.programs);
+  var out = {};
+  for (var i = 0; i < programs.length; i++) {
+    var p = programs[i];
+    if (!p || typeof p.channel_id !== 'string' || p.channel_id.length === 0) { continue; }
+    if (!out[p.channel_id]) { out[p.channel_id] = []; }
+    out[p.channel_id].push(p);
+  }
+  return out;
+}
+
+function _programStart(p) {
+  return Date.parse(p.start_utc || p.start || '');
+}
+
+function _programEnd(p) {
+  return Date.parse(p.end_utc || p.stop_utc || p.stop || p.end || '');
+}
+
+function _channelFilterSet(raw) {
+  if (typeof raw !== 'string' || raw.length === 0) { return null; }
+  var parts = raw.split(',');
+  var set = {};
+  var any = false;
+  for (var i = 0; i < parts.length; i++) {
+    var id = parts[i].trim();
+    if (!id) { continue; }
+    set[id] = true;
+    any = true;
+  }
+  return any ? set : null;
+}
+
+function _matchesChannelFilter(filter, row) {
+  if (!filter) { return true; }
+  return !!(row &&
+    ((row.channel_id && filter[row.channel_id]) ||
+     (row.catalog_item_id && filter[row.catalog_item_id]) ||
+     (row.source_item_id && filter[row.source_item_id]) ||
+     (row.xmltv_tvg_id && filter[row.xmltv_tvg_id])));
+}
 
 // ── GET /api/epg/grid ─────────────────────────────────────────────────────────
-router.get('/', function(req, res) {
+router.get('/api/epg/grid', function(req, res) {
   const { start, end, profile_id } = req.query;
 
   // profile_id
@@ -117,21 +200,29 @@ router.get('/', function(req, res) {
   }
 
   // Honest empty when no XMLTV is configured. When XMLTV_URL is set + the
-  // xmltv cache holds a parsed result, walk its programmes-by-tvgId into
-  // the grid shape and filter by window. Real-fixture EPG via the Xtream
-  // panel (xmltv.php) populates the same xmltv cache, so the gate keys on
-  // the cache contents rather than a hard-coded provider.
+  // xmltv cache holds a parsed result, walk its programmes by raw XMLTV tvgId,
+  // then map each row to the latest playable catalog/source identity when a
+  // real provider/catalog item proves that relationship. Unmapped rows keep
+  // the raw XMLTV metadata and explicitly do not claim a playable channel_id.
   var programs = [];
-  var epgMeta = { source: 'no-epg', tvg_ids: 0, programmes_total: 0 };
+  var epgMeta = { source: 'no-epg', tvg_ids: 0, programmes_total: 0, mapped: 0, unmapped: 0 };
   if (xmltv && typeof xmltv.getCachedEpg === 'function' &&
       typeof process.env.XMLTV_URL === 'string' && process.env.XMLTV_URL.length > 0) {
     try {
       var cached = xmltv.getCachedEpg(process.env.XMLTV_URL);
-      if (cached && cached.programmes_by_tvg_id && typeof cached.programmes_by_tvg_id === 'object') {
-        var byId = cached.programmes_by_tvg_id;
+      var epgData = cached && (cached.data || cached);
+      if (cached) {
+        var byId = _programmesByTvgId(cached);
         var ids = Object.keys(byId);
+        var channelNames = _channelNamesByTvgId(epgData);
+        var playableIndex = epgWaterfall.buildPlayableEpgIndex(_catalogItemsForMapping());
+        var channelFilter = _channelFilterSet(req.query.channelIds);
         epgMeta.source = 'xmltv';
         epgMeta.tvg_ids = ids.length;
+        epgMeta.mapping_source_items =
+          (playableIndex && playableIndex.byName && typeof playableIndex.byName.size === 'number')
+            ? playableIndex.byName.size
+            : 0;
         for (var i = 0; i < ids.length; i++) {
           var tvgId = ids[i];
           var arr = byId[tvgId] || [];
@@ -139,20 +230,34 @@ router.get('/', function(req, res) {
           for (var j = 0; j < arr.length; j++) {
             var p = arr[j];
             if (!p) { continue; }
-            var pStart = Date.parse(p.start_utc || p.start || '');
-            var pEnd = Date.parse(p.end_utc || p.stop_utc || p.stop || '');
+            var pStart = _programStart(p);
+            var pEnd = _programEnd(p);
             if (isNaN(pStart) || isNaN(pEnd)) { continue; }
             if (pStart < endMs && pEnd > startMs) {
-              programs.push({
+              var channelName = channelNames[tvgId] || p.channel_name || p.tvg_name || p.name || tvgId;
+              var mapping = epgWaterfall.resolvePlayableEpgChannel(tvgId, channelName, playableIndex);
+              var row = {
                 program_id: p.program_id || (tvgId + '-' + pStart),
-                channel_id: tvgId,
+                channel_id: mapping ? mapping.catalog_item_id : null,
+                catalog_item_id: mapping ? mapping.catalog_item_id : null,
+                source_item_id: mapping ? mapping.source_item_id : null,
+                provider_id: mapping ? mapping.provider_id : null,
+                source_id: mapping ? mapping.source_id : null,
+                xmltv_tvg_id: tvgId,
+                xmltv_channel_name: channelName,
                 title: p.title || '',
                 start_utc: new Date(pStart).toISOString(),
                 end_utc: new Date(pEnd).toISOString(),
                 description: p.description || p.desc || '',
                 catch_up_available: !!(p.catch_up_available || p.has_archive),
-                epg_status: 'matched'
-              });
+                epg_status: mapping ? 'mapped' : 'unmapped',
+                mapping_strategy: mapping ? mapping.match_strategy : null
+              };
+              if (_matchesChannelFilter(channelFilter, row)) {
+                programs.push(row);
+                if (mapping) { epgMeta.mapped += 1; }
+                else { epgMeta.unmapped += 1; }
+              }
             }
           }
         }

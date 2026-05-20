@@ -104,7 +104,10 @@ function _publicBaseUrl(req) {
 
 function _buildSetupUrl(req, code) {
   var base = _publicBaseUrl(req);
-  var path = '/setup/provider?code=' + encodeURIComponent(code);
+  // Public VPS nginx only proxies /api/* to the API container; non-/api paths
+  // are owned by the React web container. Encode the QR target through the API
+  // prefix so a phone scan opens the real server-rendered setup form.
+  var path = '/api/setup/provider?code=' + encodeURIComponent(code);
   return base ? (base + path) : path;
 }
 

@@ -59,6 +59,15 @@
  *
  *   findInChannelNameIndex(displayName, index) → string
  *
+ *   buildPlayableEpgIndex(catalogItems) → { byTvgId, byName }
+ *     Builds an honest XMLTV → playable catalog/source lookup from real
+ *     catalog items. Exact TVG IDs win; channel-name fallback only works
+ *     when the normalised catalog name is unique.
+ *
+ *   resolvePlayableEpgChannel(tvgId, displayName, index) → object|null
+ *     Returns { catalog_item_id, source_item_id, provider_id, source_id,
+ *     match_strategy } or null. Never fabricates IDs.
+ *
  * Style: CommonJS, Node 20+. No external dependencies.
  */
 
@@ -326,6 +335,185 @@ function findInChannelNameIndex(displayName, index) {
 }
 
 // ---------------------------------------------------------------------------
+// XMLTV channel → playable catalog/source mapping
+// ---------------------------------------------------------------------------
+
+function _trimString(v) {
+  return (typeof v === 'string') ? v.trim() : '';
+}
+
+function _tvgKey(v) {
+  return _trimString(v).toLowerCase();
+}
+
+function _isXtreamProvider(providerId) {
+  return typeof providerId === 'string' && providerId.indexOf('xtream') === 0;
+}
+
+function _firstPlayableSource(item) {
+  if (!item || typeof item !== 'object') { return null; }
+  if (Array.isArray(item.sources) && item.sources.length > 0) {
+    for (var i = 0; i < item.sources.length; i++) {
+      if (item.sources[i] && typeof item.sources[i] === 'object') { return item.sources[i]; }
+    }
+  }
+  if (Array.isArray(item.providers) && item.providers.length > 0) {
+    for (var j = 0; j < item.providers.length; j++) {
+      var p = item.providers[j];
+      if (p && typeof p === 'object') {
+        return {
+          provider_id: p.provider_id || item.provider || null,
+          item_id: item.id,
+          source_id: p.source_id || null,
+          source_health: p.source_health || null
+        };
+      }
+    }
+  }
+  if (typeof item.id === 'string' && item.id.length > 0) {
+    return {
+      provider_id: item.provider || null,
+      item_id: item.id,
+      source_id: null,
+      source_health: null
+    };
+  }
+  return null;
+}
+
+function _sourceForTvgId(item, tvgId) {
+  var key = _tvgKey(tvgId);
+  if (!key || !item || typeof item !== 'object') { return _firstPlayableSource(item); }
+
+  var sources = Array.isArray(item.sources) ? item.sources : [];
+  for (var i = 0; i < sources.length; i++) {
+    var s = sources[i];
+    if (!s || typeof s !== 'object') { continue; }
+    if (_isXtreamProvider(s.provider_id)) { continue; }
+    if (_tvgKey(s.source_id) === key) { return s; }
+  }
+
+  var providers = Array.isArray(item.providers) ? item.providers : [];
+  for (var j = 0; j < providers.length; j++) {
+    var p = providers[j];
+    if (!p || typeof p !== 'object') { continue; }
+    if (_isXtreamProvider(p.provider_id)) { continue; }
+    if (_tvgKey(p.source_id) === key) {
+      return {
+        provider_id: p.provider_id || item.provider || null,
+        item_id: item.id,
+        source_id: p.source_id || null,
+        source_health: p.source_health || null
+      };
+    }
+  }
+
+  return _firstPlayableSource(item);
+}
+
+function _mappingFromItem(item, source, strategy) {
+  if (!item || typeof item.id !== 'string' || item.id.length === 0) { return null; }
+  source = source || _firstPlayableSource(item);
+  if (!source) { return null; }
+  return {
+    catalog_item_id: item.id,
+    source_item_id: (typeof source.item_id === 'string' && source.item_id.length > 0) ? source.item_id : item.id,
+    provider_id: source.provider_id || item.provider || null,
+    source_id: source.source_id || null,
+    match_strategy: strategy
+  };
+}
+
+function _addUnique(arr, value) {
+  var key = _tvgKey(value);
+  if (!key) { return; }
+  if (arr.indexOf(key) === -1) { arr.push(key); }
+}
+
+function _candidateTvgIds(item) {
+  var out = [];
+  if (!item || typeof item !== 'object') { return out; }
+  var meta = item.metadata || {};
+  _addUnique(out, meta.tvg_id);
+  _addUnique(out, meta.xmltv_id);
+  _addUnique(out, meta.epg_channel_id);
+  _addUnique(out, item.tvg_id);
+  _addUnique(out, item.xmltv_id);
+  _addUnique(out, item.epg_channel_id);
+
+  // In M3U and iptv-org catalog rows, source_id is the TVG/XMLTV channel id.
+  // Xtream uses numeric stream ids there, so skip those and rely on
+  // metadata.tvg_id from xtreamClient.toHermesItem instead.
+  var sources = Array.isArray(item.sources) ? item.sources : [];
+  for (var i = 0; i < sources.length; i++) {
+    if (sources[i] && !_isXtreamProvider(sources[i].provider_id)) {
+      _addUnique(out, sources[i].source_id);
+    }
+  }
+  var providers = Array.isArray(item.providers) ? item.providers : [];
+  for (var j = 0; j < providers.length; j++) {
+    if (providers[j] && !_isXtreamProvider(providers[j].provider_id)) {
+      _addUnique(out, providers[j].source_id);
+    }
+  }
+  return out;
+}
+
+function buildPlayableEpgIndex(catalogItems) {
+  var byTvgId = new Map();
+  var nameToItem = new Map();
+  var nameCollisions = Object.create(null);
+
+  if (Array.isArray(catalogItems)) {
+    for (var i = 0; i < catalogItems.length; i++) {
+      var item = catalogItems[i];
+      if (!item || typeof item !== 'object' || item.type !== 'live') { continue; }
+      if (typeof item.id !== 'string' || item.id.length === 0) { continue; }
+
+      var tvgIds = _candidateTvgIds(item);
+      for (var t = 0; t < tvgIds.length; t++) {
+        if (!byTvgId.has(tvgIds[t])) {
+          byTvgId.set(tvgIds[t], item);
+        }
+      }
+
+      var nameKey = normaliseChannelName(item.title || item.name || '');
+      if (nameKey) {
+        if (nameToItem.has(nameKey)) {
+          nameCollisions[nameKey] = true;
+        } else {
+          nameToItem.set(nameKey, item);
+        }
+      }
+    }
+  }
+
+  Object.keys(nameCollisions).forEach(function(k) { nameToItem.set(k, null); });
+  return { byTvgId: byTvgId, byName: nameToItem };
+}
+
+function resolvePlayableEpgChannel(tvgId, displayName, index) {
+  if (!index || typeof index !== 'object') { return null; }
+  var key = _tvgKey(tvgId);
+  if (key && index.byTvgId && typeof index.byTvgId.get === 'function') {
+    var exact = index.byTvgId.get(key);
+    if (exact) {
+      return _mappingFromItem(exact, _sourceForTvgId(exact, key), 'tvg_id');
+    }
+  }
+
+  var nameKey = normaliseChannelName(displayName || '');
+  if (nameKey && index.byName && typeof index.byName.get === 'function') {
+    var byName = index.byName.get(nameKey);
+    if (byName) {
+      return _mappingFromItem(byName, _firstPlayableSource(byName), 'name');
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -339,5 +527,7 @@ module.exports = {
   normaliseChannelName: normaliseChannelName,
   findBestEpgChannelByName: findBestEpgChannelByName,
   buildChannelNameIndex: buildChannelNameIndex,
-  findInChannelNameIndex: findInChannelNameIndex
+  findInChannelNameIndex: findInChannelNameIndex,
+  buildPlayableEpgIndex: buildPlayableEpgIndex,
+  resolvePlayableEpgChannel: resolvePlayableEpgChannel
 };

@@ -45,9 +45,9 @@ jobs:
   deploy:
     name: Deploy to Hostinger VPS and smoke-probe
     runs-on: ubuntu-latest
-    # Build+restart+health typically takes ~6 min worst case; 12 gives buffer
-    # for a cold Docker layer cache or a slow first /health response.
-    timeout-minutes: 12
+    # Build+restart+health typically takes ~6 min worst case; provider-live
+    # proof can add several more minutes when the release gate is enabled.
+    timeout-minutes: 20
 
     env:
       # Mirror the constants from tools/redeploy-vps.sh so the YAML reads as
@@ -57,10 +57,10 @@ jobs:
       REPO_DIR: /home/operator/hermestv
       API_CONTAINER: hermestv-vps-api
       WEB_CONTAINER: hermestv-vps-web
-      # Canonical public domain (post-PR domain swap). Fallback exercised in
-      # the smoke step if the canonical resolves to the wrong upstream.
-      PRIMARY_HOST: tv.daveai.tech
-      FALLBACK_HOST: hermestv.daveai.tech
+      # Active HermesTV public domain. tv.daveai.tech currently resolves to a
+      # different DaveAI service; keep it as fallback until DNS/nginx is fixed.
+      PRIMARY_HOST: hermestv.daveai.tech
+      FALLBACK_HOST: tv.daveai.tech
 
     steps:
       # ---------------------------------------------------------------------
@@ -221,8 +221,8 @@ jobs:
       # 5) Smoke probes against the public HTTPS edge (Cloudflare → nginx →
       # container). Mirrors the five probes in tools/redeploy-vps.sh lines
       # 162-249 byte-for-byte; the only addition is `tv.daveai.tech` as
-      # primary host with `hermestv.daveai.tech` as fallback for the few
-      # hours during/after the parallel domain-swap PR.
+      # primary host. tv.daveai.tech remains a fallback only while its
+      # DNS/nginx route is corrected to point at HermesTV.
       #
       # NOTE: continue-on-error is true because Cloudflare returns 403 to
       # GitHub Actions runner CIDR ranges, so this step structurally cannot
@@ -242,23 +242,27 @@ jobs:
           echo "Pausing 3s for nginx -> upstream warm-up..."
           sleep 3
 
-          # Resolve which host to probe. If /health on the primary returns
-          # 200, lock in primary; otherwise try fallback. We don't FAIL on
-          # primary 404 here — we just pick the host with a live edge so the
-          # other four probes report against a single consistent base.
+          # Resolve which host to probe. Health must be the HermesTV API, not
+          # merely any app returning 200 at /health.
           PRIMARY="${PRIMARY_HOST}"
           FALLBACK="${FALLBACK_HOST}"
+          is_hermes_host() {
+            local host="$1"
+            local body
+            body=$(curl -sf "https://${host}/health" 2>/dev/null || echo "{}")
+            echo "$body" | jq -e '.service == "hermes-tv-api" or .brand == "DaveTV"' >/dev/null 2>&1
+          }
           PRIMARY_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${PRIMARY}/health" 2>/dev/null || echo "000")
-          if [ "$PRIMARY_CODE" = "200" ]; then
+          if [ "$PRIMARY_CODE" = "200" ] && is_hermes_host "$PRIMARY"; then
             HOST="$PRIMARY"
             echo "Probing canonical host: https://${HOST}"
           else
             FALLBACK_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${FALLBACK}/health" 2>/dev/null || echo "000")
-            if [ "$FALLBACK_CODE" = "200" ]; then
+            if [ "$FALLBACK_CODE" = "200" ] && is_hermes_host "$FALLBACK"; then
               HOST="$FALLBACK"
-              echo "::warning::Primary host ${PRIMARY} returned ${PRIMARY_CODE}; falling back to ${FALLBACK}"
+              echo "::warning::Primary host ${PRIMARY} returned ${PRIMARY_CODE} or wrong service; falling back to ${FALLBACK}"
             else
-              echo "::error::Neither ${PRIMARY} (${PRIMARY_CODE}) nor ${FALLBACK} (${FALLBACK_CODE}) responded with 200 on /health"
+              echo "::error::Neither ${PRIMARY} (${PRIMARY_CODE}) nor ${FALLBACK} (${FALLBACK_CODE}) responded as HermesTV on /health"
               echo "5 PASS, 5 FAIL" >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
@@ -349,6 +353,21 @@ jobs:
           fi
           exit 0
 
+      - name: Mark release promotion blocked when provider-live proof is skipped
+        if: ${{ inputs.run_provider_live != 'true' }}
+        run: |
+          echo "::warning::Deploy completed without provider-live truth proof; release promotion remains BLOCKED."
+          {
+            echo ""
+            echo "## Release promotion"
+            echo ""
+            echo "**BLOCKED** — rerun this workflow with \`run_provider_live=true\` to execute:"
+            echo ""
+            echo "\`\`\`bash"
+            echo "HERMES_PROVIDER_E2E_BASE=https://${PRIMARY_HOST} PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # ---------------------------------------------------------------------
       # 6) Provider-live truth proof (Lane 09 release-gate).
       # Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md, a deploy is not
@@ -381,14 +400,20 @@ jobs:
           # noted in step 5), fall back to FALLBACK_HOST. If neither works
           # this step exits 1 — the deploy itself was healthy, but the
           # release-gate proof failed, and that's the contract.
+          is_hermes_host() {
+            local host="$1"
+            local body
+            body=$(curl -sf "https://${host}/health" 2>/dev/null || echo "{}")
+            echo "$body" | jq -e '.service == "hermes-tv-api" or .brand == "DaveTV"' >/dev/null 2>&1
+          }
           PRIMARY_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${PRIMARY_HOST}/health" 2>/dev/null || echo "000")
-          if [ "$PRIMARY_CODE" != "200" ]; then
+          if [ "$PRIMARY_CODE" != "200" ] || ! is_hermes_host "$PRIMARY_HOST"; then
             FALLBACK_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://${FALLBACK_HOST}/health" 2>/dev/null || echo "000")
-            if [ "$FALLBACK_CODE" = "200" ]; then
-              echo "::warning::Primary ${PRIMARY_HOST} returned ${PRIMARY_CODE}; using fallback ${FALLBACK_HOST}"
+            if [ "$FALLBACK_CODE" = "200" ] && is_hermes_host "$FALLBACK_HOST"; then
+              echo "::warning::Primary ${PRIMARY_HOST} returned ${PRIMARY_CODE} or wrong service; using fallback ${FALLBACK_HOST}"
               echo "HERMES_PROVIDER_E2E_BASE=https://${FALLBACK_HOST}" >> "$GITHUB_ENV"
             else
-              echo "::error::Neither host reachable for provider-live proof (${PRIMARY_CODE} / ${FALLBACK_CODE})"
+              echo "::error::Neither host reachable as HermesTV for provider-live proof (${PRIMARY_CODE} / ${FALLBACK_CODE})"
               exit 1
             fi
           fi

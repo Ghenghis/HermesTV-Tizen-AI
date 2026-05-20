@@ -74,7 +74,7 @@ Use `https.request` for HTTPS bases; strengthen stream proof to require HEAD + G
 Proof:
 
 ```bash
-HERMES_PROVIDER_E2E_BASE=https://tv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
+HERMES_PROVIDER_E2E_BASE=https://hermestv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
 ```
 
 ### Agent 04: Setup Restart Chain
@@ -319,7 +319,7 @@ Required proof:
 npm test --prefix services/hermes-tv-api
 npm run build --prefix apps/hermes-web-tv
 cd tests/playwright && npm test
-HERMES_PROVIDER_E2E_BASE=https://tv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
+HERMES_PROVIDER_E2E_BASE=https://hermestv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
 node tools/proof-ledger-validate.js
 ```
 

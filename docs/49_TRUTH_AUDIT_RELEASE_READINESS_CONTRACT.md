@@ -57,7 +57,7 @@ Make release/deploy promotion require live proof or mark release `BLOCKED`.
 Proof:
 
 ```bash
-HERMES_PROVIDER_E2E_BASE=https://tv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
+HERMES_PROVIDER_E2E_BASE=https://hermestv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
 ```
 
 ### P0-3: Live E2E Tool Must Support HTTPS Correctly
@@ -72,7 +72,7 @@ Correction:
 Use `https.request` when URL protocol is `https:`.
 
 Proof:
-The live provider proof succeeds against `https://tv.daveai.tech` without plain-HTTP TLS failure.
+The live provider proof succeeds against the active HermesTV host (`https://hermestv.daveai.tech` until `tv.daveai.tech` is routed back to HermesTV) without plain-HTTP TLS failure.
 
 ### P0-4: One Chain Gate Must Prove Setup -> Restart -> Catalog -> Play
 
@@ -206,7 +206,7 @@ cd tests/playwright && npm test
 4. Provider-live proof:
 
 ```bash
-HERMES_PROVIDER_E2E_BASE=https://tv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
+HERMES_PROVIDER_E2E_BASE=https://hermestv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js
 ```
 
 5. Proof ledger:

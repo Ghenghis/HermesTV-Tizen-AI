@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # ============================================================================
 # HermesTV VPS redeploy — pull main, rebuild + restart the two HermesTV
-# containers, then smoke-probe the public domain.
+# containers, then smoke-probe the public HermesTV domain.
 # ============================================================================
 # This script is run from the operator's workstation. It SSHes into the
 # Hostinger VPS, fast-forwards /home/operator/hermestv to origin/main,
 # rebuilds and restarts ONLY the two HermesTV containers (hermes-tv-api
 # and hermes-web-tv), waits for both healthchecks to flip to "healthy",
-# and then runs five smoke probes against https://tv.daveai.tech (the
-# new canonical) plus one alias probe against https://hermestv.daveai.tech
-# to confirm the additive nginx server_name entry still resolves.
+# and then runs five smoke probes against https://hermestv.daveai.tech.
+# tv.daveai.tech is kept as an alias probe until DNS/nginx is corrected.
 #
 # Why this exists:
 #   On 2026-05-18 the agent triaging prod confirmed hermestv.daveai.tech
@@ -56,13 +55,11 @@ set -euo pipefail
 # no env vars. Anyone else exports OPERATOR_HOST=operator@<their-host>.
 OPERATOR_HOST="${OPERATOR_HOST:-srv1376124}"
 
-# Public domain we smoke-probe after the deploy. tv.daveai.tech is the
-# canonical short URL (added 2026-05-18). hermestv.daveai.tech remains a
-# valid alias served by the same nginx server_name line. We probe the
-# canonical for the five functional smokes, and run one extra HEAD probe
-# against the alias to confirm both Host headers route to the same upstream.
-PUBLIC_HOST="tv.daveai.tech"
-ALIAS_HOST="hermestv.daveai.tech"
+# Active HermesTV public domain we smoke-probe after the deploy. tv.daveai.tech
+# currently serves a different DaveAI app, so keep it as an alias probe only
+# until its DNS/nginx route is corrected.
+PUBLIC_HOST="hermestv.daveai.tech"
+ALIAS_HOST="tv.daveai.tech"
 
 # Compose project + file paths, mirroring docs/29 exactly. If these drift,
 # rollback / log-grep instructions in the runbook stop matching reality.
