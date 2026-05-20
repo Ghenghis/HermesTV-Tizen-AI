@@ -23,6 +23,7 @@ const { SEED_CATALOG } = require('../data/seedCatalog');
 const streamResolver = require('../lib/streamResolver');
 const m3uClient = require('../lib/m3uClient');
 const iptvOrg = require('../lib/iptvOrg');
+const hlsProxy = require('../lib/hlsProxy');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const TICKET_TTL_MS = 5 * 60 * 1000;
@@ -234,19 +235,67 @@ router.get(/^\/api\/play\/([^\/]+)\/stream(?:\.m3u8|\.mpd)?$/, (req, res) => {
   }
 
   if (resolved.credential_bearing) {
-    return res.status(503).json({
-      status: 'threadfin_proxy_required',
-      message: 'This stream URL embeds upstream credentials. Operator must set THREADFIN_URL and route playback through the Threadfin proxy before this item can be played.',
+    // In-API HLS proxy path (wave-11). Fetch the upstream playlist
+    // server-side, rewrite every segment URL to /api/proxy/<ticket>/seg/<b64>,
+    // and serve the rewritten body. The credential never reaches the client.
+    // We do NOT 302 here — that would put the credentialed URL into the
+    // Location header. Native HLS players (Safari, Tizen) and hls.js both
+    // accept this manifest body verbatim.
+    return hlsProxy.proxyPlaylist({
+      upstreamUrl: resolved.url,
       ticket: req.params.ticket,
-      provider: t.ticket.provider,
-      item: t.ticket.item,
-    });
+    })
+      .then(function(rewritten) {
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(200).send(rewritten);
+      })
+      .catch(function(err) {
+        var sanLog = require('../lib/sanitizeLog').sanitizeForLog;
+        console.warn('[play] hls proxy failed ticket=' + req.params.ticket + ': ' + sanLog(err && err.message ? err.message : 'unknown'));
+        res.status(502).json({
+          error: 'upstream_playlist_fetch_failed',
+          message: 'Could not fetch the upstream playlist for this item.',
+          ticket: req.params.ticket,
+          provider: t.ticket.provider,
+          item: t.ticket.item,
+        });
+      });
   }
 
   // Clean public URL — safe to redirect. credentialGuard middleware
   // is wrapping res.json only; Location-header redirects are
   // separately covered by the credential-bearing check above.
   return res.redirect(302, resolved.url);
+});
+
+/**
+ * GET /api/proxy/:ticket/seg/:b64
+ *
+ * Streams a single HLS segment (or sub-resource) through the API on
+ * behalf of the client. The :b64 param is a base64url-encoded upstream
+ * URL, planted in the playlist by hlsProxy.proxyPlaylist().
+ *
+ * Ticket validation is intentionally the same as /stream — we will not
+ * proxy bytes for an expired or unknown ticket. This keeps the proxy
+ * gated by the 5-minute play-ticket TTL, so even if a logged manifest
+ * leaks the segment URLs are useless 5 minutes later.
+ */
+router.get('/api/proxy/:ticket/seg/:b64', (req, res) => {
+  const t = tickets[req.params.ticket];
+  if (!t) {
+    return res.status(404).json({ error: 'ticket_not_found' });
+  }
+  if (Date.now() > t.expires_at) {
+    delete tickets[req.params.ticket];
+    return res.status(410).json({ error: 'ticket_expired' });
+  }
+  return hlsProxy.streamSegment({
+    res: res,
+    req: req,
+    b64Url: req.params.b64,
+    ticket: req.params.ticket,
+  });
 });
 
 /**
