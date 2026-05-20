@@ -230,6 +230,20 @@ router.get('/api/catalog', async (req, res) => {
   let items = resolved.items;
   res.setHeader(CATALOG_SOURCE_HEADER, resolved.source);
 
+  // Edge-cache the catalog at Cloudflare. Live measurement on 2026-05-20 showed
+  // 36 KB gzipped catalog took ~1 s end-to-end with cf-cache-status: DYNAMIC.
+  // Catalog changes only when the operator pastes new provider credentials —
+  // safe to cache 2 min at the edge with a 10 min stale-while-revalidate so
+  // a stale cache entry serves instantly while we backfill in the background.
+  // Browser cache (max-age) stays short so a hard refresh still gets fresh.
+  // Cache key includes the full URL (path + query) so per-profile/per-provider
+  // filters do not collide. Vary on Accept-Encoding keeps gzip/br separate.
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=30, s-maxage=120, stale-while-revalidate=600'
+  );
+  res.setHeader('Vary', 'Accept-Encoding');
+
   // Filtering by profile_access / providers array only applies to mock items —
   // Jellyfin items don't carry those fields. When we're serving Jellyfin
   // results we skip these filters entirely (the workstation library is
