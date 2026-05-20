@@ -1,5 +1,6 @@
 import React from 'react';
 import CatalogCard from './CatalogCard.jsx';
+import EmptyState from './EmptyState.jsx';
 import { useGridVirtualizer } from '../shells/shellHelpers.js';
 import { isSystemLimited } from '../utils/isSystemLimited.js';
 
@@ -57,9 +58,28 @@ function CatalogGrid(props) {
   var profile = props.profile || {};
   var tier = props.tier || 'degraded';
   var onItemClick = props.onItemClick || null;
+  var onOpenSettings = props.onOpenSettings || null;
 
   var profileId = profile.profile_id;
   var activeLayout = profile.active_layout || 'grid-standard';
+
+  // W17-PURGE: when items[] is empty, render the honest empty state with an
+  // Open Settings CTA. No fake-content fallback (the seed catalog is gone).
+  if (!Array.isArray(items) || items.length === 0) {
+    return (
+      <div
+        data-empty="true"
+        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}
+      >
+        <EmptyState
+          icon="📭"
+          title="No channels yet"
+          message="None of your providers returned content. Open Settings → Providers and verify your iptv-org / xTremeHD / Apollo Group credentials are valid and reachable."
+          cta={onOpenSettings ? { label: 'Open Settings', onClick: onOpenSettings } : null}
+        />
+      </div>
+    );
+  }
 
   // Filter by provider tab
   var filtered = items.filter(function(item) {

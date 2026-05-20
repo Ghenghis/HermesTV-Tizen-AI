@@ -20,25 +20,48 @@
 
 const { Router } = require('express');
 const router = Router();
-const { SEED_CATALOG } = require('../data/seedCatalog');
+const iptvOrg = require('../lib/iptvOrg');
+const m3uClient = require('../lib/m3uClient');
+const catalogMerge = require('../lib/catalogMerge');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const MAX_RESULTS = 100;
 
-// Build a quick category lookup for the category endpoint.
-const VALID_CATEGORIES = new Set();
-SEED_CATALOG.forEach(function(i) {
-  if (i.category) { VALID_CATEGORIES.add(i.category); }
-});
+// W17-PURGE: search now walks real provider caches via the last merged
+// catalog snapshot (populated by /api/catalog). When nothing has been
+// merged yet (cold cache) we fall back to the per-provider caches directly.
+// No seed catalog, no hard-coded actors.
+function _allItems() {
+  // Prefer the already-merged snapshot — it has cross-provider dedupe.
+  try {
+    var snap = catalogMerge.getLastMerged && catalogMerge.getLastMerged();
+    if (Array.isArray(snap) && snap.length > 0) { return snap; }
+  } catch (_) {}
+  // Fallback: union of the per-provider caches.
+  var out = [];
+  try {
+    if (iptvOrg.isEnabled()) {
+      var orgItems = iptvOrg.fetchCatalog({ limit: 500 });
+      if (Array.isArray(orgItems)) { out = out.concat(orgItems); }
+    }
+  } catch (_) {}
+  try {
+    if (m3uClient.isEnabled() && typeof m3uClient.getCachedCatalog === 'function') {
+      var m3uItems = m3uClient.getCachedCatalog();
+      if (Array.isArray(m3uItems)) { out = out.concat(m3uItems); }
+    }
+  } catch (_) {}
+  return out;
+}
 
-// Same actor list as catalog.js — keep in sync.
-const ACTORS = {
-  'actor-001': 'Tom Cruise',
-  'actor-002': 'Ryan Gosling',
-  'actor-003': 'Keanu Reeves',
-  'actor-004': 'Julia Roberts',
-  'actor-005': 'Kevin Costner',
-};
+function _categorySet() {
+  var set = {};
+  var items = _allItems();
+  for (var i = 0; i < items.length; i++) {
+    if (items[i] && items[i].category) { set[items[i].category] = true; }
+  }
+  return set;
+}
 
 function _scoreItem(item, query) {
   const q = query.toLowerCase();
@@ -104,7 +127,7 @@ router.get('/api/search', (req, res) => {
     });
   }
 
-  var candidates = SEED_CATALOG.slice();
+  var candidates = _allItems().slice();
   if (type) { candidates = candidates.filter(function(i) { return i.type === type; }); }
   candidates = _filterByProfile(candidates, profileId);
 
@@ -123,7 +146,7 @@ router.get('/api/search', (req, res) => {
     total: scored.length,
     returned: results.length,
     _meta: {
-      source: 'seed-catalog',
+      source: candidates.length > 0 ? 'providers' : 'no-providers',
       profile_filter: profileId || null,
       type_filter: type || null,
       limit: limit,
@@ -132,13 +155,15 @@ router.get('/api/search', (req, res) => {
 });
 
 // ─── GET /api/search/actor/:actorId ──────────────────────────────────────────
+// W17-PURGE: actor data was hard-coded (Tom Cruise / Ryan Gosling / ...) under
+// the old seed. Real TMDB / Jellyfin cast wiring is out of scope here, so
+// this endpoint now reports "actor_not_found" until that wiring lands. We
+// keep the route so existing clients still get a structured 404 rather than
+// a network error.
 router.get('/api/search/actor/:actorId', (req, res) => {
   const actorId = req.params.actorId;
   const profileId = req.query.profile_id;
 
-  if (!ACTORS[actorId]) {
-    return res.status(404).json({ error: 'actor_not_found', actor_id: actorId });
-  }
   if (profileId !== undefined && !VALID_PROFILES.includes(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
@@ -146,18 +171,26 @@ router.get('/api/search/actor/:actorId', (req, res) => {
     });
   }
 
-  // Match items whose metadata.cast_ids array contains this actor_id.
-  var items = SEED_CATALOG.filter(function(i) {
-    const cast = i.metadata && Array.isArray(i.metadata.cast_ids) ? i.metadata.cast_ids : [];
+  // Search providers for items whose metadata.cast_ids carries this id.
+  var items = _allItems().filter(function(i) {
+    const cast = i && i.metadata && Array.isArray(i.metadata.cast_ids) ? i.metadata.cast_ids : [];
     return cast.indexOf(actorId) !== -1;
   });
   items = _filterByProfile(items, profileId);
 
+  if (items.length === 0) {
+    return res.status(404).json({
+      error: 'actor_not_found',
+      actor_id: actorId,
+      message: 'No provider returned items tagged with this actor. Cast metadata requires Jellyfin/TMDB wiring.',
+    });
+  }
+
   res.json({
-    actor: { actor_id: actorId, name: ACTORS[actorId] },
+    actor: { actor_id: actorId, name: null },
     items: items.map(_projectItem),
     total: items.length,
-    _meta: { source: 'seed-catalog', profile_filter: profileId || null },
+    _meta: { source: 'providers', profile_filter: profileId || null },
   });
 });
 
@@ -166,13 +199,6 @@ router.get('/api/search/category/:category', (req, res) => {
   const category = req.params.category;
   const profileId = req.query.profile_id;
 
-  if (!VALID_CATEGORIES.has(category)) {
-    return res.status(404).json({
-      error: 'category_not_found',
-      category: category,
-      available_categories: Array.from(VALID_CATEGORIES).sort(),
-    });
-  }
   if (profileId !== undefined && !VALID_PROFILES.includes(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
@@ -180,14 +206,24 @@ router.get('/api/search/category/:category', (req, res) => {
     });
   }
 
-  var items = SEED_CATALOG.filter(function(i) { return i.category === category; });
+  const categories = _categorySet();
+  if (!categories[category]) {
+    var available = Object.keys(categories).sort();
+    return res.status(404).json({
+      error: 'category_not_found',
+      category: category,
+      available_categories: available,
+    });
+  }
+
+  var items = _allItems().filter(function(i) { return i && i.category === category; });
   items = _filterByProfile(items, profileId);
 
   res.json({
     category: category,
     items: items.map(_projectItem),
     total: items.length,
-    _meta: { source: 'seed-catalog', profile_filter: profileId || null },
+    _meta: { source: items.length > 0 ? 'providers' : 'no-providers', profile_filter: profileId || null },
   });
 });
 

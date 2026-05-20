@@ -34,7 +34,8 @@
 
 const { Router } = require('express');
 const router = Router();
-const { LIVE_DEFS } = require('../data/seedCatalog');
+const iptvOrg = require('../lib/iptvOrg');
+const m3uClient = require('../lib/m3uClient');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const MAX_RECORDINGS = 100;
@@ -44,11 +45,32 @@ const MAX_RECORDINGS = 100;
 var recordings = {};
 var recordingOrder = [];
 
-// Look up a channel slug in the seed live-channel list.
-const KNOWN_CHANNELS = LIVE_DEFS.reduce(function(map, def) {
-  map['live.' + def.slug] = def;
-  return map;
-}, {});
+// W17-PURGE: channel metadata lookup walks real provider caches. The seed
+// catalog (LIVE_DEFS) is gone — only iptv-org public + operator-pasted M3U
+// items contribute. Returns null when no provider has the channel; the
+// caller leaves channel_display_name as null in the envelope.
+function _findChannelMeta(channelId) {
+  function _match(items) {
+    if (!Array.isArray(items)) { return null; }
+    for (var i = 0; i < items.length; i++) {
+      if (items[i] && items[i].id === channelId) { return items[i]; }
+    }
+    return null;
+  }
+  try {
+    if (iptvOrg.isEnabled()) {
+      var hit = _match(iptvOrg.fetchCatalog({ limit: 500 }));
+      if (hit) { return hit; }
+    }
+  } catch (_) {}
+  try {
+    if (m3uClient.isEnabled() && typeof m3uClient.getCachedCatalog === 'function') {
+      var hit2 = _match(m3uClient.getCachedCatalog());
+      if (hit2) { return hit2; }
+    }
+  } catch (_) {}
+  return null;
+}
 
 // Recording settings — global app-level (not per-profile).
 var RECORDING_SETTINGS = {
@@ -117,7 +139,7 @@ router.post('/api/dvr/schedule', (req, res) => {
     }
   }
 
-  const channelMeta = KNOWN_CHANNELS[body.channel_id] || null;
+  const channelMeta = _findChannelMeta(body.channel_id);
   const recordingId = _makeRecordingId();
   const envelope = {
     recording_id: recordingId,

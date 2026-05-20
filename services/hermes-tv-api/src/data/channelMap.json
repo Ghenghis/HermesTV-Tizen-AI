@@ -1,7 +1,7 @@
 {
   "_about": "XMLTV → HermesTV channel ID map. See docs/44_EPG_XMLTV_SETUP.md.",
   "_keys": "Keys are the channel IDs your XMLTV feed emits (the <channel id=\"...\"> attribute, also the programme @channel attribute). Operators discover them via the X-Hermes-XMLTV-Channels response header on /api/epg, or by curl-piping the feed and grepping `<channel id`.",
-  "_values": "Values are HermesTV catalog channel IDs in the slug form (live.<slug>), where <slug> comes from services/hermes-tv-api/src/data/seedCatalog.js LIVE_DEFS. The same form is used by routes/channels.js and routes/catchup.js, so EPG and live-tile playback share one ID space.",
+  "_values": "Values are HermesTV catalog channel IDs in the slug form (live.<slug>), which match the IDs the operator-configured providers (iptv-org / m3uClient / Jellyfin) emit. The same form is used by routes/channels.js and routes/catchup.js, so EPG and live-tile playback share one ID space.",
   "_additive": "This file is ADDITIVE. Operators extend `map` as they wire real channels. Channels absent from the map are dropped from /api/epg responses (no orphan tiles).",
   "map": {
     "bbc1.uk":           "live.bbc-world",

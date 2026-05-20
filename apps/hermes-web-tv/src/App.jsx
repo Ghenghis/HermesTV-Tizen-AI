@@ -2019,6 +2019,7 @@ function App() {
                   contentFilter={state.contentFilter}
                   providerFilter={state.providerFilter}
                   qualityFilter={state.qualityFilter}
+                  onOpenSettings={function() { patchState({ showSettings: true }); }}
                 />
               </div>
             );
@@ -2056,6 +2057,7 @@ function App() {
                 tier={state.tier}
                 columns={state.activeTab === 'discovery' ? (state.tier === 'enhanced' ? 8 : 4) : (state.tier === 'enhanced' ? 5 : 3)}
                 onItemClick={handleItemClick}
+                onOpenSettings={function() { patchState({ showSettings: true }); }}
               />
             </main>
           </React.Fragment>

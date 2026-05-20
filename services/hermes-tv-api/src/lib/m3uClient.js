@@ -386,6 +386,22 @@ function getCachedItemById(hermesId) {
   return null;
 }
 
+/**
+ * Synchronous: flatten the per-provider cache into a single items[] array.
+ * Used by routes/channels.js to derive the live-channel list without a
+ * fresh network fetch. Returns [] when nothing is cached.
+ */
+function getCachedCatalog() {
+  var out = [];
+  for (var pid in _cache) {
+    if (!Object.prototype.hasOwnProperty.call(_cache, pid)) { continue; }
+    var c = _cache[pid];
+    if (!c || !Array.isArray(c.items)) { continue; }
+    for (var i = 0; i < c.items.length; i++) { out.push(c.items[i]); }
+  }
+  return out;
+}
+
 function _clearCache() {
   _cache = {};
   _inFlight = {};
@@ -396,6 +412,7 @@ module.exports = {
   fetchCatalog: fetchCatalog,
   getProviderStatus: getProviderStatus,
   getCachedItemById: getCachedItemById,
+  getCachedCatalog: getCachedCatalog,
   // INTERNAL — never exposed via HTTP route; lib/streamResolver.js calls this.
   internal: {
     resolveStreamUrl: _resolveStreamUrl,

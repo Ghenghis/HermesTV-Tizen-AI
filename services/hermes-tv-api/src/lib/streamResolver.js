@@ -11,7 +11,7 @@
  *     streams), OR
  *   - signal "needs Threadfin proxy" (credential-bearing URLs from
  *     Apollo Group / xTremeHD which embed user/pass in the path),
- *     deferring to a future Threadfin client.
+ *     deferring to the in-API HLS proxy or returning 503.
  *
  * This module is the ONLY audited consumer of:
  *   lib/iptvOrg.js   → internal.resolveStreamUrl(channelId)
@@ -22,22 +22,24 @@
  * an HTTP response body is middleware/credentialGuard.js, which inspects
  * every res.json() payload for credential-shaped strings.
  *
+ * W17-PURGE: the legacy `live-demo-*` branch (which looked stream_url up
+ * inside SEED_CATALOG) has been removed along with seedCatalog.js. The
+ * resolver now only dispatches against real provider caches.
+ *
  * Channel/item ID dispatch table:
  *   "m3u-<provider>-<localId>"       → m3uClient
  *   "iptv-<iptvOrgChannelId>"        → iptvOrg
- *   "live-demo-<NNN>"                → SEED_CATALOG item.stream_url
  *   anything else                    → null (handled upstream as 503)
  */
 
 var iptvOrg = require('./iptvOrg');
 var m3uClient = require('./m3uClient');
-var seed = require('../data/seedCatalog');
 
 // Credential-bearing URL patterns — mirror lib/sanitizeLog.js FORBIDDEN_PATTERNS.
 // If a resolved URL matches any of these we MUST NOT 302 the client at it,
 // because the Location header would expose the operator's upstream
-// credentials. Such URLs need a server-side proxy (Threadfin) to be
-// playable. Until that proxy is wired we surface a clear 503.
+// credentials. Such URLs need a server-side proxy (in-API HLS proxy /
+// Threadfin) to be playable. Until that proxy is wired we surface a clear 503.
 var CRED_BEARING = [
   /\/get\.php\?username=/i,
   /\/player_api\.php/i,
@@ -68,7 +70,7 @@ function isCredentialBearing(url) {
  *     URLs embed user/pass in the path (`/live/<u>/<p>/<id>.m3u8`).
  *     Even when the URL pattern doesn't match a known Xtream signature
  *     we err conservative — assume operator-paid → never 302 the
- *     client at it, route through Threadfin or return 503.
+ *     client at it, route through the HLS proxy or return 503.
  *   - "iptv-*" → public iptv-org CDN streams; classification falls back
  *     to a URL-pattern check (defensive, in case a future entry sneaks
  *     a creds-bearing URL through).
@@ -88,21 +90,6 @@ function resolveStreamUrl(channelId) {
     var iptvId = channelId.slice('iptv-'.length);
     try { url = iptvOrg.internal.resolveStreamUrl(iptvId); }
     catch (_) { url = null; }
-  } else if (channelId.indexOf('live-demo-') === 0) {
-    // Baked-in iptv-org demo channels (NASA TV, Red Bull, Bloomberg,
-    // France 24, Al Jazeera). The stream_url field is set directly on
-    // the seed item — public HLS, no credentials. We look it up in the
-    // already-loaded SEED_CATALOG rather than re-importing the demo
-    // table because the catalog is the single source of truth for IDs.
-    try {
-      var catalog = (seed && seed.SEED_CATALOG) || [];
-      for (var di = 0; di < catalog.length; di++) {
-        if (catalog[di] && catalog[di].id === channelId && catalog[di].stream_url) {
-          url = catalog[di].stream_url;
-          break;
-        }
-      }
-    } catch (_) { url = null; }
   }
 
   if (!url) { return null; }

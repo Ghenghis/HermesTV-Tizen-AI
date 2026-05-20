@@ -7,8 +7,12 @@
  * Pulls cached signals already present in the running API process:
  *   - lib/iptvOrg.js     → channel count, data age, enablement
  *   - lib/m3uClient.js   → per-provider configured/count/error/age via getProviderStatus()
- *   - data/seedCatalog.js → SEED_CATALOG fallback counts for apollo_group / xtremehd
- *                           when the operator has not yet wired real M3U URLs
+ *
+ * W17-PURGE: previously this module also pulled seed-catalog counts as a
+ * fallback so an unconfigured apollo_group / xtremehd reported non-zero
+ * channels. Under the no-fakes rule a provider that hasn't been configured
+ * reports zero items honestly — the operator sees the empty state and is
+ * directed to Settings → Providers.
  *
  * Status thresholds (from the route brief):
  *   - ok       : latency < 500ms, last check within 10 min, item count > 0
@@ -22,7 +26,6 @@
  *     aggregator always produces a complete shape for the route to serve
  */
 
-var SEED = require('../data/seedCatalog');
 var iptvOrg = require('./iptvOrg');
 var m3uClient = require('./m3uClient');
 
@@ -50,33 +53,9 @@ var CREDENTIAL_BEARING = {
 function _nowIso() { return new Date().toISOString(); }
 function _now() { return Date.now(); }
 
-/**
- * Walk SEED_CATALOG once and bucket items by provider_id × type. Cheap —
- * SEED_CATALOG is a few hundred entries at most and we only count.
- */
-function _seedCounts() {
-  var out = {};
-  var catalog = (SEED && Array.isArray(SEED.SEED_CATALOG)) ? SEED.SEED_CATALOG : [];
-  for (var i = 0; i < catalog.length; i++) {
-    var item = catalog[i];
-    if (!item) { continue; }
-    var providers = Array.isArray(item.providers) ? item.providers : [];
-    // Fall back to item.provider if the item didn't carry the providers[] array.
-    if (providers.length === 0 && item.provider) {
-      providers = [{ provider_id: item.provider }];
-    }
-    for (var p = 0; p < providers.length; p++) {
-      var pid = providers[p] && providers[p].provider_id;
-      if (!pid) { continue; }
-      if (!out[pid]) { out[pid] = { live: 0, vod: 0, series: 0 }; }
-      var t = item.type;
-      if (t === 'live')        { out[pid].live  += 1; }
-      else if (t === 'vod')    { out[pid].vod   += 1; }
-      else if (t === 'series') { out[pid].series += 1; }
-    }
-  }
-  return out;
-}
+// W17-PURGE: _seedCounts() removed along with seedCatalog.js. m3u providers
+// now report counts straight from the live cache; if the operator has not
+// pasted credentials, counts are honestly zero.
 
 /**
  * Compute a status bucket from the three thresholds. Order matters:
@@ -154,49 +133,33 @@ function _iptvOrgEntry(now) {
 }
 
 /**
- * Build a single m3u-fronted provider entry (apollo_group or xtremehd). We
- * combine the live M3U cache (m3uClient.getProviderStatus) with the seed
- * fallback so the UI gets non-zero counts on a freshly-booted VPS even when
- * the operator has not yet pasted a real URL.
+ * Build a single m3u-fronted provider entry (apollo_group or xtremehd).
+ * Counts come directly from the live M3U cache (m3uClient.getProviderStatus).
+ * Unconfigured providers report zero items honestly — no seed fallback.
  */
-function _m3uEntry(providerId, providerStatusMap, seedByProvider) {
+function _m3uEntry(providerId, providerStatusMap) {
   var ps = providerStatusMap[providerId] || {};
-  var seed = seedByProvider[providerId] || { live: 0, vod: 0, series: 0 };
 
   var configured = !!ps.configured;
   var liveFromM3U = (typeof ps.count === 'number' && ps.count > 0) ? ps.count : 0;
   var ageMs = (typeof ps.age_ms === 'number') ? ps.age_ms : null;
   var lastCheckIso = (ageMs == null) ? _nowIso() : new Date(_now() - ageMs).toISOString();
-  // If the M3U cache has items we use that count for live; otherwise we
-  // surface the seed count so an unconfigured deployment still reports the
-  // number of channels the UI is actually seeing on /api/catalog.
-  var itemsLive = liveFromM3U > 0 ? liveFromM3U : seed.live;
-  var itemsVod = seed.vod;
-  var itemsSeries = seed.series;
+  var itemsLive = liveFromM3U;
+  var itemsVod = 0;
+  var itemsSeries = 0;
   var totalItems = itemsLive + itemsVod + itemsSeries;
 
-  // Reachability: configured + no fetch error + non-zero items. When the
-  // provider is not configured the operator-pasted credential is missing,
-  // which the brief treats as offline regardless of seed coverage.
+  // Reachability: configured + no fetch error + non-zero items.
   var reachable;
   if (configured) {
-    reachable = (!ps.error) && (liveFromM3U > 0 || totalItems > 0);
+    reachable = (!ps.error) && (totalItems > 0);
   } else {
-    // Seed-only mode — credentials not wired yet. Per brief: credential-
-    // bearing providers without creds are offline so the UI can prompt
-    // the operator to paste a URL.
     reachable = false;
   }
 
-  // Latency: m3uClient doesn't time HEAD probes individually; we use the
-  // cache age as a proxy where 0 = freshly populated, capped at 500ms so
-  // we never lie about an in-memory read. When configured + healthy and
-  // we have items, report 30ms — matches the seed item latency floor.
   var latencyMs;
   if (configured && reachable) {
     latencyMs = 30;
-  } else if (configured && !reachable) {
-    latencyMs = 0;
   } else {
     latencyMs = 0;
   }
@@ -224,14 +187,13 @@ function _m3uEntry(providerId, providerStatusMap, seedByProvider) {
  */
 function getSourceHealth() {
   var nowMs = _now();
-  var seedByProvider = _seedCounts();
 
   var m3uStatus = {};
   try { m3uStatus = m3uClient.getProviderStatus() || {}; }
   catch (_) { m3uStatus = {}; }
 
   var providers = [];
-  try { providers.push(_m3uEntry('apollo_group', m3uStatus, seedByProvider)); }
+  try { providers.push(_m3uEntry('apollo_group', m3uStatus)); }
   catch (_) {
     providers.push({
       id: 'apollo_group', display_name: DISPLAY_NAMES.apollo_group, status: 'offline',
@@ -247,7 +209,7 @@ function getSourceHealth() {
       credential_bearing: false, items_live: 0, items_vod: 0, items_series: 0,
     });
   }
-  try { providers.push(_m3uEntry('xtremehd', m3uStatus, seedByProvider)); }
+  try { providers.push(_m3uEntry('xtremehd', m3uStatus)); }
   catch (_) {
     providers.push({
       id: 'xtremehd', display_name: DISPLAY_NAMES.xtremehd, status: 'offline',

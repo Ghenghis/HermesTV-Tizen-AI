@@ -29,10 +29,35 @@
 
 const { Router } = require('express');
 const router = Router();
-const { SEED_CATALOG } = require('../data/seedCatalog');
+const iptvOrg = require('../lib/iptvOrg');
+const m3uClient = require('../lib/m3uClient');
+const catalogMerge = require('../lib/catalogMerge');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const MAX_CONTINUE_WATCHING = 50;
+
+// W17-PURGE: catalog lookups walk the real provider caches via the merged
+// snapshot (populated by /api/catalog). The seed catalog is gone.
+function _allItems() {
+  try {
+    var snap = catalogMerge.getLastMerged && catalogMerge.getLastMerged();
+    if (Array.isArray(snap) && snap.length > 0) { return snap; }
+  } catch (_) {}
+  var out = [];
+  try {
+    if (iptvOrg.isEnabled()) {
+      var orgItems = iptvOrg.fetchCatalog({ limit: 500 });
+      if (Array.isArray(orgItems)) { out = out.concat(orgItems); }
+    }
+  } catch (_) {}
+  try {
+    if (m3uClient.isEnabled() && typeof m3uClient.getCachedCatalog === 'function') {
+      var m3uItems = m3uClient.getCachedCatalog();
+      if (Array.isArray(m3uItems)) { out = out.concat(m3uItems); }
+    }
+  } catch (_) {}
+  return out;
+}
 
 // Per-profile in-memory state.
 // watchedEpisodes[profile_id] = Set<episode_id>
@@ -48,8 +73,9 @@ var favorites       = {
 var continueWatching = { dave_tv: [], mom_tv: [] };
 
 function _findItem(itemId) {
-  for (var i = 0; i < SEED_CATALOG.length; i++) {
-    if (SEED_CATALOG[i].id === itemId) { return SEED_CATALOG[i]; }
+  var items = _allItems();
+  for (var i = 0; i < items.length; i++) {
+    if (items[i] && items[i].id === itemId) { return items[i]; }
   }
   return null;
 }
@@ -105,7 +131,7 @@ router.get('/api/series', (req, res) => {
     });
   }
 
-  var series = SEED_CATALOG.filter(function(i) { return i.type === 'series'; });
+  var series = _allItems().filter(function(i) { return i && i.type === 'series'; });
   if (profileId) {
     series = series.filter(function(i) {
       return !i.profile_access || i.profile_access.indexOf(profileId) !== -1;
@@ -125,7 +151,7 @@ router.get('/api/series', (req, res) => {
       };
     }),
     total: series.length,
-    _meta: { source: 'seed-catalog', profile_filter: profileId || null },
+    _meta: { source: series.length > 0 ? 'providers' : 'no-providers', profile_filter: profileId || null },
   });
 });
 
@@ -161,7 +187,7 @@ router.get('/api/series/:seriesId', (req, res) => {
       favorite: profileId ? favorites[profileId].series.has(item.id) : false,
     },
     episodes: episodesWithState,
-    _meta: { source: 'seed-catalog', profile_filter: profileId || null },
+    _meta: { source: 'providers', profile_filter: profileId || null },
   });
 });
 

@@ -857,10 +857,10 @@ function StremioShell(props) {
               >
                 <div style={{ fontSize: '2.4rem', marginBottom: '0.6rem' }} aria-hidden="true">♥</div>
                 <div style={{ fontSize: 'calc(0.9rem * var(--font-scale, 1))', fontWeight: 700, color: COLOR_TEXT, marginBottom: '0.25rem' }}>
-                  Library coming soon
+                  Your library is empty
                 </div>
                 <div style={{ fontSize: 'calc(0.78rem * var(--font-scale, 1))' }}>
-                  Mark items as favourites and they'll show up here. Sync across HermesTV devices arrives with the next update.
+                  Mark items as favourites from any card and they'll appear here.
                 </div>
               </div>
             ) : (

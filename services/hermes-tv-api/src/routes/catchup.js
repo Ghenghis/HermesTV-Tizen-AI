@@ -23,43 +23,49 @@
 
 const { Router } = require('express');
 const router = Router();
-const { LIVE_DEFS } = require('../data/seedCatalog');
+const iptvOrg = require('../lib/iptvOrg');
+const m3uClient = require('../lib/m3uClient');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
-// Build a lookup by "live.<slug>" channel_id form.
-const CATCHUP_CHANNELS = LIVE_DEFS.filter(function(d) { return d.has_catchup; }).reduce(function(map, def) {
-  map['live.' + def.slug] = def;
-  return map;
-}, {});
-
-// Synthesise 24h of half-hour catchup blocks for a channel. Real implementation
-// queries the EPG store / Xtream Codes `xc_get_simple_data_table` endpoint.
-function _synthesizeCatchupPrograms(channelId, channelDef) {
-  const now = Date.now();
-  const programs = [];
-  // 48 half-hour slots = last 24 hours.
-  for (var i = 0; i < 48; i++) {
-    const endMs = now - (i * 30 * 60 * 1000);
-    const startMs = endMs - (30 * 60 * 1000);
-    // Skip programs that are still in the future.
-    if (startMs > now) { continue; }
-    programs.push({
-      program_id: 'cu-' + (channelDef.slug || 'unknown') + '-' + i,
-      channel_id: channelId,
-      title: channelDef.title + ' — Block ' + (i + 1),
-      start_utc: new Date(startMs).toISOString(),
-      end_utc: new Date(endMs).toISOString(),
-      duration_min: 30,
-      catch_up_available: true,
-      catch_up_expires_utc: new Date(endMs + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    });
+// W17-PURGE: the catchup channel set used to be derived from the seed catalog.
+// Now we walk the real-provider caches and surface anything carrying
+// metadata.has_catchup=true (currently only set by operator-pasted Xtream
+// providers; iptv-org public channels do not advertise catchup). When no
+// provider is configured the lookup is empty and every channel returns 404.
+function _findCatchupChannel(channelId) {
+  function _match(items) {
+    if (!Array.isArray(items)) { return null; }
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it || it.type !== 'live') { continue; }
+      if (it.id !== channelId) { continue; }
+      if (it.metadata && it.metadata.has_catchup) { return it; }
+    }
+    return null;
   }
-  return programs;
+  try {
+    if (iptvOrg.isEnabled()) {
+      var hit = _match(iptvOrg.fetchCatalog({ limit: 500 }));
+      if (hit) { return hit; }
+    }
+  } catch (_) {}
+  try {
+    if (m3uClient.isEnabled() && typeof m3uClient.getCachedCatalog === 'function') {
+      var hit2 = _match(m3uClient.getCachedCatalog());
+      if (hit2) { return hit2; }
+    }
+  } catch (_) {}
+  return null;
 }
 
 // ─── GET /api/catchup/:channelId ─────────────────────────────────────────────
 // Maps to: get_catchup_programs({ channel_id, playlist_id })
+// W17-PURGE: catchup programs were previously synthesised from the seed
+// catalog ("ESPN — Block 1", "CNN — Block 2", ...). That was placeholder
+// content the project bans. Until a real EPG / Xtream catchup adapter is
+// wired the endpoint returns an empty programs[] list (with the correct
+// 404 when the channel doesn't exist or doesn't support catchup).
 router.get('/api/catchup/:channelId', (req, res) => {
   const channelId = req.params.channelId;
   const profileId = req.query.profile_id;
@@ -71,7 +77,7 @@ router.get('/api/catchup/:channelId', (req, res) => {
     });
   }
 
-  const channelDef = CATCHUP_CHANNELS[channelId];
+  const channelDef = _findCatchupChannel(channelId);
   if (!channelDef) {
     return res.status(404).json({
       error: 'catchup_not_available',
@@ -80,14 +86,17 @@ router.get('/api/catchup/:channelId', (req, res) => {
     });
   }
 
-  const programs = _synthesizeCatchupPrograms(channelId, channelDef);
   res.json({
     channel_id: channelId,
-    channel_display_name: channelDef.title,
-    programs: programs,
-    total: programs.length,
+    channel_display_name: channelDef.title || channelId,
+    programs: [],
+    total: 0,
     catch_up_window_hours: 24,
-    _meta: { source: 'synthesised-from-seed', server_time: new Date().toISOString() },
+    _meta: {
+      source: 'no-catchup-adapter',
+      message: 'Catchup program data requires Xtream xc_get_simple_data_table or XMLTV history — not yet wired.',
+      server_time: new Date().toISOString(),
+    },
   });
 });
 
@@ -118,7 +127,7 @@ router.post('/api/catchup/play', (req, res) => {
     }
   }
 
-  const channelDef = CATCHUP_CHANNELS[body.channel_id];
+  const channelDef = _findCatchupChannel(body.channel_id);
   if (!channelDef) {
     return res.status(404).json({
       error: 'catchup_not_available',
