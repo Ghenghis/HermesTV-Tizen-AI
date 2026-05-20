@@ -33,11 +33,14 @@ Status: In Progress
     "Hey DaveTV", users can change/disable it, unsupported wake phrase states
     are honest.
 
-- [ ] T005: Implement provider catalog search adapter.
+- [x] T005: Implement provider catalog search adapter.
   - Files: `services/hermes-tv-api/src/lib/agentProviderSearch.js`,
     catalog/provider modules as needed,
     `services/hermes-tv-api/test/agentProviderSearch.test.js`
-  - Proof: searches real registry/catalog fixtures and returns no fake rows.
+  - Proof: `node services/hermes-tv-api/test/agentProviderSearch.test.js` ->
+    7 PASS, 0 FAIL. Searches the real merged/provider catalog shape, supports
+    provider filtering, strips unsafe media URLs, and returns honest empty
+    candidates when no provider item matches.
 
 - [ ] T006: Implement intent planner and confidence model.
   - Files: `services/hermes-tv-api/src/lib/agentIntentPlanner.js`,

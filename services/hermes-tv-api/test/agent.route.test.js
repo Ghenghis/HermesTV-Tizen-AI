@@ -12,6 +12,7 @@ process.env.NODE_ENV = 'test';
 process.env.PORT = '0';
 
 var agentConfigStore = require('../src/lib/agentConfigStore');
+var catalogMerge = require('../src/lib/catalogMerge');
 agentConfigStore._resetCacheForTests();
 
 var app = require('../src/index');
@@ -71,6 +72,19 @@ function request(srv, method, urlPath, body) {
 (async function run() {
   var srv = await startServer();
   try {
+    catalogMerge.setLastMerged([
+      {
+        id: 'm3u-apollo-batman-1989',
+        title: 'Batman',
+        type: 'vod',
+        category: 'Movies',
+        provider: 'apollo_group',
+        metadata: { release_date: '1989-06-23', resolution: '1080p' },
+        providers: [{ provider_id: 'apollo_group', source_id: 'batman-1989', source_health: { status: 'ok' } }],
+        sources: [{ provider_id: 'apollo_group', item_id: 'm3u-apollo-batman-1989', source_id: 'batman-1989', resolution: '1080p', source_health: { status: 'ok' } }],
+      },
+    ]);
+
     var cfg = await request(srv, 'GET', '/api/agent/config/warren');
     ok('GET config returns 200', cfg.status === 200, cfg.text);
     ok('GET config exposes DaveTV defaults', cfg.body && cfg.body.config && cfg.body.config.assistant_name === 'DaveTV' && cfg.body.config.trigger_phrase === 'Hey DaveTV', cfg.text);
@@ -101,10 +115,18 @@ function request(srv, method, urlPath, body) {
       input_mode: 'voice',
       screen_state: { active_view: 'home' },
     });
-    ok('utterance route returns honest blocked status', utterance.status === 501 && utterance.body && utterance.body.status === 'blocked', utterance.text);
-    ok('utterance route does not fake actions or candidates', utterance.body && Array.isArray(utterance.body.actions) && utterance.body.actions.length === 0 && Array.isArray(utterance.body.candidates) && utterance.body.candidates.length === 0, utterance.text);
-    ok('utterance route does not echo raw utterance', utterance.text.indexOf('Batman') === -1, utterance.text);
+    ok('utterance route returns real provider candidates', utterance.status === 200 && utterance.body && utterance.body.status === 'candidates', utterance.text);
+    ok('utterance route does not return playback actions yet', utterance.body && Array.isArray(utterance.body.actions) && utterance.body.actions.length === 0, utterance.text);
+    ok('utterance route includes playable provider candidate',
+      utterance.body && Array.isArray(utterance.body.candidates) &&
+        utterance.body.candidates[0] &&
+        utterance.body.candidates[0].id === 'm3u-apollo-batman-1989' &&
+        utterance.body.candidates[0].preferred_source &&
+        utterance.body.candidates[0].preferred_source.item_id === 'm3u-apollo-batman-1989',
+      utterance.text);
+    ok('utterance route does not echo raw utterance', utterance.text.indexOf('Hey DaveTV, find Batman from 1989') === -1, utterance.text);
     ok('utterance route includes configured trigger phrase', utterance.body && utterance.body.config && utterance.body.config.trigger_phrase === 'Computer Dave', utterance.text);
+    ok('utterance route reports catalog snapshot search source', utterance.body && utterance.body.search && utterance.body.search.source === 'catalog_snapshot', utterance.text);
 
     var job = await request(srv, 'GET', '/api/agent/jobs/job_test');
     ok('job route is honest blocked', job.status === 501 && job.body && job.body.error === 'agent_jobs_unavailable', job.text);

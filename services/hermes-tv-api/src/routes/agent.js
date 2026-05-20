@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const agentConfigStore = require('../lib/agentConfigStore');
+const agentProviderSearch = require('../lib/agentProviderSearch');
 const { sanitizeForLog } = require('../lib/sanitizeLog');
 
 const router = Router();
@@ -85,13 +86,32 @@ router.post('/api/agent/utterance', async function(req, res) {
     return res.status(500).json({ error: 'agent_failed', message: 'Could not load agent config.' });
   }
 
-  return res.status(501).json({
-    status: 'blocked',
-    error: 'agent_orchestrator_unavailable',
-    spoken_text: 'DaveTV voice search is not ready yet. I will not fake provider search or playback.',
-    confidence: 0,
+  var search;
+  try {
+    search = await agentProviderSearch.search({
+      query: body.utterance,
+      trigger_phrase: config.trigger_phrase,
+      media_type: body.media_type || body.type,
+      provider_ids: body.provider_ids || body.provider_id,
+      limit: body.limit || 8,
+      refresh_on_empty: body.refresh_on_empty === true,
+    });
+  } catch (err2) {
+    if (err2 && err2.code === 'VALIDATION_FAILED') { return validationError(res, err2); }
+    console.warn('[agent] provider search failed: ' + sanitizeForLog(err2 && err2.message));
+    return res.status(500).json({ error: 'agent_failed', message: 'Could not search provider catalog.' });
+  }
+
+  var found = search.candidates.length > 0;
+  return res.json({
+    status: found ? 'candidates' : 'no_results',
+    error: null,
+    spoken_text: found
+      ? 'I found real provider matches. I will not start playback automatically until the playback checks are wired.'
+      : 'I searched the real provider catalog and did not find a match.',
+    confidence: search.confidence,
     actions: [],
-    candidates: [],
+    candidates: search.candidates,
     job_id: null,
     memory_suggestions: [],
     config: {
@@ -103,9 +123,16 @@ router.post('/api/agent/utterance', async function(req, res) {
       wake_phrase_supported: config.wake_phrase_supported,
       voice_first: config.voice_first,
     },
+    search: {
+      returned: search.returned,
+      total: search.total,
+      source: search._meta.source,
+      refreshed: search._meta.refreshed,
+      provider_filters: search._meta.provider_filters,
+      type_filter: search._meta.type_filter,
+    },
     proof_required: [
       'agentOrchestrator implementation',
-      'real provider catalog search',
       'action policy validation',
       'background job proof',
       'no-secret transcript/search proof',
