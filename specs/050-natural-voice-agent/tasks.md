@@ -1,6 +1,6 @@
 # Task Breakdown: Natural Voice Agent
 
-Status: Draft
+Status: In Progress
 
 ## Tasks
 
@@ -11,23 +11,27 @@ Status: Draft
     `apps/hermes-web-tv/src/i18n/en.json`
   - Proof: Markdown audit with exact file/line evidence and no code changes.
 
-- [ ] T002: Add backend agent route skeleton with honest unavailable states.
+- [x] T002: Add backend agent route skeleton with honest unavailable states.
   - Files: `services/hermes-tv-api/src/routes/agent.js`,
     `services/hermes-tv-api/src/index.js`,
     `services/hermes-tv-api/test/agent.route.test.js`
-  - Proof: route tests show real validation, no fake provider/search results.
+  - Proof: `node services/hermes-tv-api/test/agent.route.test.js` -> 13 PASS,
+    0 FAIL. Route tests show real validation, no fake provider/search results,
+    and no raw utterance echo.
 
 - [ ] T003: Implement profile-scoped memory store.
   - Files: `services/hermes-tv-api/src/lib/agentMemoryStore.js`,
     `services/hermes-tv-api/test/agentMemoryStore.test.js`
   - Proof: CRUD tests, restart survival test, secret scan.
 
-- [ ] T004: Implement profile-scoped agent config store.
+- [x] T004: Implement profile-scoped agent config store.
   - Files: `services/hermes-tv-api/src/lib/agentConfigStore.js`,
     `services/hermes-tv-api/test/agentConfigStore.test.js`,
     `services/hermes-tv-api/src/routes/agent.js`
-  - Proof: default assistant is DaveTV, default trigger phrase is "Hey DaveTV",
-    users can change/disable it, unsupported wake phrase states are honest.
+  - Proof: `node services/hermes-tv-api/test/agentConfigStore.test.js` ->
+    14 PASS, 0 FAIL. Default assistant is DaveTV, default trigger phrase is
+    "Hey DaveTV", users can change/disable it, unsupported wake phrase states
+    are honest.
 
 - [ ] T005: Implement provider catalog search adapter.
   - Files: `services/hermes-tv-api/src/lib/agentProviderSearch.js`,

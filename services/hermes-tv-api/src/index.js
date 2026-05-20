@@ -35,6 +35,7 @@ const searchRouter = require('./routes/search');
 const backupRouter = require('./routes/backup');
 const remoteRouter = require('./routes/remote');
 const authRouter = require('./routes/auth');
+const agentRouter = require('./routes/agent');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -127,6 +128,9 @@ app.use('/', searchRouter);
 app.use('/', backupRouter);
 // Phone-as-remote relay: POST /api/remote/event + GET /api/remote/events (SSE).
 app.use('/', remoteRouter);
+// DaveTV natural voice agent surface. Routes are honest-blocked until the
+// provider-search/orchestrator lane is implemented; config is durable.
+app.use('/', agentRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {
