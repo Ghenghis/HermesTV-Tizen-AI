@@ -40,6 +40,7 @@ var fixture = require(path.resolve(__dirname, '..', '..', '..', 'tools', 'xtream
 
 var FIXTURE_USER = 'fixturedemo';
 var FIXTURE_PASS = 'fixturedemo';
+var hermesApp = null;
 
 var totalPass = 0;
 var totalFail = 0;
@@ -86,7 +87,7 @@ function bootHermesApi(port) {
     process.env.NODE_ENV = 'test';
     var apiPath = path.resolve(__dirname, '..', 'src', 'index.js');
     delete require.cache[apiPath];
-    try { require(apiPath); } catch (e) { return reject(e); }
+    try { hermesApp = require(apiPath); } catch (e) { return reject(e); }
     var deadline = Date.now() + 20000;
     function probe() {
       call('GET', 'http://127.0.0.1:' + port + '/health').then(function(r) {
@@ -99,13 +100,39 @@ function bootHermesApi(port) {
   });
 }
 
+function closeHermesApi() {
+  return new Promise(function(resolve) {
+    if (hermesApp && typeof hermesApp.closeHermesServer === 'function') {
+      return hermesApp.closeHermesServer(function() { resolve(); });
+    }
+    return resolve();
+  });
+}
+
+async function cleanup(fx, tmpDir, savedEnv) {
+  await closeHermesApi();
+  if (fx && fx.server) { await fixture.stop(fx.server); }
+  if (savedEnv) {
+    ['APOLLO_M3U_URL','XTREMEHD_M3U_URL','JELLYFIN_URL','JELLYFIN_API_KEY','IPTV_ORG_ENABLED'].forEach(function(k) {
+      if (savedEnv[k] === undefined) { delete process.env[k]; } else { process.env[k] = savedEnv[k]; }
+    });
+  }
+  if (tmpDir) {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
 (async function main() {
   // ------ 1. Start the Xtream fixture server on a random port ------------
   process.env.XTREAM_FIXTURE_USER = FIXTURE_USER;
   process.env.XTREAM_FIXTURE_PASS = FIXTURE_PASS;
   var fx;
   try { fx = await fixture.start(0); }
-  catch (e) { fail('fixture.start', e.message); process.exit(1); }
+  catch (e) {
+    fail('fixture.start', e.message);
+    process.exitCode = 1;
+    return;
+  }
   pass('xtream-fixture-server listening on 127.0.0.1:' + fx.port);
 
   // ------ 2. Point Hermes at the fixture -----------------------------------
@@ -128,8 +155,9 @@ function bootHermesApi(port) {
   try { await bootHermesApi(hermesPort); }
   catch (e) {
     fail('Hermes API boot', e.message);
-    await fixture.stop(fx.server);
-    process.exit(1);
+    await cleanup(fx, tmpDir, savedEnv);
+    process.exitCode = 1;
+    return;
   }
   pass('Hermes API listening on 127.0.0.1:' + hermesPort);
 
@@ -197,8 +225,17 @@ function bootHermesApi(port) {
     }
   }
 
-  // ------ 7. GET stream must return 200/206/302 with media content-type ---
+  // ------ 7. HEAD + GET stream must return media response ----------------
   if (streamEndpoint) {
+    var headResp = await call('HEAD', 'http://127.0.0.1:' + hermesPort + streamEndpoint);
+    var headStatus = headResp.status;
+    var headCt = (headResp.headers && (headResp.headers['content-type'] || headResp.headers['Content-Type'])) || '';
+    if (headStatus === 200 || headStatus === 206 || headStatus === 302) {
+      pass('HEAD stream_endpoint status=' + headStatus + ' content-type=' + headCt);
+    } else {
+      fail('HEAD stream_endpoint unexpected status', 'status=' + headStatus + ' raw=' + (headResp.raw || '').slice(0, 200));
+    }
+
     var streamResp = await call('GET', 'http://127.0.0.1:' + hermesPort + streamEndpoint);
     var status = streamResp.status;
     var ct = (streamResp.headers && (streamResp.headers['content-type'] || streamResp.headers['Content-Type'])) || '';
@@ -227,20 +264,14 @@ function bootHermesApi(port) {
   }
 
   // ------ Cleanup ---------------------------------------------------------
-  await fixture.stop(fx.server);
-  ['APOLLO_M3U_URL','XTREMEHD_M3U_URL','JELLYFIN_URL','JELLYFIN_API_KEY','IPTV_ORG_ENABLED'].forEach(function(k) {
-    if (savedEnv[k] === undefined) { delete process.env[k]; } else { process.env[k] = savedEnv[k]; }
-  });
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+  await cleanup(fx, tmpDir, savedEnv);
 
   console.log('');
   console.log('=== Results: ' + totalPass + ' PASS, ' + totalFail + ' FAIL ===');
   console.log('# NOTE: fixture proof DOES NOT replace live-provider proof');
   console.log('# per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md.');
-  // Hermes API is shared module; explicit exit so the in-process listener
-  // doesn't keep the test runner alive.
-  process.exit(totalFail === 0 ? 0 : 1);
+  process.exitCode = totalFail === 0 ? 0 : 1;
 })().catch(function(err) {
   console.error('Harness error:', err && err.stack ? err.stack : err);
-  process.exit(2);
+  cleanup(null, null, null).then(function() { process.exitCode = 2; });
 });

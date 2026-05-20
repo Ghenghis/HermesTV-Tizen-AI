@@ -12,6 +12,23 @@ var BASE_URL = (function() {
   if (h === 'hermestv.local') return 'http://hermestv.local';
   return '';
 })();
+
+function getApiBaseUrl() {
+  return BASE_URL;
+}
+
+function buildApiUrl(path) {
+  var safePath = String(path || '');
+  if (safePath.charAt(0) !== '/') { safePath = '/' + safePath; }
+  if (/^https?:\/\//i.test(BASE_URL)) { return BASE_URL + safePath; }
+  if (typeof window !== 'undefined' && window.location) {
+    var loc = window.location;
+    var origin = loc.origin;
+    if (!origin && loc.protocol && loc.host) { origin = loc.protocol + '//' + loc.host; }
+    if (origin) { return origin + safePath; }
+  }
+  return safePath;
+}
 // Cold-cache /api/catalog returns ~540 KB over Cloudflare; on a cold worker
 // the full transfer occasionally crosses 8 s. Bumped to 20 s so Mom doesn't
 // see "Profile load failed: Request timed out" on cold boot. The /health
@@ -307,8 +324,8 @@ function cancelDownload(jobId) {
 
 /**
  * Mint a fresh pairing code for the "Add a Provider" QR flow.
- * Returns { pairing_code, status, issued_at, expires_at, ttl_ms } from
- * POST /api/pair. The TV displays the pairing_code under the QR and then
+ * Returns { pairing_code, setup_url, status, issued_at, expires_at, ttl_ms }
+ * from POST /api/pair. The TV displays the pairing_code under the QR and then
  * polls getPairingStatus(code) every 5s until status === 'completed'.
  */
 function createPairing() {
@@ -348,6 +365,7 @@ export {
   submitCommand, validateCommand, startPlayback,
   startDownload, listDownloads, cancelDownload,
   createPairing, getPairingStatus,
+  getApiBaseUrl, buildApiUrl,
   // Wave-20 multi-provider CRUD
   listProviders, addProvider, updateProvider, removeProvider, testProvider, parseQrText,
 };

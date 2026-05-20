@@ -40,7 +40,6 @@
  */
 
 var http = require('http');
-var url = require('url');
 
 // ---------------------------------------------------------------------------
 // Fixture data — deterministic and small. Three live channels, two VOD,
@@ -411,9 +410,12 @@ var LISTENING_PORT = null;
 
 function makeServer() {
   return http.createServer(function(req, res) {
-    var parsed = url.parse(req.url || '/', true);
+    var parsed = new URL(req.url || '/', 'http://127.0.0.1');
     var pathname = parsed.pathname || '/';
-    var query = parsed.query || {};
+    var query = {};
+    parsed.searchParams.forEach(function(value, key) {
+      query[key] = value;
+    });
     if (pathname === '/health') {
       return jsonReply(res, 200, { status: 'ok', service: 'xtream-fixture-server', port: LISTENING_PORT });
     }

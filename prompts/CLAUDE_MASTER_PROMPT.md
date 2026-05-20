@@ -35,6 +35,9 @@ Thin Samsung Tizen TV app (remote-first, dark-first UI shell + player) talks onl
 - Remaining release/E2E work must follow
   `docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md` and
   `prompts/CLAUDE_E2E_20_AGENT_SWARM_PROMPT.md`.
+- Any work using `G:\Github\IPTV-Apps` as reference material must follow
+  `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md` and
+  `prompts/CLAUDE_REFERENCE_APPS_E2E_SWARM_PROMPT.md`.
 
 ## Profiles
 
@@ -65,6 +68,7 @@ Read these in order — they supersede any generic assumption:
 13. `docs/13_VPS_ISOLATION_DEPLOYMENT_CONTRACT.md` — VPS isolation, AI routing policy, vault protection
 14. `docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md` — provider truth gate, root issues, proof artifacts
 15. `docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md` — remaining E2E release gates and 20-agent lane plan
+16. `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md` — reference-app adoption gates, missing IPTV features, and E2E proof matrix
 
 ## Safe execution mode
 
@@ -129,3 +133,5 @@ tools/                    — Dev/operator tooling
 11. E2E/release claims require the remaining E2E contract: web build, Tizen
    packaged API/player proof, source-health/EPG alignment, CI/deploy gates, and
    sanitized proof artifacts.
+12. Reference-app work must use tests and behavior contracts first. Do not copy
+   GPL/AGPL/uncleared source into HermesTV.

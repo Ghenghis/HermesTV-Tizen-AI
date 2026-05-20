@@ -14,8 +14,9 @@ Start by reading, in this order:
 
 1. `docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md`
 2. `docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md`
-3. `prompts/CLAUDE_PROVIDER_FINISH_PROMPT.md`
-4. `prompts/CLAUDE_MASTER_PROMPT.md`
+3. `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md`
+4. `prompts/CLAUDE_PROVIDER_FINISH_PROMPT.md`
+5. `prompts/CLAUDE_MASTER_PROMPT.md`
 
 The E2E completion contract supersedes stale phase notes, old "ready" language,
 and any agent report that claims success without proof.
@@ -33,6 +34,10 @@ Treat this as starting truth:
 - Tizen API base/CSP/CORS/player proof is not complete.
 - EPG/source-health still need registry/source ID alignment.
 - CI/deploy gates must be hardened so provider-live proof cannot pass by skip.
+- Reference apps in `G:\Github\IPTV-Apps` expose missing real-world features:
+  fixture provider proof, robust M3U parsing, multi-source EPG, playback
+  diagnostics, account health, catchup/timeshift, subtitles/audio, source
+  failover, and Tizen wrapper proof. Use `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md`.
 
 Do not ask the user for provider secrets in chat. The operator configures
 secrets outside the repo.
@@ -47,6 +52,8 @@ secrets outside the repo.
 6. No EPG/source-health PASS unless IDs match catalog/play IDs.
 7. Unsupported features must return honest unsupported status.
 8. Each agent must report changed files, proof run, blockers, and secret status.
+9. Do not copy GPL/AGPL/uncleared reference-app source into HermesTV. Port
+   behavior and tests unless license review explicitly permits code adoption.
 
 ## Coordination Instructions
 

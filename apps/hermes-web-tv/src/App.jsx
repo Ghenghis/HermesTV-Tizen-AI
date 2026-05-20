@@ -2194,10 +2194,10 @@ function App() {
           {/* Phone-as-remote QR modal (wave-8) — same component as the
               provider-import flow above, switched into mode='remote-pair'.
               QROnboarding mints its own pairing code on open via POST /api/pair
-              (in `online` mode) or falls back to 'HRM-MOCK' offline; we don't
-              forward `state.remotePairCode` here because that mock SSE channel
-              would just race the modal's own /api/pair call. Opened from the
-              header "Phone Remote" button. */}
+              in `online` mode; offline opens surface an honest error instead
+              of a fake pairing code. We don't forward `state.remotePairCode`
+              here because that SSE channel would just race the modal's own
+              /api/pair call. Opened from the header "Phone Remote" button. */}
           {state.showRemotePair && (
             <QROnboarding
               isOpen={state.showRemotePair}

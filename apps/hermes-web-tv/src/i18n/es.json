@@ -215,7 +215,7 @@
   "download.aria_open": "Descargar {title}",
 
   "pairing.title": "Añadir un proveedor",
-  "pairing.qr_aria": "Marcador de código QR",
+  "pairing.qr_aria": "Código QR de emparejamiento",
   "pairing.code_label": "Código de emparejamiento",
   "pairing.instruction": "Escanea este código con el teléfono para añadir un proveedor en {host}",
   "pairing.completed": "Proveedor añadido — cerrando…",

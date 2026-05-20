@@ -168,6 +168,14 @@ const server = app.listen(PORT, () => {
   }
 });
 
+// Test harnesses that require this module in-process need a way to close the
+// auto-started listener cleanly before process exit, especially on Windows.
+app.closeHermesServer = function closeHermesServer(callback) {
+  server.close(function(err) {
+    if (typeof callback === 'function') { callback(err || null); }
+  });
+};
+
 // --- Graceful shutdown ---
 process.on('SIGTERM', () => {
   console.log('[HermesAPI] SIGTERM received — shutting down gracefully');

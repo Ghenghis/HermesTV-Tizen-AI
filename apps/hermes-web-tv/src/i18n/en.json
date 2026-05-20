@@ -215,7 +215,7 @@
   "download.aria_open": "Download {title}",
 
   "pairing.title": "Add a Provider",
-  "pairing.qr_aria": "QR code placeholder",
+  "pairing.qr_aria": "Pairing QR code",
   "pairing.code_label": "Pairing code",
   "pairing.instruction": "Scan this code on your phone to add a provider at {host}",
   "pairing.completed": "Provider added — closing…",
