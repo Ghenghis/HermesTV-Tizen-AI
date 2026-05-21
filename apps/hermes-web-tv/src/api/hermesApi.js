@@ -186,6 +186,24 @@ function createInvite(args) {
   });
 }
 
+function createUserAccount(args) {
+  return fetchWithTimeout(BASE_URL + '/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {}),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Account creation failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
 function adminSetPassword(userId, password) {
   return fetchWithTimeout(BASE_URL + '/api/admin/users/' + encodeURIComponent(userId) + '/password', {
     method: 'POST',
@@ -510,7 +528,7 @@ export {
   createPairing, getPairingStatus,
   getApiBaseUrl, buildApiUrl,
   getAuthMe, login, logout, registerWithToken, requestPasswordReset, resetPassword,
-  getAdminUsers, createInvite, adminSetPassword,
+  getAdminUsers, createInvite, createUserAccount, adminSetPassword,
   // Wave-20 multi-provider CRUD
   listProviders, addProvider, updateProvider, removeProvider, testProvider, parseQrText,
 };

@@ -196,7 +196,6 @@ jobs:
           require_env_key DAVETV_AUTH_ENFORCE_API
           require_env_key DAVETV_PUBLIC_APP_URL
           require_env_key DAVETV_ADMIN_EMAIL
-          require_env_key DAVETV_ADMIN_PASSWORD
           app_url=\$(grep -E '^DAVETV_PUBLIC_APP_URL=' .env | tail -n1 | cut -d= -f2-)
           if [ "\$app_url" != "https://tv.daveai.tech" ]; then
             echo "  remote: ERROR — DAVETV_PUBLIC_APP_URL must be https://tv.daveai.tech (value redacted)" >&2

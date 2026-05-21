@@ -78,6 +78,7 @@ function closeAppServer() {
   var srv = await startServer();
   var adminJar = {};
   var userJar = {};
+  var resetJar = {};
   try {
     var me = await request(srv, { path: '/api/auth/me' }, null, {});
     ok('auth status bootstraps Dave admin', me.status === 200 && me.body && me.body.auth && me.body.auth.configured === true && me.body.user === null, me.text);
@@ -121,11 +122,30 @@ function closeAppServer() {
     }, userJar);
     ok('invite registration creates viewer', registered.status === 201 && registered.body && registered.body.user && registered.body.user.display_name === 'Sherri' && registered.body.user.role === 'viewer', registered.text);
 
+    var emailAccount = await request(srv, { method: 'POST', path: '/api/admin/users', headers: { Origin: 'http://localhost:5173' } }, {
+      email: 'warren@example.test',
+      display_name: 'Warren',
+      duration_days: 30,
+    }, adminJar);
+    ok('admin creates email-only Warren account', emailAccount.status === 201 && emailAccount.body && emailAccount.body.user && emailAccount.body.user.display_name === 'Warren', emailAccount.text);
+    ok('email-only account returns reset link when SMTP not configured', emailAccount.body && emailAccount.body.delivery && emailAccount.body.delivery.sent === false && /reset_token=/.test(emailAccount.body.reset_url || ''), emailAccount.text);
+
+    var resetToken = new URL(emailAccount.body.reset_url).searchParams.get('reset_token');
+    var resetUser = await request(srv, { method: 'POST', path: '/api/auth/password/reset' }, {
+      token: resetToken,
+      password: 'WarrenPass123!',
+    }, resetJar);
+    ok('reset link sets first password for email-only account', resetUser.status === 200 && resetUser.body && resetUser.body.user && resetUser.body.user.display_name === 'Warren', resetUser.text);
+    ok('reset password sets durable session cookie', /^davetv_session=/.test(resetJar.cookie || ''), resetJar.cookie);
+
     var viewerAdmin = await request(srv, { path: '/api/admin/users' }, null, userJar);
     ok('viewer cannot access admin users', viewerAdmin.status === 403, viewerAdmin.text);
 
+    var resetViewerAdmin = await request(srv, { path: '/api/admin/users' }, null, resetJar);
+    ok('email-only viewer still cannot access admin users', resetViewerAdmin.status === 403, resetViewerAdmin.text);
+
     var users = await request(srv, { path: '/api/admin/users' }, null, adminJar);
-    ok('admin can list users and invites', users.status === 200 && users.body && users.body.users && users.body.users.length === 2 && users.body.invites && users.body.invites.length === 1, users.text);
+    ok('admin can list users and invites', users.status === 200 && users.body && users.body.users && users.body.users.length === 3 && users.body.invites && users.body.invites.length === 1, users.text);
     var sherri = users.body.users.filter(function(u) { return u.email === 'sherri@example.test'; })[0];
     ok('registered account carries expiry', sherri && typeof sherri.account_expires_at === 'string' && Date.parse(sherri.account_expires_at) > Date.now(), JSON.stringify(sherri));
 

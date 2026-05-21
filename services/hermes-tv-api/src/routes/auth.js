@@ -185,7 +185,9 @@ router.post('/api/auth/password/forgot', async (req, res) => {
 router.post('/api/auth/password/reset', (req, res) => {
   try {
     const user = authStore.resetPassword(req.body && req.body.token, req.body && req.body.password);
-    res.json({ user });
+    const login = authStore.createSession(user.id, deviceLabel(req));
+    setSessionCookie(req, res, login);
+    res.json({ user: login.user });
   } catch (err) {
     res.status(400).json({ error: err.code || 'reset_failed', message: err.message || 'Password reset failed.' });
   }
@@ -231,6 +233,28 @@ router.get('/api/auth/oauth/:provider/callback', async (req, res) => {
 
 router.get('/api/admin/users', requireAdmin, (req, res) => {
   res.json({ users: authStore.listUsers(), invites: authStore.listInvites() });
+});
+
+router.post('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const created = authStore.createEmailAccount({
+      email: req.body && req.body.email,
+      display_name: req.body && req.body.display_name,
+      duration_days: req.body && req.body.duration_days,
+      role: req.body && req.body.role,
+      created_by: req.auth.user.id,
+    });
+    const resetUrl = linkFor(req, 'reset', created.reset.token);
+    const delivery = await authMailer.sendReset(created.user.email, resetUrl);
+    res.status(created.created ? 201 : 200).json({
+      user: created.user,
+      created: created.created,
+      delivery,
+      reset_url: delivery.sent ? undefined : resetUrl,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.code || 'user_create_failed', message: err.message || 'Account could not be created.' });
+  }
 });
 
 router.post('/api/admin/invites', requireAdmin, async (req, res) => {

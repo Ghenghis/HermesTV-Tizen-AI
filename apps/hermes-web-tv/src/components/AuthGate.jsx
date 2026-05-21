@@ -169,7 +169,7 @@ function LoginView(props) {
         {brandHeader(adminMode ? 'Dave admin login' : 'Family login', auth.configured ? 'Invite-only access for DaveTV.' : 'Owner setup is required before family accounts can be used.')}
         {!auth.configured ? (
           <div style={{ background: 'rgba(227,179,65,0.12)', border: '1px solid rgba(227,179,65,0.45)', color: '#f0d58a', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem' }}>
-            No DaveTV admin account is configured. Set DAVETV_ADMIN_EMAIL and DAVETV_ADMIN_PASSWORD on the VPS, then redeploy/restart the API.
+            No DaveTV admin account is configured. Set DAVETV_ADMIN_EMAIL on the VPS, then redeploy/restart the API. Dave can use Reset password to create the first password.
           </div>
         ) : null}
         {authErrorBox(message)}
@@ -267,6 +267,7 @@ function RegisterView(props) {
 
 function ResetView(props) {
   var token = props.token;
+  var onAuthed = props.onAuthed;
   var doneState = React.useState(false);
   var done = doneState[0];
   var setDone = doneState[1];
@@ -283,8 +284,12 @@ function ResetView(props) {
   function submit(e) {
     e.preventDefault();
     if (password !== confirm) { setErr('Passwords do not match.'); return; }
-    hermesApi.resetPassword(token, password).then(function() {
+    hermesApi.resetPassword(token, password).then(function(body) {
       cleanUrl();
+      if (body && body.user && onAuthed) {
+        onAuthed(body.user);
+        return;
+      }
       setDone(true);
     }).catch(function(error) {
       setErr(error.message || 'Password reset failed.');
@@ -294,7 +299,7 @@ function ResetView(props) {
   return (
     <div style={PANEL}>
       <form onSubmit={submit} style={CARD}>
-        {brandHeader(done ? 'Password updated' : 'Reset password', done ? 'You can sign in with the new password.' : 'Choose a new DaveTV password.')}
+        {brandHeader(done ? 'Password updated' : 'Reset password', done ? 'DaveTV will keep this device signed in.' : 'Choose a new DaveTV password.')}
         {authErrorBox(err)}
         {done ? <a href="/" style={BUTTON}>Back to login</a> : (
           <React.Fragment>
@@ -344,17 +349,17 @@ function AdminPanel(props) {
   function create(e) {
     e.preventDefault();
     setMsg('');
-    hermesApi.createInvite({
+    hermesApi.createUserAccount({
       email: email,
       display_name: displayName,
       duration_days: Number(duration),
       role: displayName === 'Dave' ? 'admin' : 'viewer',
     }).then(function(body) {
       setEmail('');
-      setMsg(body.invite_url ? ('Invite created. SMTP is not configured, use this link: ' + body.invite_url) : 'Invite created and emailed.');
+      setMsg(body.reset_url ? ('Account ready. SMTP is not configured, use this reset link: ' + body.reset_url) : 'Account ready and reset link emailed.');
       load();
     }).catch(function(err) {
-      setMsg(err.message || 'Invite failed.');
+      setMsg(err.message || 'Account creation failed.');
     });
   }
 
@@ -392,7 +397,7 @@ function AdminPanel(props) {
               <option value="365">1 year</option>
             </select>
           </label>
-          <button type="submit" style={BUTTON}>Create invite</button>
+          <button type="submit" style={BUTTON}>Create account</button>
         </form>
 
         <div style={{ overflowX: 'auto' }}>
@@ -477,7 +482,7 @@ function AuthGate(props) {
   if (loading) { return <LoadingAuth />; }
   if (auth && auth.required === false) { return children; }
   if (registerToken) { return <RegisterView token={registerToken} auth={auth} onAuthed={function(u) { setUser(u); }} />; }
-  if (resetToken) { return <ResetView token={resetToken} />; }
+  if (resetToken) { return <ResetView token={resetToken} onAuthed={function(u) { setUser(u); }} />; }
   if (!user) { return <LoginView auth={auth} adminMode={adminMode} onAuthed={function(u) { setUser(u); }} />; }
   if (adminMode) {
     if (user.role !== 'admin') {

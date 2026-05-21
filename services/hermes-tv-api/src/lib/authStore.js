@@ -214,17 +214,36 @@ function createUserRecord(args) {
 }
 
 function bootstrapAdminFromEnv() {
-  if (!cache || Object.keys(cache.users || {}).length > 0) return;
+  if (!cache) return;
   const email = process.env.DAVETV_ADMIN_EMAIL;
-  const password = process.env.DAVETV_ADMIN_PASSWORD;
-  if (!email || !password) return;
+  const password = process.env.DAVETV_ADMIN_PASSWORD || '';
+  if (!email) return;
   try {
+    const existing = findUserByEmail(email);
+    if (existing) {
+      let changed = false;
+      if (existing.display_name !== 'Dave') { existing.display_name = 'Dave'; changed = true; }
+      if (existing.role !== 'admin') { existing.role = 'admin'; changed = true; }
+      if (existing.status !== 'active') { existing.status = 'active'; changed = true; }
+      if (existing.account_expires_at !== null) { existing.account_expires_at = null; changed = true; }
+      if (!existing.password && password) {
+        existing.password = hashPassword(password);
+        if (existing.auth_methods.indexOf('password') === -1) existing.auth_methods.push('password');
+        changed = true;
+      }
+      if (changed) {
+        persist();
+        console.log('[authStore] ensured Dave admin from env email');
+      }
+      return;
+    }
+
     createUserRecord({
       email,
-      password,
+      password: password || null,
       display_name: 'Dave',
       role: 'admin',
-      auth_methods: ['password'],
+      auth_methods: password ? ['password'] : [],
       account_expires_at: null,
       created_by: 'env-bootstrap',
     });
@@ -398,6 +417,48 @@ function createInvite(args) {
   return { token: raw, invite: publicInvite(cache.invites[hash]) };
 }
 
+function createEmailAccount(args) {
+  hydrate();
+  const email = assertEmail(args.email);
+  const displayName = assertAllowedName(args.display_name);
+  const durationDays = Number(args.duration_days || 30);
+  if (ALLOWED_DURATIONS.indexOf(durationDays) === -1) {
+    const err = new Error('Account duration must be 1 month, 3 months, 6 months, or 1 year.');
+    err.code = 'invalid_duration';
+    throw err;
+  }
+
+  let user = findUserByEmail(email);
+  let created = false;
+  const role = args.role === 'admin' && displayName === 'Dave' ? 'admin' : 'viewer';
+  if (!user) {
+    user = createUserRecord({
+      email,
+      display_name: displayName,
+      role,
+      auth_methods: [],
+      account_expires_at: role === 'admin' ? null : addDays(durationDays),
+      created_by: args.created_by || null,
+    });
+    created = true;
+    persist();
+  } else {
+    user.display_name = displayName;
+    user.role = role;
+    user.status = 'active';
+    user.account_expires_at = role === 'admin' ? null : addDays(durationDays);
+    persist();
+  }
+
+  const reset = createPasswordReset(user.email, args.created_by || 'admin');
+  if (!reset) {
+    const err = new Error('Password reset could not be created for this account.');
+    err.code = 'reset_unavailable';
+    throw err;
+  }
+  return { user: publicUser(user), created, reset };
+}
+
 function publicInvite(invite) {
   if (!invite) return null;
   return {
@@ -454,6 +515,11 @@ function createPasswordReset(email, createdBy) {
   hydrate();
   const user = findUserByEmail(email);
   if (!user || user.status !== 'active') return null;
+  try {
+    assertActiveUser(user);
+  } catch (_) {
+    return null;
+  }
   const raw = token(32);
   cache.resets[sha256(raw)] = {
     id: 'rst-' + token(8),
@@ -606,6 +672,7 @@ module.exports = {
   destroySession,
   destroySessionsForUser,
   loginWithPassword,
+  createEmailAccount,
   createInvite,
   getInvite,
   registerWithInvite,
