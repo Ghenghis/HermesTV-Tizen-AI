@@ -136,9 +136,17 @@ function CatalogCard(props) {
   //
   // Reject picsum.photos URLs — pre-wave-9 the seed catalog shipped random
   // nature photos under those URLs labelled with channel names, which read
-  // as broken art. Null-out picsum so the channelArt placeholder fires.
+  // as broken art. Also reject the old transparent-pixel fallback that made
+  // live cards render as black empty boxes. Null them so channelArt fires.
+  function _transparentPixel(u) {
+    return typeof u === 'string'
+      && u.indexOf('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB') === 0;
+  }
   function _realArt(u) {
-    return typeof u === 'string' && u.length > 0 && u.indexOf('picsum.photos') === -1;
+    return typeof u === 'string'
+      && u.length > 0
+      && u.indexOf('picsum.photos') === -1
+      && !_transparentPixel(u);
   }
   function _pick() {
     for (var i = 0; i < arguments.length; i++) {

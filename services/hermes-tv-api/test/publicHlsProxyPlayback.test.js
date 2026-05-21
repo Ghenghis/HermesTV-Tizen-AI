@@ -30,6 +30,13 @@ process.env.PORT = '0';
 var pass = 0;
 var fail = 0;
 var fetched = [];
+var realDateNow = Date.now;
+var fakeNow = realDateNow();
+Date.now = function() { return fakeNow; };
+
+function advanceClock(ms) {
+  fakeNow += ms;
+}
 
 function ok(label, cond, detail) {
   if (cond) {
@@ -75,8 +82,12 @@ global.fetch = function(url, opts) {
       '#EXTINF:6.0,',
       'segment001.ts',
     ].join('\n'), {
-      status: 200,
-      headers: { 'content-type': 'application/vnd.apple.mpegurl' },
+      status: 206,
+      headers: {
+        'content-type': 'application/vnd.apple.mpegurl',
+        'content-range': 'bytes 0-74/75',
+        'accept-ranges': 'bytes',
+      },
     }));
   }
 
@@ -170,15 +181,29 @@ function firstProxyPath(body) {
     String(stream.body));
 
   var variantPath = firstProxyPath(stream.body);
-  var variant = await request(srv, 'GET', variantPath);
+  advanceClock((4 * 60 + 55) * 1000);
+  var variant = await request(srv, 'GET', variantPath, null, { Range: 'bytes=0-' });
   ok('Nested variant playlist is also rewritten', variant.status === 200, 'status=' + variant.status);
+  ok('Nested variant playlist normalizes partial upstream responses',
+    variant.status === 200 && !variant.headers['content-range'] && String(variant.headers['content-type']).indexOf('mpegurl') !== -1,
+    JSON.stringify(variant.headers));
   ok('Nested variant does not leak upstream host',
     String(variant.body).indexOf('/api/proxy/') !== -1 && String(variant.body).indexOf('cdn.example.test') === -1,
     String(variant.body));
 
   var segmentPath = firstProxyPath(variant.body);
+  advanceClock(20 * 1000);
   var segment = await request(srv, 'GET', segmentPath);
   ok('Rewritten segment proxy returns media bytes', segment.status === 200 && segment.body === 'VIDEO-BYTES', 'status=' + segment.status + ' body=' + segment.body);
+  ok('Active HLS playback keeps ticket alive past original 5-minute issue TTL',
+    segment.status === 200 && fakeNow > Date.parse(ticket.body.issued_at) + (5 * 60 * 1000),
+    'status=' + segment.status + ' fakeNow=' + fakeNow + ' issued=' + ticket.body.issued_at);
+
+  advanceClock((5 * 60 + 1) * 1000);
+  var expired = await request(srv, 'GET', segmentPath);
+  ok('HLS ticket still expires after playback inactivity',
+    expired.status === 410 && expired.body && expired.body.error === 'ticket_expired',
+    'status=' + expired.status + ' body=' + JSON.stringify(expired.body));
 
   ok('No browser-facing 302 was needed for public HLS',
     fetched.indexOf('GET https://cdn.example.test/master/index.m3u8') !== -1 &&
@@ -186,12 +211,14 @@ function firstProxyPath(body) {
     JSON.stringify(fetched));
 
   srv.close();
+  Date.now = realDateNow;
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
 
   console.log('Results: ' + pass + ' PASS, ' + fail + ' FAIL');
   process.exit(fail === 0 ? 0 : 1);
 })().catch(function(err) {
   console.error('Unhandled test error:', err && err.stack ? err.stack : err);
+  Date.now = realDateNow;
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
   process.exit(1);
 });

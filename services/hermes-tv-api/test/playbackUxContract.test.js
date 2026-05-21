@@ -88,9 +88,39 @@ ok('PlayerModal retries playback after stream readiness and visibility recovery'
   /function startPlaybackIfDesired\(\)[\s\S]*v\.play\(\);/.test(playerModal)
     && /setInterval\(function\(\)[\s\S]*startPlaybackIfDesired\(\);[\s\S]*2500\);/.test(playerModal)
     && /document\.addEventListener\('visibilitychange', onVisibilityChange\);/.test(playerModal)
-    && /onCanPlay=\{startPlaybackIfDesired\}/.test(playerModal));
+    && /onCanPlay=\{handlePlayableFrame\}/.test(playerModal));
+ok('PlayerModal keeps controls clickable when playback is paused or failed',
+  /var controlsIdle = idle && playing && streamState\.status === 'streaming' && !error;/.test(playerModal)
+    && /var overlayOpacity = \(locked \|\| controlsIdle\) \? 0 : 1;/.test(playerModal)
+    && playerModal.indexOf('pointerEvents: (locked || idle)') === -1);
+ok('PlayerModal fails dead live feeds after no first frame',
+  /var STARTUP_WATCHDOG_MS = 10000;/.test(playerModal)
+    && /startupWatchdogRef = React\.useRef\(null\);/.test(playerModal)
+    && /This channel did not reach a playable frame/.test(playerModal)
+    && /if \(isLive && v\.currentTime > 0\.25\)[\s\S]*setLiveStartedAt\(Date\.now\(\)\);[\s\S]*clearTimeout\(startupWatchdogRef\.current\);/.test(playerModal)
+    && /if \(\(v\.currentTime \|\| 0\) < 0\.25\)[\s\S]*This channel did not reach a playable frame/.test(playerModal)
+    && playerModal.indexOf('onPlay={function() {\\n                  setPlaying(true);\\n                  if (isLive && !liveStartedAt)') === -1);
+ok('PlayerModal dead-feed state offers explicit channel recovery',
+  /failedChannelIdsRef = React\.useRef\(\{\}\);/.test(playerModal)
+    && /function rememberFailedChannel\(\)[\s\S]*failedChannelIdsRef\.current\[String\(item\.id\)\] = Date\.now\(\);/.test(playerModal)
+    && /while \(hops < channels\.length && failed\[String\(channels\[next\]\.id\)\]\);/.test(playerModal)
+    && /Previous channel/.test(playerModal)
+    && /Next channel/.test(playerModal));
+ok('PlayerModal dead-feed recovery buttons are not blocked by center controls',
+  /var centerControlsActive = !error[\s\S]*streamState\.status !== 'error'[\s\S]*streamState\.status !== 'pending_operator';/.test(playerModal)
+    && /opacity: centerControlsActive \? overlayOpacity : 0/.test(playerModal)
+    && /pointerEvents: \(!centerControlsActive \|\| locked \|\| controlsIdle\) \? 'none' : 'auto'/.test(playerModal)
+    && /position: 'absolute', inset: 0, zIndex: 13/.test(playerModal));
+ok('PlayerModal does not claim a dead live channel streamed for zero seconds',
+  /var liveStatusText = hasPlayableLiveFrame[\s\S]*No playable video yet[\s\S]*Connecting\.\.\./.test(playerModal)
+    && /\{liveStatusText\}/.test(playerModal)
+    && playerModal.indexOf('Streamed for {fmtDurationCompact(liveDurationSec)}') === -1);
 ok('hls.js requests include session credentials for local API playback',
   /xhrSetup: function\(xhr\)[\s\S]*xhr\.withCredentials = true;/.test(hlsHook));
+ok('hls.js fails bad manifests and fragments quickly',
+  /manifestLoadingTimeOut: 8000/.test(hlsHook)
+    && /levelLoadingTimeOut: 8000/.test(hlsHook)
+    && /fragLoadingTimeOut: 12000/.test(hlsHook));
 ok('API CORS allows HEAD probes for playback tickets',
   /methods: \['GET', 'HEAD', 'POST', 'PATCH', 'OPTIONS'\]/.test(apiIndex));
 

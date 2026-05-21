@@ -111,11 +111,10 @@ function _bestLogo(channelId, channel, logosByChannel) {
   if (channel && typeof channel.logo === 'string' && channel.logo.length > 0) {
     return channel.logo;
   }
-  // Stable fallback so the UI never renders a broken-image icon. Use a 1x1
-  // transparent PNG data URI rather than a hermestv.local path so the browser
-  // never performs a DNS lookup that fails in production (the web container
-  // doesn't ship /assets/logos/*; only hashed JS/CSS chunks live there).
-  return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  // Missing artwork must stay null. The web UI has a deterministic
+  // gradient/initials fallback; sending a transparent pixel makes cards look
+  // black while pretending real art exists.
+  return null;
 }
 
 // --------------------------------------------------------------------------
@@ -205,7 +204,12 @@ function _mapChannelToItem(channel, streamsByChannel, logosByChannel) {
       {
         provider_id: 'iptv-org',
         source_id: channel.id,
-        source_health: { status: 'ok', latency_ms: null, checked_utc: null },
+        source_health: {
+          status: 'unknown',
+          health_label: 'unverified',
+          latency_ms: null,
+          checked_utc: null,
+        },
       },
     ],
     metadata: {

@@ -35,6 +35,7 @@ var IDLE_MS = 3000;
 // Wave-15 — auto-retry on 503 stream_temporarily_unavailable.
 var MAX_RETRIES = 3;
 var RETRY_DELAY_MS = 5000;
+var STARTUP_WATCHDOG_MS = 10000;
 
 // Media type from URL — feeds the Chromecast receiver so the right
 // HLS / progressive pipeline is selected on the cast device.
@@ -264,11 +265,13 @@ function PlayerModal(props) {
   var idleTimerRef = React.useRef(null);
   // Holds the active retry setTimeout id so a re-mount can cancel it.
   var retryTimerRef = React.useRef(null);
+  var startupWatchdogRef = React.useRef(null);
   // Keep "what DaveTV should be doing" separate from the media element's
   // momentary state. Browsers and Tizen can pause during source attach,
   // visibility changes, or HLS recovery without the user pressing Pause.
   var desiredPlaybackRef = React.useRef(true);
   var resumeTimerRef = React.useRef(null);
+  var failedChannelIdsRef = React.useRef({});
 
   var item = (ticket && ticket.item) || {};
   var provider = (ticket && ticket.provider) || {};
@@ -305,6 +308,7 @@ function PlayerModal(props) {
     setRetryCount(0);
     setManualSourceIndex(-1);
     setPlaying(true);
+    setLiveStartedAt(0);
     desiredPlaybackRef.current = true;
     if (resumeTimerRef.current) {
       clearTimeout(resumeTimerRef.current);
@@ -313,6 +317,10 @@ function PlayerModal(props) {
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
+    }
+    if (startupWatchdogRef.current) {
+      clearTimeout(startupWatchdogRef.current);
+      startupWatchdogRef.current = null;
     }
   }, [item && item.id, profileId]); // eslint-disable-line
 
@@ -324,6 +332,10 @@ function PlayerModal(props) {
       if (resumeTimerRef.current) {
         clearTimeout(resumeTimerRef.current);
         resumeTimerRef.current = null;
+      }
+      if (startupWatchdogRef.current) {
+        clearTimeout(startupWatchdogRef.current);
+        startupWatchdogRef.current = null;
       }
     };
   }, []);
@@ -401,7 +413,6 @@ function PlayerModal(props) {
         var resolved = (r.url && r.url !== endpoint) ? r.url : endpoint;
         setStreamUrl(resolved);
         setStreamState({ status: 'streaming', message: 'Stream ready' });
-        if (isLive) { setLiveStartedAt(Date.now()); }
         return;
       }
       // Try GET to get the JSON error body
@@ -446,7 +457,6 @@ function PlayerModal(props) {
       if (cancelled) { return; }
       setStreamUrl(endpoint);
       setStreamState({ status: 'streaming', message: 'Stream ready' });
-      if (isLive) { setLiveStartedAt(Date.now()); }
     });
     return function() {
       cancelled = true;
@@ -456,6 +466,56 @@ function PlayerModal(props) {
       }
     };
   }, [ticket, isLive, retryCount, manualSourceIndex]); // eslint-disable-line
+
+  React.useEffect(function() {
+    if (!isOpen || !streamUrl || streamState.status !== 'streaming') { return undefined; }
+    if (startupWatchdogRef.current) {
+      clearTimeout(startupWatchdogRef.current);
+      startupWatchdogRef.current = null;
+    }
+    startupWatchdogRef.current = setTimeout(function() {
+      startupWatchdogRef.current = null;
+      var v = videoRef.current;
+      if (!v) { return; }
+      if ((v.currentTime || 0) < 0.25) {
+        rememberFailedChannel();
+        desiredPlaybackRef.current = false;
+        setPlaying(false);
+        setLiveStartedAt(0);
+        setStreamState({
+          status: 'error',
+          message: 'This channel did not reach a playable frame. The upstream feed may be offline; use Channel Up or Channel Down to skip it.',
+        });
+      }
+    }, STARTUP_WATCHDOG_MS);
+    return function() {
+      if (startupWatchdogRef.current) {
+        clearTimeout(startupWatchdogRef.current);
+        startupWatchdogRef.current = null;
+      }
+    };
+  }, [isOpen, streamUrl, streamState.status, item && item.id]); // eslint-disable-line
+
+  React.useEffect(function() {
+    if (!isOpen || !hlsState.error) { return undefined; }
+    desiredPlaybackRef.current = false;
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+    if (startupWatchdogRef.current) {
+      clearTimeout(startupWatchdogRef.current);
+      startupWatchdogRef.current = null;
+    }
+    setPlaying(false);
+    setLiveStartedAt(0);
+    rememberFailedChannel();
+    setStreamState({
+      status: 'error',
+      message: hlsState.error,
+    });
+    return undefined;
+  }, [isOpen, hlsState.error]); // eslint-disable-line
 
   // ── EPG fetch (live channels only) ─────────────────────────────────────
   React.useEffect(function() {
@@ -671,6 +731,14 @@ function PlayerModal(props) {
       setWatchDuration(v.duration);
     }
     if (typeof v.currentTime === 'number') {
+      if (isLive && v.currentTime > 0.25) {
+        if (item && item.id) { delete failedChannelIdsRef.current[String(item.id)]; }
+        if (!liveStartedAt) { setLiveStartedAt(Date.now()); }
+        if (startupWatchdogRef.current) {
+          clearTimeout(startupWatchdogRef.current);
+          startupWatchdogRef.current = null;
+        }
+      }
       setCurrentTime(v.currentTime);
       recordTick(v.currentTime);
       // Mirror the position into the fast-path localStorage store for the
@@ -706,6 +774,10 @@ function PlayerModal(props) {
       seekedItemIdRef.current = item.id;
     }
     handleTimeUpdate();
+  }
+
+  function handlePlayableFrame() {
+    startPlaybackIfDesired();
   }
 
   // Mark watched + clear resume point when the user finishes the asset.
@@ -801,6 +873,11 @@ function PlayerModal(props) {
     return out;
   }
 
+  function rememberFailedChannel() {
+    if (!isLive || !item || !item.id) { return; }
+    failedChannelIdsRef.current[String(item.id)] = Date.now();
+  }
+
   function switchChannelBy(delta) {
     if (!isLive || !onSwitchItem) { return; }
     var channels = liveCatalog();
@@ -811,9 +888,15 @@ function PlayerModal(props) {
       if (String(channels[i].id) === String(currentId)) { idx = i; break; }
     }
     if (idx === -1) { return; }
-    var next = idx + delta;
-    if (next < 0) { next = channels.length - 1; }
-    if (next >= channels.length) { next = 0; }
+    var failed = failedChannelIdsRef.current || {};
+    var next = idx;
+    var hops = 0;
+    do {
+      next += delta;
+      if (next < 0) { next = channels.length - 1; }
+      if (next >= channels.length) { next = 0; }
+      hops += 1;
+    } while (hops < channels.length && failed[String(channels[next].id)]);
     onSwitchItem(channels[next]);
   }
 
@@ -884,11 +967,19 @@ function PlayerModal(props) {
   else if (healthStatus === 'degraded') { healthDot = '#e3b341'; }
   else if (healthStatus === 'down' || healthStatus === 'not_configured') { healthDot = '#ef4444'; }
 
-  var overlayOpacity = (locked || idle) ? 0 : 1;
+  var controlsIdle = idle && playing && streamState.status === 'streaming' && !error;
+  var overlayOpacity = (locked || controlsIdle) ? 0 : 1;
   var lockedOverlayOpacity = locked ? 1 : 0;
   var transition = reducedMotion ? 'none' : 'opacity 220ms ease';
 
   var liveDurationSec = isLive && liveStartedAt ? Math.floor((Date.now() - liveStartedAt) / 1000) : 0;
+  var hasPlayableLiveFrame = isLive && !!liveStartedAt && streamState.status === 'streaming' && !error;
+  var liveStatusText = hasPlayableLiveFrame
+    ? ('Streamed for ' + fmtDurationCompact(liveDurationSec))
+    : (streamState.status === 'error' ? 'No playable video yet' : 'Connecting...');
+  var centerControlsActive = !error
+    && streamState.status !== 'error'
+    && streamState.status !== 'pending_operator';
   var totalSec = watchDuration || 0;
   var progressFrac = totalSec > 0 ? Math.min(1, Math.max(0, currentTime / totalSec)) : 0;
 
@@ -1078,8 +1169,8 @@ function PlayerModal(props) {
                 playsInline
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={function() { handleLoadedMetadata(); startPlaybackIfDesired(); }}
-                onLoadedData={startPlaybackIfDesired}
-                onCanPlay={startPlaybackIfDesired}
+                onLoadedData={handlePlayableFrame}
+                onCanPlay={handlePlayableFrame}
                 onEnded={handleEnded}
                 onPlay={function() {
                   setPlaying(true);
@@ -1103,7 +1194,7 @@ function PlayerModal(props) {
             </React.Fragment>
           )}
           {!error && streamState.status !== 'streaming' && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+            <div style={{ position: 'absolute', inset: 0, zIndex: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
               <div style={{ width: '100%', maxWidth: '880px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 {(streamState.status === 'loading' || streamState.status === 'idle') && (
                   <SkeletonBlock width="100%" height={0} radius="10px" style={{ paddingBottom: '56.25%', height: 0 }} />
@@ -1120,6 +1211,46 @@ function PlayerModal(props) {
                     <div style={{ color: 'var(--muted, #8b949e)', fontSize: '0.9rem', lineHeight: 1.5 }}>
                       {streamState.message}
                     </div>
+                    {isLive && onSwitchItem && (
+                      <div style={{ marginTop: '1rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={function(e) { e.stopPropagation(); bumpActivity(); switchChannelBy(1); }}
+                          style={{
+                            minHeight: minTouch + 'px',
+                            padding: '0 1.05rem',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(255,255,255,0.22)',
+                            background: 'rgba(255,255,255,0.10)',
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: 'calc(0.85rem * ' + fontScale + ')',
+                            cursor: 'pointer',
+                            outline: 'none',
+                          }}
+                        >
+                          Previous channel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={function(e) { e.stopPropagation(); bumpActivity(); switchChannelBy(-1); }}
+                          style={{
+                            minHeight: minTouch + 'px',
+                            padding: '0 1.05rem',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(31,111,235,0.9)',
+                            background: 'var(--accent, #1f6feb)',
+                            color: '#fff',
+                            fontWeight: 800,
+                            fontSize: 'calc(0.85rem * ' + fontScale + ')',
+                            cursor: 'pointer',
+                            outline: 'none',
+                          }}
+                        >
+                          Next channel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
                 {(streamState.status === 'loading' || streamState.status === 'idle') && (
@@ -1232,7 +1363,7 @@ function PlayerModal(props) {
             background: 'linear-gradient(180deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.0) 100%)',
             color: '#fff',
             opacity: overlayOpacity, transition: transition,
-            pointerEvents: (locked || idle) ? 'none' : 'auto',
+            pointerEvents: (locked || controlsIdle) ? 'none' : 'auto',
             zIndex: 10,
           }}
         >
@@ -1324,8 +1455,8 @@ function PlayerModal(props) {
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: (momMode ? '2rem' : '1.5rem'),
-            opacity: overlayOpacity, transition: transition,
-            pointerEvents: (locked || idle) ? 'none' : 'auto',
+            opacity: centerControlsActive ? overlayOpacity : 0, transition: transition,
+            pointerEvents: (!centerControlsActive || locked || controlsIdle) ? 'none' : 'auto',
             zIndex: 11,
           }}
         >
@@ -1352,8 +1483,8 @@ function PlayerModal(props) {
               transition: reducedMotion ? 'none' : 'width 220ms ease, background 220ms ease',
               overflow: 'hidden',
               zIndex: 12,
-              opacity: (locked || idle) ? 0 : 1,
-              pointerEvents: (locked || idle) ? 'none' : 'auto',
+              opacity: (locked || controlsIdle) ? 0 : 1,
+              pointerEvents: (locked || controlsIdle) ? 'none' : 'auto',
             }}
           >
             {railOpen && (
@@ -1404,7 +1535,7 @@ function PlayerModal(props) {
             background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.0) 100%)',
             color: '#fff',
             opacity: overlayOpacity, transition: transition,
-            pointerEvents: (locked || idle) ? 'none' : 'auto',
+            pointerEvents: (locked || controlsIdle) ? 'none' : 'auto',
             zIndex: 10,
           }}
         >
@@ -1452,7 +1583,7 @@ function PlayerModal(props) {
                 LIVE
               </span>
               <span style={{ fontSize: 'calc(0.78rem * ' + fontScale + ')', color: 'rgba(255,255,255,0.7)' }}>
-                Streamed for {fmtDurationCompact(liveDurationSec)}
+                {liveStatusText}
               </span>
               <div style={{ flex: 1 }} />
             </div>

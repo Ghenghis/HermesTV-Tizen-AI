@@ -14,7 +14,8 @@
  *     pointer to GET /api/play/:ticket/stream. The actual streaming
  *     proxy is operator-side (Threadfin / Jellyfin / iptv-org) and
  *     lands in Phase 4.
- *   - The ticket expires in 5 minutes — bounded blast radius.
+ *   - The ticket expires after 5 minutes of inactivity. Active playback
+ *     slides that window forward, capped by an absolute max lifetime.
  */
 
 const { Router } = require('express');
@@ -28,15 +29,41 @@ const streamProbe = require('../lib/streamProbe');
 const xtreamClient = require('../lib/xtreamClient');
 const profileIds = require('../lib/profileIds');
 
-const TICKET_TTL_MS = 5 * 60 * 1000;
+const TICKET_IDLE_TTL_MS = 5 * 60 * 1000;
+const TICKET_MAX_TTL_MS = 12 * 60 * 60 * 1000;
 
 // In-memory ticket store. A real implementation would use Redis or a signed
 // JWT; for the surface-area-first version this is fine. Tickets self-clean
 // on read after expiry.
 var tickets = {};
 
+function _nowMs() {
+  return Date.now();
+}
+
+function _isTicketExpired(entry) {
+  if (!entry) { return true; }
+  var now = _nowMs();
+  if (entry.max_expires_at && now > entry.max_expires_at) { return true; }
+  return now > entry.expires_at;
+}
+
+function _touchTicket(entry) {
+  if (!entry) { return; }
+  var now = _nowMs();
+  var max = entry.max_expires_at || (now + TICKET_IDLE_TTL_MS);
+  var next = now + TICKET_IDLE_TTL_MS;
+  if (next > max) { next = max; }
+  if (!entry.expires_at || next > entry.expires_at) {
+    entry.expires_at = next;
+    if (entry.ticket) {
+      entry.ticket.expires_at = new Date(next).toISOString();
+    }
+  }
+}
+
 function _makeTicketId() {
-  return 'play-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  return 'play-' + _nowMs().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
 // Resolve a HermesTV item by ID across all enabled catalog sources.
@@ -280,7 +307,7 @@ router.post('/api/play', async (req, res) => {
   // Build ticket. Strip any internal source_id detail that doesn't belong
   // on a client response — keep provider_id + display name + health only.
   const ticketId = _makeTicketId();
-  const now = Date.now();
+  const now = _nowMs();
   const ticket = {
     ticket: ticketId,
     item: {
@@ -312,7 +339,7 @@ router.post('/api/play', async (req, res) => {
     }),
     profile_id: profileId,
     issued_at: new Date(now).toISOString(),
-    expires_at: new Date(now + TICKET_TTL_MS).toISOString(),
+    expires_at: new Date(now + TICKET_IDLE_TTL_MS).toISOString(),
     stream_endpoint: '/api/play/' + ticketId + '/stream',
     sources_endpoint: '/api/play/' + ticketId + '/sources',
     _note: 'Stream URL is never returned to client. Call stream_endpoint to begin playback.',
@@ -339,7 +366,8 @@ router.post('/api/play', async (req, res) => {
   // returned to the client.
   tickets[ticketId] = {
     ticket: ticket,
-    expires_at: now + TICKET_TTL_MS,
+    expires_at: now + TICKET_IDLE_TTL_MS,
+    max_expires_at: now + TICKET_MAX_TTL_MS,
     internal: {
       sources: sources,           // full list with item_id for resolver
       current_source_index: 0,    // updated as fallback walks the list
@@ -386,10 +414,11 @@ function _streamHandler(req, res) {
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found', message: 'Ticket expired or invalid.' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired', message: 'Re-request /api/play to get a fresh ticket.' });
   }
+  _touchTicket(t);
 
   // Build the candidate walk order. Default: every source in priority
   // order. If `?source_index=N` is set, hoist that index to front;
@@ -598,10 +627,11 @@ router.get('/api/play/:ticket/sources', (req, res) => {
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired' });
   }
+  _touchTicket(t);
 
   var internal = t.internal || { sources: [], current_source_index: 0 };
   var sources = Array.isArray(internal.sources) ? internal.sources : [];
@@ -636,18 +666,19 @@ router.get('/api/play/:ticket/sources', (req, res) => {
  *
  * Ticket validation is intentionally the same as /stream — we will not
  * proxy bytes for an expired or unknown ticket. This keeps the proxy
- * gated by the 5-minute play-ticket TTL, so even if a logged manifest
- * leaks the segment URLs are useless 5 minutes later.
+ * gated by the active playback inactivity window, so copied segment URLs
+ * die shortly after playback stops.
  */
 router.get('/api/proxy/:ticket/seg/:b64', (req, res) => {
   const t = tickets[req.params.ticket];
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired' });
   }
+  _touchTicket(t);
   return hlsProxy.streamSegment({
     res: res,
     req: req,
@@ -664,7 +695,7 @@ router.get('/api/play/:ticket', (req, res) => {
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired' });
   }

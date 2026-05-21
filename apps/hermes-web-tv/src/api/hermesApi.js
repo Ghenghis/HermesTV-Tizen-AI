@@ -244,8 +244,18 @@ function patchProfile(profileId, patch) {
   });
 }
 
-function getProviders() {
-  return fetchWithTimeout(BASE_URL + '/api/providers').then(function(response) {
+function getProviders(options) {
+  options = options || {};
+  var url = BASE_URL + '/api/providers';
+  var fetchOptions = undefined;
+  if (options.refresh === true) {
+    url += '?refresh=1&_ts=' + encodeURIComponent(String(Date.now()));
+    fetchOptions = {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    };
+  }
+  return fetchWithTimeout(url, fetchOptions).then(function(response) {
     if (!response.ok) {
       throw makeNetworkError('Providers fetch failed: HTTP ' + response.status);
     }
@@ -349,8 +359,26 @@ function parseQrText(text) {
   });
 }
 
-function getCatalog() {
-  return fetchWithTimeout(BASE_URL + '/api/catalog').then(function(response) {
+function getCatalog(options) {
+  options = options || {};
+  var url = BASE_URL + '/api/catalog';
+  var qs = [];
+  var fetchOptions = undefined;
+  var timeoutMs = undefined;
+  if (options.refresh === true) {
+    qs.push('refresh=1');
+    qs.push('_ts=' + encodeURIComponent(String(Date.now())));
+    fetchOptions = {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    };
+  }
+  if (typeof options.waitForColdMs === 'number' && options.waitForColdMs > 0) {
+    qs.push('wait_for_cold_ms=' + encodeURIComponent(String(Math.floor(options.waitForColdMs))));
+    timeoutMs = Math.max(DEFAULT_TIMEOUT, Math.floor(options.waitForColdMs) + 5000);
+  }
+  if (qs.length > 0) { url += '?' + qs.join('&'); }
+  return fetchWithTimeout(url, fetchOptions, timeoutMs).then(function(response) {
     if (!response.ok) {
       throw makeNetworkError('Catalog fetch failed: HTTP ' + response.status);
     }

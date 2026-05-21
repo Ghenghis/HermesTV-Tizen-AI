@@ -280,9 +280,10 @@ function streamSegment(opts) {
     'User-Agent': 'DaveTV/1.0 (+https://daveai.tech) hls-proxy',
     'Accept': '*/*'
   };
-  // Forward Range header so the client can seek within VOD-ish HLS
-  // segments + master playlist byte-ranges.
-  if (req && req.headers && req.headers.range) {
+  // Forward Range header for media bytes, but never for playlist-looking
+  // URLs. Some upstreams answer ranged .m3u8 requests with 206 Partial
+  // Content, which makes hls.js treat the rewritten playlist as incomplete.
+  if (req && req.headers && req.headers.range && !_looksLikePlaylistResource(upstream, '')) {
     headers.Range = req.headers.range;
   }
 
@@ -319,9 +320,9 @@ function streamSegment(opts) {
       // origin for local dev, Cloudflare, and Tizen.
       if (_looksLikePlaylistResource(upstream, upstreamContentType)) {
         return upstreamRes.text().then(function(text) {
-          res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+          res.setHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
-          res.status(upstreamRes.status).send(rewritePlaylist(text, upstream, ticket));
+          res.status(200).send(rewritePlaylist(text, upstream, ticket));
           return null;
         });
       }
@@ -340,9 +341,9 @@ function streamSegment(opts) {
         var v = upstreamRes.headers.get(h);
         if (v) { res.setHeader(h, v); }
       }
-      // Default to no-store if upstream didn't set Cache-Control —
-      // we don't want a proxy further down the chain caching the
-      // segment URL (it's tied to a ticket that expires in 5 min).
+      // Default to no-store if upstream didn't set Cache-Control.
+      // Proxy URLs are tied to short-lived play tickets, so a downstream
+      // cache should not replay stale ticketed media paths.
       if (!upstreamRes.headers.get('cache-control')) {
         res.setHeader('Cache-Control', 'no-store');
       }

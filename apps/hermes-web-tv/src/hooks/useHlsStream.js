@@ -127,6 +127,15 @@ function useHlsStream(url, videoRef) {
         maxBufferLength: 20,
         maxMaxBufferLength: 30,
         enableWorker: true,
+        manifestLoadingTimeOut: 8000,
+        manifestLoadingMaxRetry: 1,
+        manifestLoadingRetryDelay: 700,
+        levelLoadingTimeOut: 8000,
+        levelLoadingMaxRetry: 1,
+        levelLoadingRetryDelay: 700,
+        fragLoadingTimeOut: 12000,
+        fragLoadingMaxRetry: 1,
+        fragLoadingRetryDelay: 700,
         // Local development serves the web app and API from different
         // loopback origins. Playback tickets are real API resources, so HLS
         // manifest/segment requests must carry the same DaveTV session cookie

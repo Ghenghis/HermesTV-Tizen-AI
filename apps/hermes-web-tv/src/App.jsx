@@ -595,6 +595,57 @@ function App() {
     });
   }
 
+  function catalogPatchFromRaw(rawCatalog, isOnline) {
+    rawCatalog = rawCatalog || {};
+    var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
+    var actors = rawCatalog.actors || [];
+    var sourceHeader = rawCatalog._source_header || null;
+    var meta = rawCatalog._meta || {};
+    var metaSource = meta.source || null;
+    var catalogSource = isOnline ? (sourceHeader || metaSource || 'no-providers') : 'api-offline';
+    var m3uProviders = meta.m3u_providers || null;
+    var iptvOrgCount = (typeof meta.iptv_org_count === 'number') ? meta.iptv_org_count : 0;
+    return {
+      catalog: catalog,
+      actors: actors,
+      catalogSource: catalogSource,
+      m3uProviders: m3uProviders,
+      iptvOrgCount: iptvOrgCount,
+    };
+  }
+
+  function refreshProvidersAndCatalog(options) {
+    options = options || {};
+    var expectedProviderId = options.expectedProviderId || '';
+    var providerFilter = options.providerFilter || null;
+    var keepSettingsOpen = options.keepSettingsOpen === true;
+    return Promise.all([
+      hermesApi.getProviders({ refresh: true }),
+      hermesApi.getCatalog({ refresh: true, waitForColdMs: 15000 }),
+    ]).then(function(results) {
+      var payload = results[0];
+      var list = payload && payload.providers
+        ? payload.providers
+        : (Array.isArray(payload) ? payload : []);
+      if (expectedProviderId) {
+        var found = list.some(function(row) {
+          return row && (row.id === expectedProviderId || row.persisted_provider_id === expectedProviderId);
+        });
+        if (!found) {
+          var missing = new Error('Provider save reached the API, but /api/providers did not return the durable provider row. Nothing was confirmed.');
+          missing.code = 'provider_refresh_missing';
+          throw missing;
+        }
+      }
+      var patch = catalogPatchFromRaw(results[1], true);
+      patch.providers = list;
+      if (providerFilter) { patch.providerFilter = providerFilter; }
+      if (keepSettingsOpen) { patch.showSettings = true; }
+      patchState(patch);
+      return { providers: list, catalog: patch.catalog };
+    });
+  }
+
   // Parental gate hook — used to guard handlePlay / handleStartDownload at
   // the App level. See the import comment for why this duplicates the gate
   // already mounted inside MediaDetailPanel.
@@ -1122,24 +1173,12 @@ function App() {
           api.getProviders(),
           api.getCatalog(),
         ]).then(function(results) {
-          var providers = results[0] || [];
+          var providerPayload = results[0] || [];
+          var providers = providerPayload && providerPayload.providers
+            ? providerPayload.providers
+            : (Array.isArray(providerPayload) ? providerPayload : []);
           var rawCatalog = results[1] || [];
-
-          // Support both array-of-items and catalog-wrapper formats
-          var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
-          var actors = rawCatalog.actors || [];
-          // X-Catalog-Source header (or _meta.source fallback) — honest data
-          // source signal for the Settings badge. Wave-17 removed every mock
-          // fallback path; when the API is offline we surface 'api-offline'
-          // (not a fake catalog) so DevTools shows reality.
-          var sourceHeader = rawCatalog._source_header || null;
-          var meta = rawCatalog._meta || {};
-          var metaSource = meta.source || null;
-          var catalogSource = isOnline ? (sourceHeader || metaSource || 'no-providers') : 'api-offline';
-          // m3u_providers + iptv_org_count + paid-panel status land on _meta
-          // when the API has those providers configured. Absent → null/0.
-          var m3uProviders = meta.m3u_providers || null;
-          var iptvOrgCount = (typeof meta.iptv_org_count === 'number') ? meta.iptv_org_count : 0;
+          var catalogPatch = catalogPatchFromRaw(rawCatalog, isOnline);
 
           // Restore per-profile Azure voice preference from localStorage
           // (set when the user last picked a voice in VoicePickerModal).
@@ -1150,16 +1189,16 @@ function App() {
             loading: false,
             profile: profile,
             providers: providers,
-            catalog: catalog,
-            actors: actors,
+            catalog: catalogPatch.catalog,
+            actors: catalogPatch.actors,
             tier: tier,
             tvModel: tvModel,
             online: isOnline,
             showProfilePicker: false,
-            catalogSource: catalogSource,
+            catalogSource: catalogPatch.catalogSource,
             activeVoiceId: persistedVoiceId || '',
-            m3uProviders: m3uProviders,
-            iptvOrgCount: iptvOrgCount,
+            m3uProviders: catalogPatch.m3uProviders,
+            iptvOrgCount: catalogPatch.iptvOrgCount,
           });
 
           // ── Boot greeting via Azure TTS (Azure-only path) ──────────────────
@@ -2321,15 +2360,11 @@ function App() {
               online={state.online}
               profile={profile}
               onCompleted={function() {
-                // Pairing handshake finished — refresh provider list so the
-                // newly-added entry shows up in ProviderFilter and chips.
-                var api = hermesApi;
-                api.getProviders().then(function(payload) {
-                  var list = payload && payload.providers
-                    ? payload.providers
-                    : (Array.isArray(payload) ? payload : []);
-                  patchState({ providers: list });
-                }).catch(function() { /* non-fatal; tick again on next user action */ });
+                // Pairing handshake finished — refresh providers AND catalog
+                // with cache bypass so the newly-added provider is selectable
+                // and its channels/movies appear immediately.
+                refreshProvidersAndCatalog({ keepSettingsOpen: false })
+                  .catch(function() { /* non-fatal; tick again on next user action */ });
               }}
             />
           )}
@@ -2481,29 +2516,20 @@ function App() {
               isOpen={state.showPlaylistImport}
               onClose={function() { patchState({ showPlaylistImport: false }); }}
               onSaved={function(saved) {
-                // Refresh provider list so the new playlist tag appears in
-                // ProviderFilter / FilterBar selects. We re-open Settings so
-                // the user sees the new entry in the Playlists tab list.
-                var api = hermesApi;
-                return api.getProviders().then(function(payload) {
-                  var list = payload && payload.providers
-                    ? payload.providers
-                    : (Array.isArray(payload) ? payload : []);
-                  var persistedProviderId = saved && saved.persisted_provider_id;
-                  if (persistedProviderId) {
-                    var found = list.some(function(row) {
-                      return row && (row.id === persistedProviderId || row.persisted_provider_id === persistedProviderId);
-                    });
-                    if (!found) {
-                      var missing = new Error('Provider save reached the API, but /api/providers did not return the durable provider row. Nothing was confirmed.');
-                      missing.code = 'provider_refresh_missing';
-                      throw missing;
-                    }
-                  }
-                  patchState({ providers: list, showPlaylistImport: false, showSettings: true });
+                // Refresh provider list and catalog with cache-bypass proof.
+                // Closing only after this resolves prevents the previous
+                // "saved, but grid still old until reload" failure mode.
+                var persistedProviderId = saved && saved.persisted_provider_id;
+                var providerFilter = saved && saved.provider_id ? saved.provider_id : null;
+                return refreshProvidersAndCatalog({
+                  expectedProviderId: persistedProviderId,
+                  providerFilter: providerFilter,
+                  keepSettingsOpen: true,
+                }).then(function() {
+                  patchState({ showPlaylistImport: false, showSettings: true });
                 }).catch(function() {
                   patchState({ showPlaylistImport: true, showSettings: false });
-                  throw new Error('Provider save reached the API, but DaveTV could not refresh /api/providers to prove it. Please do not re-enter credentials until this is fixed.');
+                  throw new Error('Provider save reached the API, but DaveTV could not refresh /api/providers and /api/catalog to prove it. Please do not re-enter credentials until this is fixed.');
                 });
               }}
             />

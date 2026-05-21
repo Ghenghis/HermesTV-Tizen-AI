@@ -313,20 +313,17 @@ function _normaliseCategory(group) {
 
 // Defensive: some upstream providers embed creds in logo URLs too
 // (e.g. `tvg-logo="http://host/get.php?username=X..."`). If any logo
-// matches the credential-bearing shape, swap to a 1x1 transparent data
-// URI so the catalog response cannot trigger credentialGuard and kill
-// the entire payload, and so the browser never makes a DNS lookup for
-// a hermestv.local fallback host that doesn't exist in production.
-// We never just trust upstream metadata.
-var DEFAULT_LOGO_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+// matches the credential-bearing shape, drop the artwork entirely so the UI
+// falls through to its gradient/initials tile. Never substitute transparent
+// pixels: they create black cards while pretending real art exists.
 var CRED_BEARING_LOGO = [/\/get\.php\?username=/i, /\/player_api\.php/i, /m3u_plus/i];
 function _safeLogo(url) {
   if (typeof url !== 'string' || url.length === 0) {
-    return DEFAULT_LOGO_DATA_URI;
+    return null;
   }
   for (var i = 0; i < CRED_BEARING_LOGO.length; i++) {
     if (CRED_BEARING_LOGO[i].test(url)) {
-      return DEFAULT_LOGO_DATA_URI;
+      return null;
     }
   }
   return url;
@@ -449,6 +446,9 @@ function _getAnyCached(providerId) {
 async function fetchCatalog(opts) {
   opts = opts || {};
   var limit = (typeof opts.limit === 'number' && opts.limit > 0) ? opts.limit : 600;
+  var waitForColdMs = (typeof opts.waitForColdMs === 'number' && opts.waitForColdMs > 0)
+    ? Math.min(15000, Math.floor(opts.waitForColdMs))
+    : 2000;
   await _refreshRegistrySnapshot();
   if (_registrySnapshot.length === 0) { return []; }
 
@@ -492,7 +492,7 @@ async function fetchCatalog(opts) {
     try {
       var raced = await Promise.race([
         Promise.all(coldFetches),
-        new Promise(function(resolve) { setTimeout(function() { resolve(null); }, 2000); }),
+        new Promise(function(resolve) { setTimeout(function() { resolve(null); }, waitForColdMs); }),
       ]);
       if (Array.isArray(raced)) {
         for (var rr = 0; rr < raced.length; rr++) {
