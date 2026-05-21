@@ -2247,6 +2247,7 @@ function App() {
                   providers={state.providers}
                   onItemSelect={handleItemClick}
                   onItemFocus={handleItemFocus}
+                  onOpenDetail={handleOpenDetail}
                   focusedItem={state.focusedItem}
                   contentFilter={state.contentFilter}
                   providerFilter={state.providerFilter}

@@ -82,9 +82,9 @@ function _providerDisplayName(pid) {
 // Decide which extension to append to the stream_endpoint pointer so the
 // client-side hls.js path detection (which probes for `.m3u8` / `.mpd` in
 // the URL string) wires up the right engine. Returning an extension here
-// is *purely cosmetic* on the server — the actual bytes come from the
-// 302 target — but it makes the front end pick hls.js so the 302 to the
-// upstream CDN is followed transparently inside the player engine.
+// is *purely cosmetic* on the server — the actual bytes come from this same
+// endpoint — but it makes the front end pick hls.js instead of trying to hand
+// a manifest to the browser's progressive video path.
 //
 // Best-effort: peeks at the same resolver play-time path uses. If it
 // can't resolve (cold cache, missing item), returns '' — the bare
@@ -94,9 +94,6 @@ function _streamExtFor(itemId) {
   try {
     var resolved = streamResolver.resolveStreamUrl(itemId);
     if (!resolved || !resolved.url) { return ''; }
-    // Don't expose hint for credential-bearing streams — those land at
-    // 503 anyway, never become a real stream URL the client can use.
-    if (resolved.credential_bearing) { return ''; }
     var lower = String(resolved.url).toLowerCase();
     if (lower.indexOf('.m3u8') !== -1) { return '.m3u8'; }
     if (lower.indexOf('.mpd') !== -1)  { return '.mpd'; }
@@ -360,11 +357,10 @@ router.post('/api/play', async (req, res) => {
  *      `?source_index=N` if the caller pinned a specific index).
  *   3. For each source:
  *      a. Ask lib/streamResolver for the upstream URL. Unresolved = advance.
- *      b. Credential-bearing? Try the in-API HLS proxy fetch (wave-11). On
+ *      b. HLS manifest? Try the in-API HLS proxy fetch (wave-11). On
  *         fetch failure (timeout, 502, 504) → record provider failure, log
  *         "[play] source N failed: ... advancing to N+1", advance to next.
- *      c. Clean public URL? 302 the client — assumed playable (the iptv-org
- *         CDN reliability has been > 99% in production).
+ *      c. Clean public non-HLS URL? 302 the client — assumed playable.
  *   4. If a proxy fetch SUCCEEDS we record the provider as healthy + serve
  *      the rewritten body. First success wins. Update
  *      ticket.internal.current_source_index.
@@ -501,13 +497,14 @@ function _streamHandler(req, res) {
       catch (_) { /* setHeader after writeHead — ignore */ }
     }
 
-    if (resolved.credential_bearing && _looksLikeHlsManifest(resolved.url)) {
+    if (_looksLikeHlsManifest(resolved.url)) {
       // In-API HLS proxy path (wave-11). Fetch the upstream playlist
       // server-side, rewrite every segment URL to /api/proxy/<ticket>/seg/<b64>,
-      // and serve the rewritten body. The credential never reaches the client.
-      // We do NOT 302 here — that would put the credentialed URL into the
-      // Location header. Native HLS players (Safari, Tizen) and hls.js both
-      // accept this manifest body verbatim.
+      // and serve the rewritten body. Credential-bearing streams need this to
+      // avoid leaks; public iptv-org streams need it because desktop Chrome,
+      // Cloudflare, and Tizen can all fail on cross-origin HLS manifest/segment
+      // redirects. Native HLS players and hls.js both accept this manifest body
+      // verbatim.
       return hlsProxy.proxyPlaylist({
         upstreamUrl: resolved.url,
         ticket: req.params.ticket,

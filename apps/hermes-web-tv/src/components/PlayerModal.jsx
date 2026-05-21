@@ -5,6 +5,7 @@ import TimeShiftOverlay from './TimeShiftOverlay.jsx';
 import useWatchProgress from '../hooks/useWatchProgress.js';
 import useHlsStream from '../hooks/useHlsStream.js';
 import { fetchEPG } from '../api/epgClient.js';
+import { buildApiUrl } from '../api/hermesApi.js';
 import playbackPositionStore from '../store/playbackPositionStore.js';
 
 // PlayerModal — TiviMate / Plex / IPTV Smarters class single-stream
@@ -48,6 +49,12 @@ function mediaTypeFromUrl(url) {
 function urlLooksHls(url) {
   if (!url || typeof url !== 'string') { return false; }
   return url.toLowerCase().indexOf('.m3u8') !== -1;
+}
+
+function resolveTicketEndpoint(endpoint) {
+  if (!endpoint || typeof endpoint !== 'string') { return ''; }
+  if (/^https?:\/\//i.test(endpoint)) { return endpoint; }
+  return buildApiUrl(endpoint);
 }
 
 function fmtExpiresIn(expiresAtIso) {
@@ -334,7 +341,7 @@ function PlayerModal(props) {
     // If a manual source advance was requested, append ?source_index=N to
     // the stream endpoint so the server pins that source first. We keep
     // the .m3u8/.mpd suffix when present.
-    var endpoint = ticket.stream_endpoint;
+    var endpoint = resolveTicketEndpoint(ticket.stream_endpoint);
     if (manualSourceIndex >= 0) {
       var sep = endpoint.indexOf('?') === -1 ? '?' : '&';
       endpoint = endpoint + sep + 'source_index=' + manualSourceIndex;
@@ -367,12 +374,11 @@ function PlayerModal(props) {
       }, RETRY_DELAY_MS);
     }
 
-    // The HEAD probe gives us the redirect target without downloading the
-    // playlist. For HLS we cannot wire the redirected URL into hls.js by
-    // following it ourselves (CORS preflight + 302 = headache). Instead
-    // we just hand the proxy URL directly to the <video>/hls.js — the
-    // redirect will be followed transparently by the browser/MSE engine.
-    fetch(endpoint, { method: 'HEAD' }).then(function(r) {
+    // The HEAD probe validates the DaveTV stream endpoint without downloading
+    // the playlist. For HLS, the endpoint itself returns a rewritten manifest
+    // on our API origin; hls.js then requests nested playlists and segments
+    // through the same ticketed proxy path.
+    fetch(endpoint, { method: 'HEAD', credentials: 'include' }).then(function(r) {
       if (cancelled) { return; }
       if (r.ok || r.status === 200 || (r.status >= 200 && r.status < 400)) {
         // Use the redirect target URL if HEAD followed it, else the
@@ -384,7 +390,7 @@ function PlayerModal(props) {
         return;
       }
       // Try GET to get the JSON error body
-      fetch(endpoint).then(function(r2) {
+      fetch(endpoint, { credentials: 'include' }).then(function(r2) {
         if (cancelled) { return; }
         r2.json().then(function(j) {
           if (cancelled) { return; }
@@ -1407,9 +1413,9 @@ function PlayerModal(props) {
               {/* Cast button — auto-hides on Tizen */}
               {(!momMode || showAdvanced) && (
                 <ChromecastButton
-                  mediaUrl={streamUrl || ((ticket && ticket.stream_endpoint) || '')}
+                  mediaUrl={streamUrl || resolveTicketEndpoint((ticket && ticket.stream_endpoint) || '')}
                   mediaTitle={item && item.title ? item.title : ''}
-                  mediaType={mediaTypeFromUrl(streamUrl || (ticket && ticket.stream_endpoint))}
+                  mediaType={mediaTypeFromUrl(streamUrl || resolveTicketEndpoint(ticket && ticket.stream_endpoint))}
                   posterUrl={item && (item.poster_url || (item.metadata && item.metadata.poster_url)) || ''}
                 />
               )}

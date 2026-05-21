@@ -108,6 +108,7 @@ function ZeroShell(props) {
   var tier = props.tier;
   var providers = props.providers;
   var onItemSelect = props.onItemSelect;
+  var onOpenDetail = props.onOpenDetail;
   // onItemFocus + focusedItem drive the hero panel. We also keep an internal
   // fallback so the shell works correctly when used standalone (e.g. via
   // /layout/zero with no App.jsx orchestrator above it).
@@ -611,7 +612,7 @@ function ZeroShell(props) {
           profile={profile}
           tier={tier}
           onPlay={function(item) { if (typeof onItemSelect === 'function') { onItemSelect(item); } }}
-          onMoreInfo={function(item) { if (typeof onItemSelect === 'function') { onItemSelect(item); } }}
+          onMoreInfo={function(item) { if (typeof onOpenDetail === 'function') { onOpenDetail(item); } }}
         />
 
         {/* Now/Next strip — only meaningful when the focused item is a live

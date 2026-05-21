@@ -122,6 +122,13 @@ function _isUriTag(line) {
   return false;
 }
 
+function _looksLikePlaylistResource(url, contentType) {
+  var ct = String(contentType || '').toLowerCase();
+  if (ct.indexOf('mpegurl') !== -1 || ct.indexOf('vnd.apple.mpegurl') !== -1) { return true; }
+  var u = String(url || '').toLowerCase();
+  return /\.m3u8?($|[?#])/.test(u);
+}
+
 /**
  * Fetch the upstream HLS playlist with credentials (server-side only),
  * then rewrite every segment URL + every URI attribute to point at the
@@ -299,6 +306,24 @@ function streamSegment(opts) {
           ticket: ticket
         });
         return null;
+      }
+
+      var upstreamContentType = upstreamRes.headers && typeof upstreamRes.headers.get === 'function'
+        ? upstreamRes.headers.get('content-type')
+        : '';
+
+      // Master playlists can point at variant playlists. Those variant
+      // playlists arrive through this same /api/proxy/.../seg path, so detect
+      // them and rewrite again instead of piping raw upstream-relative segment
+      // URLs back to the browser. This keeps the entire HLS tree on DaveTV's
+      // origin for local dev, Cloudflare, and Tizen.
+      if (_looksLikePlaylistResource(upstream, upstreamContentType)) {
+        return upstreamRes.text().then(function(text) {
+          res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+          res.setHeader('Cache-Control', 'no-store');
+          res.status(upstreamRes.status).send(rewritePlaylist(text, upstream, ticket));
+          return null;
+        });
       }
 
       var passHeaders = [

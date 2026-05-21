@@ -67,7 +67,7 @@ app.use(
       console.warn('[HermesAPI] CORS: origin not allowed: ' + origin);
       return cb(null, false);
     },
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Accept'],
     credentials: true,
   })

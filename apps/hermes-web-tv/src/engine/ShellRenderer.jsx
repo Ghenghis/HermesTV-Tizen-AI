@@ -27,6 +27,9 @@ function ShellRenderer(props) {
   // hero background + title + CTAs, and call onItemFocus on card hover /
   // remote-focus / single-click. Shells without a hero ignore both.
   var onItemFocus = props.onItemFocus;
+  // Explicit details path. Normal card/OK activation stays wired to
+  // onItemSelect so it plays instantly; shells route Info / More Info here.
+  var onOpenDetail = props.onOpenDetail;
   var focusedItem = props.focusedItem;
 
   var ShellComponent = getShell(layout);
@@ -99,6 +102,7 @@ function ShellRenderer(props) {
           providers={providers}
           onItemSelect={onItemSelect}
           onItemFocus={onItemFocus}
+          onOpenDetail={onOpenDetail}
           focusedItem={focusedItem}
           contentFilter={contentFilter}
           providerFilter={providerFilter}

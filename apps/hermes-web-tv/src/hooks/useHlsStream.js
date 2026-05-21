@@ -127,6 +127,13 @@ function useHlsStream(url, videoRef) {
         maxBufferLength: 20,
         maxMaxBufferLength: 30,
         enableWorker: true,
+        // Local development serves the web app and API from different
+        // loopback origins. Playback tickets are real API resources, so HLS
+        // manifest/segment requests must carry the same DaveTV session cookie
+        // as the initial /api/play call. Same-origin production is unaffected.
+        xhrSetup: function(xhr) {
+          try { xhr.withCredentials = true; } catch (_e) {}
+        },
       });
 
       hlsInstance.on(Hls.Events.MANIFEST_PARSED, function(_event, data) {

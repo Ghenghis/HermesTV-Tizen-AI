@@ -189,6 +189,7 @@ function NetflixShell(props) {
   var profile = props.profile;
   var tier = props.tier;
   var onItemSelect = props.onItemSelect;
+  var onOpenDetail = props.onOpenDetail;
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
@@ -343,11 +344,11 @@ function NetflixShell(props) {
                 <button
                   className="hermes-focusable hermes-press"
                   tabIndex={0}
-                  onClick={function() { if (onItemSelect) onItemSelect(featured); }}
+                  onClick={function() { if (onOpenDetail) onOpenDetail(featured); }}
                   onKeyDown={function(e) {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      if (onItemSelect) onItemSelect(featured);
+                      if (onOpenDetail) onOpenDetail(featured);
                     }
                   }}
                   style={{

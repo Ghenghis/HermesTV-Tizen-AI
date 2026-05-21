@@ -387,6 +387,7 @@ function NuvioShell(props) {
   var tier = props.tier;
   var providers = props.providers;
   var onItemSelect = props.onItemSelect;
+  var onOpenDetail = props.onOpenDetail;
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
@@ -675,11 +676,11 @@ function NuvioShell(props) {
                 </button>
                 <button
                   tabIndex={0}
-                  onClick={function() { if (typeof onItemSelect === 'function') { onItemSelect(hero); } }}
+                  onClick={function() { if (typeof onOpenDetail === 'function') { onOpenDetail(hero); } }}
                   onKeyDown={function(e) {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      if (typeof onItemSelect === 'function') { onItemSelect(hero); }
+                      if (typeof onOpenDetail === 'function') { onOpenDetail(hero); }
                     }
                   }}
                   style={{
