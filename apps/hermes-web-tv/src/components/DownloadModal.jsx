@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from '../i18n/useTranslation.js';
+import { isDownloadsEnabled } from '../store/releaseFlags.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DownloadModal — IPTV-Player-Zero-style exact-size disclosure dialog.
@@ -46,6 +47,100 @@ function DownloadModal(props) {
   }, [isOpen, onClose]);
 
   if (!isOpen) { return null; }
+
+  // HANDOFF #2 gate. Until the server-side download muxer ships, the
+  // modal renders an honest "not yet available" panel instead of the
+  // size-disclosure flow. The route layer already returns 503 on the
+  // /file endpoint; this prevents the UI from claiming a queued job is
+  // making progress when no bytes will ever flow.
+  if (!isDownloadsEnabled()) {
+    var gatedTitle = (item && item.title) || t('common.untitled');
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('download.aria_open', { title: gatedTitle })}
+        onClick={function(e) {
+          if (e.target === e.currentTarget && typeof onClose === 'function') { onClose(); }
+        }}
+        className="hermes-modal-overlay"
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 70,
+          background: 'rgba(5,8,14,0.78)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1.5rem',
+        }}
+      >
+        <div
+          className="hermes-modal-panel"
+          style={{
+            width: '100%', maxWidth: '480px',
+            background: 'var(--surface, #112240)', color: 'var(--text, #e0f2fe)',
+            border: '1px solid var(--border, #1c3a5e)', borderRadius: '20px',
+            padding: '1.4rem 1.5rem',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.65)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 'calc(0.72rem * var(--font-scale, 1))',
+              fontWeight: 700,
+              color: 'var(--muted, #7dd3fc)',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {t('download.title_blocked')}
+          </div>
+          <div
+            style={{
+              marginTop: '0.4rem',
+              fontSize: 'calc(1.05rem * var(--font-scale, 1))',
+              fontWeight: 800,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}
+          >
+            {gatedTitle}
+          </div>
+          <div
+            style={{
+              marginTop: '0.9rem',
+              padding: '0.85rem 1rem',
+              background: 'var(--bg, #0a1628)',
+              border: '1px solid var(--border, #1c3a5e)',
+              borderRadius: '10px',
+              fontSize: 'calc(0.85rem * var(--font-scale, 1))',
+              color: 'var(--muted, #7dd3fc)',
+              lineHeight: 1.5,
+            }}
+          >
+            Downloads aren't live yet. The server-side muxer that writes
+            bytes to your Downloads folder ships in a future release.
+            Until then this button is disabled — no fake queue, no
+            partial files.
+          </div>
+          <div style={{ marginTop: '1.1rem', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              tabIndex={0}
+              autoFocus
+              onClick={function() { if (typeof onClose === 'function') { onClose(); } }}
+              style={{
+                padding: '0.6rem 1.6rem',
+                background: 'linear-gradient(135deg, var(--accent, #00d4ff), #6366f1)',
+                border: 'none', borderRadius: '999px',
+                color: '#0a1628',
+                fontSize: 'calc(0.9rem * var(--font-scale, 1))',
+                fontWeight: 800, cursor: 'pointer', outline: 'none',
+                boxShadow: '0 6px 18px rgba(0,212,255,0.28)',
+              }}
+              onFocus={function(e) { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 212, 255, 0.45), 0 6px 18px rgba(0,212,255,0.28)'; }}
+              onBlur={function(e) { e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,212,255,0.28)'; }}
+            >{t('common.close')}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // envelope.label (when present) carries the series-aware string like
   // "Smallville — Season 1 (21 eps)" or "Smallville — S01E05". Falls back
