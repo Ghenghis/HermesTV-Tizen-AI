@@ -15,7 +15,7 @@ test.describe('EPG day tabs', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const sherri = page.locator(profileSelector('Sherri')).first();
     if (await sherri.count()) await sherri.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
   });
 
   test('Guide button opens EPG modal and Escape closes it', async ({ page }) => {

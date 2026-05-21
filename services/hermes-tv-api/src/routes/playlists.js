@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * routes/playlists.js — Playlist Import surface (m3u / XMLTV / xtream / stalker).
+ * routes/playlists.js — Playlist Import surface (m3u / XMLTV / xtream).
  *
  * Mirrors the IPTV Player Zero "Add Playlist" flow (docs/USER_JOURNEYS.md §1,
  * docs/DATA_FLOW.md §"Playlist Import Data Flow") onto the HermesTV API.
@@ -11,17 +11,17 @@
  * Endpoints:
  *
  *   POST   /api/playlists/preview
- *     body: { type|kind: 'url'|'file'|'xtream'|'stalker', ...source-specific }
+ *     body: { type|kind: 'url'|'file'|'xtream', ...source-specific }
  *     200:  { channels_count, groups_count, sample_channels[], _meta }
  *     400:  validation_failed (URL scheme, file size, missing fields, bad name)
- *     501:  not_implemented (stalker — phase 4)
+ *     501:  not_durable (file save only; preview remains supported)
  *     502:  upstream_unreachable (URL fetch failure)
  *
  *   POST   /api/playlists/save
  *     body: { name, provider_id, source: <same shape as /preview body> }
  *     200:  { id, name, provider_id, channels_count, created_at }
  *     400:  validation_failed
- *     501:  not_implemented (stalker only)
+ *     501:  not_durable (file save only)
  *
  *   GET    /api/playlists
  *     200:  { playlists: [{id, name, provider_id, channels_count, created_at}] }
@@ -47,16 +47,13 @@
  *     server-side ONLY in the in-memory record's `_xtream_credentials`
  *     field, never serialised to a TV-bound response. The /preview and
  *     /save bodies surface only counts + sample + masked meta.
- *   - Stalker portal ingest currently returns 501 (phase 4) with a useful
- *     message + docs/19 pointer so the operator gets a clear "not yet"
- *     instead of a silent failure.
+ *   - Local file preview is supported, but file save is rejected because
+ *     DaveTV cannot refetch a browser-local file after restart.
  *
  * STORE
- *   - In-memory only for Phase 1 (matches existing providers / downloads
- *     patterns in this service). A file-backed store can land in a follow-up
- *     once the operator confirms the import flow shape. Each saved record
- *     carries { id, name, provider_id, source_type, channels_count,
- *     created_at, _streams_by_local_id, _xtream_credentials? }.
+ *   - Saved URL/Xtream imports are mirrored into providerStore before the
+ *     response can succeed. The short-lived in-memory playlist record is only
+ *     a smoke/projection cache and is never treated as durable truth.
  */
 
 const { Router } = require('express');
@@ -69,7 +66,7 @@ const FETCH_TIMEOUT_MS = 15000;
 const MAX_ITEMS_PER_PARSE = 5000;
 const SAMPLE_CHANNEL_COUNT = 10;
 const MAX_PLAYLISTS = 50;                         // soft cap on in-memory store
-const VALID_TYPES = ['url', 'file', 'xtream', 'stalker'];
+const VALID_TYPES = ['url', 'file', 'xtream'];
 // Provider IDs the saved playlist can be tagged under. Mirrors the m3uClient
 // PROVIDER_DEFS plus a generic "custom" bucket for operator-imported sources.
 const VALID_PROVIDER_IDS = ['apollo_group', 'xtremehd', 'custom'];
@@ -144,7 +141,8 @@ function _validateXtreamServerUrl(url) {
   return { ok: true, normalised: url.replace(/\/+$/, '') };
 }
 
-// Stalker MAC validator. Format: xx:xx:xx:xx:xx:xx (hex, case-insensitive).
+// Legacy helper kept for route-internal validation tests that exercise common
+// IPTV address parsing. It is not exposed in the web import UI.
 function _validateMacAddress(mac) {
   if (typeof mac !== 'string' || mac.length === 0) {
     return { ok: false, error: 'mac_address is required and must be a string' };
@@ -371,7 +369,7 @@ async function _fetchXtreamSource(serverUrl, username, password) {
 //   { type: 'url', url: 'https://...' }
 //   { type: 'file', text: '#EXTM3U\n...' }
 //   { type: 'xtream', host, username, password }     // 501
-//   { type: 'stalker', portal_url, mac }              // 501
+//   { type: 'file', text }                            // preview only
 async function handlePreview(req, res) {
   const body = req.body || {};
   // Accept either `type` (legacy) or `kind` (task spec) as the source-kind field.
@@ -426,13 +424,11 @@ async function handlePreview(req, res) {
     xtSummary._meta = { source_type: 'xtream' };
     return res.status(200).json(xtSummary);
   }
-  if (type === 'stalker') {
+  if (type === 'file') {
     return res.status(501).json({
-      error: 'not_implemented',
-      message: 'Stalker portal ingest is preview-only. Full support lands in Phase 4 — see docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md.',
-      type: 'stalker',
-      phase: 'phase4',
-      docs: 'docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md',
+      error: 'not_durable',
+      message: 'File imports cannot be saved yet because DaveTV cannot refetch them after restart. Use a provider URL or Xtream login so the provider is stored durably.',
+      type: 'file',
     });
   }
 
@@ -521,13 +517,11 @@ async function handleSave(req, res) {
     });
   }
 
-  if (type === 'stalker') {
+  if (type === 'file') {
     return res.status(501).json({
-      error: 'not_implemented',
-      message: 'Stalker portal ingest is preview-only. Full support lands in Phase 4 — see docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md.',
-      type: 'stalker',
-      phase: 'phase4',
-      docs: 'docs/19_PROVIDER_ONBOARDING_WITHOUT_SECRETS.md',
+      error: 'not_durable',
+      message: 'File imports cannot be saved yet because DaveTV cannot refetch them after restart. Use a provider URL or Xtream login so the provider is stored durably.',
+      type: 'file',
     });
   }
 
@@ -599,6 +593,64 @@ async function handleSave(req, res) {
     });
   }
 
+  // Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md P0#2: "saved playlists are
+  // in-memory and do not feed catalog/playback after restart". The fix is
+  // to mirror the credential-bearing record into providerStore so it
+  // survives restart and gets picked up by catalog ingest. The in-memory
+  // _playlists record stays (it carries the parsed channel list which
+  // is short-lived smoke-test data); the durable provider config goes
+  // to disk.
+  var persistedProviderId = null;
+  var addInput = null;
+  if (type === 'url') {
+    addInput = {
+      type: 'm3u',
+      provider_id: providerId === 'custom' ? undefined : providerId,
+      label: name,
+      url: source.url,
+      epg_url: (source.epg_url && typeof source.epg_url === 'string') ? source.epg_url : undefined
+    };
+  } else if (type === 'xtream' && xtreamCreds) {
+    addInput = {
+      type: 'xtream',
+      provider_id: providerId === 'custom' ? undefined : providerId,
+      label: name,
+      url: xtreamCreds.server_url,
+      username: xtreamCreds.username,
+      password: xtreamCreds.password
+    };
+  }
+  try {
+    var providerStore = require('../lib/providerStore');
+    if (addInput) {
+      var saved = await providerStore.add(addInput);
+      if (saved && saved.id) {
+        persistedProviderId = saved.id;
+      }
+    }
+  } catch (err) {
+    if (err && err.code === 'VALIDATION_FAILED') {
+      return res.status(400).json({
+        error: 'provider_validation_failed',
+        message: 'Provider details validated for preview, but the durable provider record was rejected.',
+        errors: err.errors || [err.message],
+      });
+    }
+    var SANITIZE2 = require('../lib/sanitizeLog').sanitizeForLog;
+    console.warn('[playlists] provider persist failed: ' + SANITIZE2(err && err.message ? err.message : 'unknown'));
+    return res.status(500).json({
+      error: 'provider_persist_failed',
+      message: 'Could not save provider config durably. Nothing was saved.',
+    });
+  }
+
+  if (!persistedProviderId) {
+    return res.status(500).json({
+      error: 'provider_persist_failed',
+      message: 'Provider save did not return a durable provider id. Nothing was saved.',
+    });
+  }
+
   const id = _makeId();
   const record = {
     id: id,
@@ -608,6 +660,7 @@ async function handleSave(req, res) {
     channels_count: parsed.length,
     created_at: new Date(_now()).toISOString(),
     _streams_by_local_id: _buildStreamMap(parsed),
+    _persisted_provider_id: persistedProviderId,
   };
   if (xtreamCreds) {
     // Server-only. NEVER serialised below; see handleList for the TV-safe
@@ -618,61 +671,6 @@ async function handleSave(req, res) {
   _playlists[id] = record;
   _playlistOrder.push(id);
   _trim();
-
-  // Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md P0#2: "saved playlists are
-  // in-memory and do not feed catalog/playback after restart". The fix is
-  // to mirror the credential-bearing record into providerStore so it
-  // survives restart and gets picked up by catalog ingest. The in-memory
-  // _playlists record stays (it carries the parsed channel list which
-  // is short-lived smoke-test data); the durable provider config goes
-  // to disk.
-  var persistedProviderId = null;
-  try {
-    var providerStore = require('../lib/providerStore');
-    var SANITIZE = require('../lib/sanitizeLog').sanitizeForLog;
-    var addInput = null;
-    if (type === 'url') {
-      addInput = {
-        type: 'm3u',
-        label: name,
-        url: source.url,
-        epg_url: (source.epg_url && typeof source.epg_url === 'string') ? source.epg_url : undefined
-      };
-    } else if (type === 'xtream' && xtreamCreds) {
-      addInput = {
-        type: 'xtream',
-        label: name,
-        url: xtreamCreds.server_url,
-        username: xtreamCreds.username,
-        password: xtreamCreds.password
-      };
-    }
-    // file imports are local one-shots — no URL to refetch on restart, so
-    // we leave them in the in-memory record only. Future enhancement could
-    // store the parsed channel list as a JSON catalog file alongside
-    // providers.json.
-    if (addInput) {
-      var saved = await providerStore.add(addInput).catch(function(err) {
-        if (err && err.code === 'VALIDATION_FAILED') {
-          // Validation failure on persist is non-fatal here — the in-memory
-          // import still returns 200 with channel counts so the operator
-          // sees the preview worked. Just log so it shows up in diagnostics.
-          console.warn('[playlists] persist skipped (validation): ' + SANITIZE(err.message));
-          return null;
-        }
-        console.warn('[playlists] persist failed: ' + SANITIZE(err && err.message ? err.message : 'unknown'));
-        return null;
-      });
-      if (saved && saved.id) {
-        persistedProviderId = saved.id;
-        record._persisted_provider_id = saved.id;
-      }
-    }
-  } catch (e) {
-    // Never block the response on persistence.
-    var SANITIZE2 = require('../lib/sanitizeLog').sanitizeForLog;
-    console.warn('[playlists] provider persist hook errored: ' + SANITIZE2(e && e.message ? e.message : 'unknown'));
-  }
 
   return res.status(200).json({
     id: record.id,
@@ -685,32 +683,79 @@ async function handleSave(req, res) {
   });
 }
 
+function _playlistProjectionFromProvider(row) {
+  if (!row || !row.id) { return null; }
+  if (row.type !== 'm3u' && row.type !== 'xtream') { return null; }
+  var memory = null;
+  for (var i = 0; i < _playlistOrder.length; i++) {
+    var rec = _playlists[_playlistOrder[i]];
+    if (rec && rec._persisted_provider_id === row.id) {
+      memory = rec;
+      break;
+    }
+  }
+  return {
+    id: row.id,
+    playlist_id: memory ? memory.id : undefined,
+    name: row.label || (memory && memory.name) || 'Provider',
+    provider_id: row.provider_id || (memory && memory.provider_id) || 'custom',
+    source_type: row.type === 'xtream' ? 'xtream' : 'url',
+    channels_count: memory ? memory.channels_count : 0,
+    created_at: row.created_at || (memory && memory.created_at) || null,
+    persisted_provider_id: row.id,
+    enabled: row.enabled !== false,
+    url_host: row.url_host || undefined,
+  };
+}
+
 // GET /api/playlists
-function handleList(req, res) {
-  const list = _playlistOrder.map(function(id) {
-    var r = _playlists[id];
-    if (!r) { return null; }
-    return {
-      id: r.id,
-      name: r.name,
-      provider_id: r.provider_id,
-      source_type: r.source_type,
-      channels_count: r.channels_count,
-      created_at: r.created_at,
-    };
-  }).filter(Boolean);
-  return res.status(200).json({ playlists: list, total: list.length });
+async function handleList(req, res) {
+  var providerStore = require('../lib/providerStore');
+  try {
+    var rows = await providerStore.list();
+    var list = rows.map(_playlistProjectionFromProvider).filter(Boolean);
+    return res.status(200).json({ playlists: list, total: list.length, source: 'providerStore' });
+  } catch (err) {
+    var SANITIZE3 = require('../lib/sanitizeLog').sanitizeForLog;
+    console.warn('[playlists] durable list failed: ' + SANITIZE3(err && err.message ? err.message : 'unknown'));
+    return res.status(500).json({
+      error: 'playlist_list_failed',
+      message: 'Could not load durable playlist providers.',
+    });
+  }
 }
 
 // DELETE /api/playlists/:id
-function handleDelete(req, res) {
+async function handleDelete(req, res) {
   const id = req.params.id;
-  if (!_playlists[id]) {
+  var providerId = null;
+  if (_playlists[id]) {
+    providerId = _playlists[id]._persisted_provider_id || null;
+    delete _playlists[id];
+    _playlistOrder = _playlistOrder.filter(function(x) { return x !== id; });
+  } else if (/^prov-[a-f0-9]{8,16}$/.test(String(id || ''))) {
+    providerId = id;
+  }
+
+  if (!providerId) {
     return res.status(404).json({ error: 'not_found', id: id });
   }
-  delete _playlists[id];
-  _playlistOrder = _playlistOrder.filter(function(x) { return x !== id; });
-  return res.status(200).json({ deleted: true, id: id });
+
+  try {
+    var providerStore = require('../lib/providerStore');
+    var removed = await providerStore.remove(providerId);
+    if (!removed) {
+      return res.status(404).json({ error: 'not_found', id: id, persisted_provider_id: providerId });
+    }
+    return res.status(200).json({ deleted: true, id: id, persisted_provider_id: providerId });
+  } catch (err) {
+    var SANITIZE4 = require('../lib/sanitizeLog').sanitizeForLog;
+    console.warn('[playlists] durable delete failed: ' + SANITIZE4(err && err.message ? err.message : 'unknown'));
+    return res.status(500).json({
+      error: 'playlist_delete_failed',
+      message: 'Could not delete durable playlist provider.',
+    });
+  }
 }
 
 router.post('/api/playlists/preview', handlePreview);

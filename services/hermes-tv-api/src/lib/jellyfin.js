@@ -8,17 +8,16 @@
  *
  * Responsibilities:
  *   - fetchCatalog()       — pull movies/series/episodes from /Items and map
- *                            each item onto the HermesTV catalog shape
- *                            (see apps/hermes-web-tv/mock/catalog.mock.json).
+ *                            each item onto the DaveTV catalog shape.
  *   - fetchLiveSessions()  — currently-playing sessions for the future
  *                            "What Mom is watching" widget. (/Sessions/Playing)
  *
  * Failure semantics:
  *   - 8 s timeout per HTTP call. On timeout we throw UNREACHABLE.
- *   - HTTP 401 from Jellyfin → throws AUTH_FAILED so the caller can fall
- *     back to the mock catalog.
- *   - Any network / 5xx error → throws UNREACHABLE so the caller can fall
- *     back to the mock catalog.
+ *   - HTTP 401 from Jellyfin → throws AUTH_FAILED so the caller can serve
+ *     an honest empty/partial catalog.
+ *   - Any network / 5xx error → throws UNREACHABLE so the caller can serve
+ *     an honest empty/partial catalog.
  *
  * Caching:
  *   - 5-minute in-memory cache per endpoint. The workstation Jellyfin
@@ -27,12 +26,9 @@
  * Notes:
  *   - Uses native global `fetch` (Node 20+). No external deps.
  *   - The Jellyfin API key is read from process.env.JELLYFIN_API_KEY and
- *     attached as the `X-Emby-Token` header on every call. It is also
- *     embedded in the poster_url query string so the web client can render
- *     posters cross-origin. This is acceptable for Mom's home-network use
- *     case (the key only grants library reads, the workstation is not
- *     internet-exposed). PHASE 4: a small image proxy on the API will
- *     strip the key from outbound URLs entirely.
+ *     attached as the `X-Emby-Token` header on every Jellyfin REST call.
+ *     Catalog poster_url values point at a DaveTV image proxy; the key is
+ *     never embedded in a browser-visible URL.
  */
 
 var DEFAULT_TIMEOUT_MS = 8000;
@@ -98,6 +94,21 @@ function _normalizeBase(url) {
   return url;
 }
 
+function _catalogItemId(rawItemId) {
+  if (typeof rawItemId !== 'string' || rawItemId.length === 0) { return ''; }
+  return 'jellyfin-' + encodeURIComponent(rawItemId);
+}
+
+function _rawItemIdFromCatalogId(catalogItemId) {
+  if (typeof catalogItemId !== 'string' || catalogItemId.length === 0) { return ''; }
+  var raw = catalogItemId;
+  if (raw.indexOf('jellyfin-') === 0) {
+    raw = raw.slice('jellyfin-'.length);
+  }
+  try { raw = decodeURIComponent(raw); } catch (_) { /* leave raw */ }
+  return raw;
+}
+
 /**
  * Make a Jellyfin HTTP call with an 8 s timeout. Returns parsed JSON on 2xx.
  * Throws AUTH_FAILED on 401, UNREACHABLE on any other failure / non-2xx.
@@ -146,10 +157,28 @@ function _fetchJellyfin(path, baseUrl, apiKey) {
  * The API key is embedded as a query parameter so the browser can render
  * the image cross-origin. See PHASE 4 note above.
  */
-function _buildPosterUrl(baseUrl, itemId, apiKey) {
-  var base = _normalizeBase(baseUrl);
-  return base + '/Items/' + encodeURIComponent(itemId) +
-    '/Images/Primary?api_key=' + encodeURIComponent(apiKey);
+function _buildPosterUrl(catalogItemId) {
+  return '/api/jellyfin/items/' + encodeURIComponent(catalogItemId) + '/image/primary';
+}
+
+function _buildPrimaryImageRequest(catalogItemId) {
+  var baseUrl = process.env.JELLYFIN_URL;
+  var apiKey = process.env.JELLYFIN_API_KEY;
+  var rawItemId = _rawItemIdFromCatalogId(catalogItemId);
+  if (!baseUrl || !apiKey || !rawItemId) { return null; }
+  return {
+    url: _normalizeBase(baseUrl) + '/Items/' + encodeURIComponent(rawItemId) + '/Images/Primary',
+    headers: {
+      'Accept': 'image/*,*/*',
+      'X-Emby-Token': apiKey,
+    },
+  };
+}
+
+function _buildStreamUrl(baseUrl, itemId, apiKey) {
+  return _normalizeBase(baseUrl) +
+    '/Videos/' + encodeURIComponent(itemId) +
+    '/stream?Static=true&api_key=' + encodeURIComponent(apiKey);
 }
 
 /**
@@ -158,9 +187,11 @@ function _buildPosterUrl(baseUrl, itemId, apiKey) {
  */
 function _mapItem(jfItem, baseUrl, apiKey) {
   if (!jfItem || typeof jfItem !== 'object') { return null; }
+  if (typeof jfItem.Id !== 'string' || jfItem.Id.length === 0) { return null; }
 
   var type = TYPE_MAP[jfItem.Type];
   if (!type) { return null; } // skip BoxSet, MusicAlbum, etc.
+  var catalogId = _catalogItemId(jfItem.Id);
 
   var durationMinutes = null;
   if (typeof jfItem.RunTimeTicks === 'number' && jfItem.RunTimeTicks > 0) {
@@ -170,8 +201,8 @@ function _mapItem(jfItem, baseUrl, apiKey) {
 
   var posterUrl = null;
   var hasPrimary = jfItem.ImageTags && jfItem.ImageTags.Primary;
-  if (hasPrimary && jfItem.Id) {
-    posterUrl = _buildPosterUrl(baseUrl, jfItem.Id, apiKey);
+  if (hasPrimary && catalogId) {
+    posterUrl = _buildPosterUrl(catalogId);
   }
 
   var genres = [];
@@ -180,7 +211,7 @@ function _mapItem(jfItem, baseUrl, apiKey) {
   }
 
   return {
-    id: jfItem.Id || '',
+    id: catalogId,
     title: jfItem.Name || '',
     type: type,
     year: typeof jfItem.ProductionYear === 'number' ? jfItem.ProductionYear : null,
@@ -189,9 +220,23 @@ function _mapItem(jfItem, baseUrl, apiKey) {
     description: typeof jfItem.Overview === 'string' ? jfItem.Overview : '',
     duration_minutes: durationMinutes,
     poster_url: posterUrl,
+    provider: 'jellyfin',
     provider_id: 'jellyfin',
+    providers: [{
+      provider_id: 'jellyfin',
+      source_id: jfItem.Id,
+      source_health: { status: 'unknown' },
+    }],
     quality_floor: '1080p',
   };
+}
+
+function resolveStreamUrl(catalogItemId) {
+  var baseUrl = process.env.JELLYFIN_URL;
+  var apiKey = process.env.JELLYFIN_API_KEY;
+  var rawItemId = _rawItemIdFromCatalogId(catalogItemId);
+  if (!baseUrl || !apiKey || !rawItemId) { return null; }
+  return _buildStreamUrl(baseUrl, rawItemId, apiKey);
 }
 
 // --------------------------------------------------------------------------
@@ -213,7 +258,7 @@ function _mapItem(jfItem, baseUrl, apiKey) {
  *   - CONFIG       — JELLYFIN_URL or JELLYFIN_API_KEY not set
  *
  * The caller (routes/catalog.js) is expected to catch any of these and
- * fall back to the mock catalog, with `X-Catalog-Source: mock-fallback`.
+ * serve an honest empty/partial catalog.
  */
 function fetchCatalog() {
   var baseUrl = process.env.JELLYFIN_URL;
@@ -285,4 +330,10 @@ module.exports = {
   fetchLiveSessions: fetchLiveSessions,
   // Exposed for tests only.
   _clearCache: _clearCache,
+  internal: {
+    catalogItemId: _catalogItemId,
+    rawItemIdFromCatalogId: _rawItemIdFromCatalogId,
+    buildPrimaryImageRequest: _buildPrimaryImageRequest,
+    resolveStreamUrl: resolveStreamUrl,
+  },
 };

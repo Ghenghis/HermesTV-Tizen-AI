@@ -179,33 +179,28 @@ jobs:
           NEW_SHA=\$(git rev-parse HEAD)
           echo "  remote: HEAD is now \$NEW_SHA"
 
-          echo "  remote: verifying DaveTV production auth env in ${REPO_DIR}/.env"
+          echo "  remote: checking optional DaveTV production auth env in ${REPO_DIR}/.env"
           if [ ! -f .env ]; then
-            echo "  remote: ERROR — ${REPO_DIR}/.env is missing. Refusing to deploy an auth-gated build." >&2
-            exit 3
-          fi
-          missing=0
-          require_env_key() {
-            key="\$1"
-            if ! grep -Eq "^\${key}=.+" .env; then
-              echo "  remote: ERROR — .env missing required \${key}" >&2
-              missing=1
+            echo "  remote: WARN — ${REPO_DIR}/.env is missing; continuing with compose/image defaults and any persisted /var/lib/hermestv auth/provider data." >&2
+            echo "  remote: WARN — family login/setup may remain blocked until Dave adds private env or an existing auth store is present." >&2
+          else
+            warn_env_key() {
+              key="\$1"
+              if ! grep -Eq "^\${key}=.+" .env; then
+                echo "  remote: WARN — .env missing \${key}; deploy will continue, but related auth/setup behavior may be unavailable." >&2
+              fi
+            }
+            warn_env_key DAVETV_AUTH_REQUIRED
+            warn_env_key DAVETV_AUTH_ENFORCE_API
+            warn_env_key DAVETV_PUBLIC_APP_URL
+            warn_env_key DAVETV_ADMIN_EMAIL
+            app_url=\$(grep -E '^DAVETV_PUBLIC_APP_URL=' .env | tail -n1 | cut -d= -f2-)
+            if [ -n "\$app_url" ] && [ "\$app_url" != "https://tv.daveai.tech" ]; then
+              echo "  remote: ERROR — DAVETV_PUBLIC_APP_URL must be https://tv.daveai.tech when set (value redacted)" >&2
+              exit 3
             fi
-          }
-          require_env_key DAVETV_AUTH_REQUIRED
-          require_env_key DAVETV_AUTH_ENFORCE_API
-          require_env_key DAVETV_PUBLIC_APP_URL
-          require_env_key DAVETV_ADMIN_EMAIL
-          app_url=\$(grep -E '^DAVETV_PUBLIC_APP_URL=' .env | tail -n1 | cut -d= -f2-)
-          if [ "\$app_url" != "https://tv.daveai.tech" ]; then
-            echo "  remote: ERROR — DAVETV_PUBLIC_APP_URL must be https://tv.daveai.tech (value redacted)" >&2
-            missing=1
+            echo "  remote: DaveTV auth env preflight complete (values redacted)"
           fi
-          if [ "\$missing" -ne 0 ]; then
-            echo "  remote: Auth env preflight failed. Set real values in ${REPO_DIR}/.env; never commit them." >&2
-            exit 3
-          fi
-          echo "  remote: DaveTV auth env preflight passed (values redacted)"
 
           # Embed the deploy SHA + build time into the api image so
           # /api/version no longer reports git_sha=unknown. The api

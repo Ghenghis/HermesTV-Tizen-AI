@@ -2,13 +2,15 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './specs',
+  globalSetup: './global-setup.js',
   timeout: 60000,
   expect: { timeout: 10000 },
   fullyParallel: false,
   workers: 1,
   reporter: [['list'], ['html', { outputFolder: 'report', open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.DAVETV_E2E_WEB_URL || 'http://localhost:5173',
+    storageState: './.auth/davetv-user.json',
     headless: true,
     viewport: { width: 1920, height: 1080 },
     screenshot: 'only-on-failure',

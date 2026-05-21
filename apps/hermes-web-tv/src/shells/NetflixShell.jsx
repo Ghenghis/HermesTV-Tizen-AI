@@ -408,8 +408,8 @@ function NetflixShell(props) {
             catalog={filtered}
           />
           <CardRow title="Top Picks For You" items={filtered} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
-          <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, capForProfile(profile, 8))} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
-          <CardRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(4)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="Live Now" items={liveItems} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="Movies" items={movies} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="New Arrivals" items={filtered.slice().reverse()} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
         </div>
       </div>

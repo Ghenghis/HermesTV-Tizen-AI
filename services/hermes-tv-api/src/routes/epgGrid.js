@@ -40,8 +40,7 @@
 
 const express = require('express');
 const router  = express.Router();
-
-const VALID_PROFILES = new Set(['dave_tv', 'mom_tv']);
+const profileIds = require('../lib/profileIds');
 
 // Maximum permitted window in milliseconds (4 hours)
 const MAX_WINDOW_MS = 4 * 60 * 60 * 1000;
@@ -211,10 +210,10 @@ router.get('/api/epg/grid', async function(req, res) {
       message: 'profile_id query parameter is required',
     });
   }
-  if (!VALID_PROFILES.has(profile_id)) {
+  if (!profileIds.isValidProfileId(profile_id)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + Array.from(VALID_PROFILES).join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
 

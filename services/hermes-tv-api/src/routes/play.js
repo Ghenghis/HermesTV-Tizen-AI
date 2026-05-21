@@ -25,8 +25,9 @@ const iptvOrg = require('../lib/iptvOrg');
 const hlsProxy = require('../lib/hlsProxy');
 const catalogMerge = require('../lib/catalogMerge');
 const streamProbe = require('../lib/streamProbe');
+const xtreamClient = require('../lib/xtreamClient');
+const profileIds = require('../lib/profileIds');
 
-const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const TICKET_TTL_MS = 5 * 60 * 1000;
 
 // In-memory ticket store. A real implementation would use Redis or a signed
@@ -163,24 +164,54 @@ function _buildSourcesForItem(item, requestedProviderId) {
   return sources;
 }
 
+function _episodeItemIdForPlay(item, episodeItemId) {
+  if (!item || item.type !== 'series') { return null; }
+  if (typeof episodeItemId !== 'string' || episodeItemId.length === 0) { return null; }
+  if (episodeItemId.indexOf('xtream-') === 0) {
+    var storeSeries = /^xtream-(prov-[a-f0-9]+)-series-/.exec(item.id);
+    if (storeSeries) {
+      return episodeItemId.indexOf('xtream-' + storeSeries[1] + '-series-') === 0 ? episodeItemId : null;
+    }
+    if (item.id.indexOf('xtream-series-') === 0) {
+      return episodeItemId.indexOf('xtream-series-') === 0 ? episodeItemId : null;
+    }
+    return null;
+  }
+  return xtreamClient.internal.episodeItemIdForSeries(item.id, episodeItemId);
+}
+
+async function _defaultEpisodeItemIdForPlay(item) {
+  if (!item || item.type !== 'series' || typeof item.id !== 'string') { return null; }
+  if (item.id.indexOf('xtream-') !== 0) { return null; }
+  var episodes = await xtreamClient.getSeriesEpisodesForItemId(item.id);
+  if (!Array.isArray(episodes) || episodes.length === 0) { return null; }
+  for (var i = 0; i < episodes.length; i++) {
+    if (episodes[i] && typeof episodes[i].play_item_id === 'string' && episodes[i].play_item_id.length > 0) {
+      return episodes[i].play_item_id;
+    }
+  }
+  return null;
+}
+
 /**
  * POST /api/play
  * Body: { item_id, profile_id, provider_id? }
  * Response: ticket envelope (no stream URL).
  */
-router.post('/api/play', (req, res) => {
+router.post('/api/play', async (req, res) => {
   const body = req.body || {};
   const itemId = body.item_id;
   const profileId = body.profile_id;
   const requestedProviderId = body.provider_id;
+  const requestedEpisodeItemId = body.episode_item_id || body.episode_id || null;
 
   if (!itemId || typeof itemId !== 'string') {
     return res.status(400).json({ error: 'validation_failed', message: 'item_id is required.' });
   }
-  if (VALID_PROFILES.indexOf(profileId) === -1) {
+  if (!profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
 
@@ -192,6 +223,38 @@ router.post('/api/play', (req, res) => {
   // Wave-13: build the full sources[] array up-front so the stream
   // endpoint can walk providers in order and auto-fall-through.
   var sources = _buildSourcesForItem(item, requestedProviderId);
+  var episodeItemId = _episodeItemIdForPlay(item, requestedEpisodeItemId);
+
+  if (requestedEpisodeItemId && !episodeItemId) {
+    return res.status(400).json({
+      error: 'invalid_episode_item',
+      message: 'episode_item_id is only valid for playable provider-backed series episodes.',
+    });
+  }
+
+  if (!requestedEpisodeItemId && item.type === 'series') {
+    try {
+      episodeItemId = await _defaultEpisodeItemIdForPlay(item);
+    } catch (errEpisode) {
+      console.warn('[play] series episode metadata fetch failed: ' + (errEpisode && errEpisode.message ? errEpisode.message : 'unknown'));
+      episodeItemId = null;
+    }
+    if (!episodeItemId) {
+      return res.status(503).json({
+        error: 'episode_metadata_unavailable',
+        message: 'This provider did not return playable episode metadata for the selected series.',
+        item_id: item.id,
+      });
+    }
+  }
+
+  if (episodeItemId) {
+    sources = sources.map(function(s) {
+      var next = Object.assign({}, s);
+      next.item_id = episodeItemId;
+      return next;
+    });
+  }
 
   if (sources.length === 0) {
     return res.status(503).json({
@@ -227,6 +290,7 @@ router.post('/api/play', (req, res) => {
       id: item.id,
       title: item.title,
       type: item.type,
+      episode_item_id: episodeItemId || null,
       resolution: (item.metadata && item.metadata.resolution) || item.quality || null,
       hdr_format: (item.metadata && item.metadata.hdr_format) || null,
       category: item.category || null,

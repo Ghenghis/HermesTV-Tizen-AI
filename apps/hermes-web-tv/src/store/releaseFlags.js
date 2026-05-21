@@ -3,9 +3,9 @@
 // shipped yet (HANDOFF_FOR_CODEX §2 blocker #2). The route layer already
 // behaves honestly:
 //
-//   POST /api/dvr/schedule    → 200 {status:'scheduled', _note:'Phase 4...'}
-//   GET  /api/download/:id/file → 503 download_pipeline_not_implemented
-//   POST /api/catchup/play    → 501 not_implemented
+//   POST /api/dvr/schedule      → 200 {status:'scheduled', _note:'Phase 4...'}
+//   POST /api/download          → 503 download_pipeline_not_available
+//   POST /api/catchup/play      → 501 not_implemented
 //
 // …but the UI affordance still LIES — the user sees a "queued" envelope
 // or a "View all recordings" button or a "What you missed" rail and

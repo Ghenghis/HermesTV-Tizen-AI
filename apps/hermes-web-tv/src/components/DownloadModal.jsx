@@ -3,21 +3,12 @@ import { useTranslation } from '../i18n/useTranslation.js';
 import { isDownloadsEnabled } from '../store/releaseFlags.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DownloadModal — IPTV-Player-Zero-style exact-size disclosure dialog.
+// DownloadModal — future offline-viewing dialog.
 //
-// Shows the operator the precise byte count BEFORE the download starts, with
-// a green "Exact" pill so they know we're not estimating. Two primary states:
-//
-//   1. "review"  — title, size in 24px bold, Cancel + Proceed buttons.
-//   2. "queued"  — Proceed clicked; we have a job_id and the actual byte
-//                  stream is currently 503 (Phase 4 wires the muxer).
-//                  Modal stays open and surfaces the friendly
-//                  "Server-side download muxer lands in Phase 4" message
-//                  with a Close button.
-//   3. "error"   — backend returned a non-queue response (404 / 503 /
-//                  threadfin_proxy_required). Show the error message
-//                  inline + a Close button so the operator gets actionable
-//                  feedback rather than a silent failure.
+// Until the real download worker ships, releaseFlags keeps this component on
+// an honest blocked panel. The review/queued states below are retained for
+// the future worker contract only; disabled-mode API responses render as
+// errors and never claim a fake job_id, exact size, or active byte stream.
 //
 // Tizen / Chrome 76 safe: no spread, no optional chaining, no nullish
 // coalescing in JSX. Focusable Cancel/Proceed for the remote.
@@ -28,7 +19,7 @@ function DownloadModal(props) {
   var t = tx.t;
 
   var isOpen = !!props.isOpen;
-  var envelope = props.envelope || null;     // download envelope from /api/download (success path)
+  var envelope = props.envelope || null;     // future /api/download worker envelope
   var pending = !!props.pending;             // request in flight
   var confirmed = !!props.confirmed;         // user clicked Proceed — switch to queued view
   var error = props.error || null;           // server error envelope (body.error + body.message)
@@ -149,10 +140,9 @@ function DownloadModal(props) {
     || (item && item.title)
     || t('common.untitled');
   var sizeHuman = envelope && envelope.exact_size_human ? envelope.exact_size_human : null;
-  // "queued" view fires after the user clicks Proceed (parent flips `confirmed`).
-  // The envelope.status is always 'queued' on success — that's the API contract —
-  // but we only switch UI state after explicit consent so Mom never sees the job
-  // is already queued before she's reviewed the size.
+  // The queued view only applies after the future worker returns a durable job
+  // envelope and the user explicitly confirms. Disabled-mode responses render
+  // through the error branch.
   var isQueued = confirmed && envelope && envelope.status === 'queued';
   var isError = !!error;
   var threadfinNeeded = isError && error.error === 'threadfin_proxy_required';

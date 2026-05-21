@@ -14,7 +14,7 @@ async function boot(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const t = page.locator('button[aria-label*="profile"]').first();
   if (await t.count()) await t.click();
-  await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
 }
 const cardLoc = (page: Page) =>
   page.locator('[role="button"][aria-label*="Details for"], button[aria-label*="Details for"]').first();
@@ -68,7 +68,7 @@ test.describe('Tizen Back cascade — keyCode 10009 closes top-most modal', () =
     const errors = collectConsoleErrors(page);
     await boot(page);
     await tizenBack(page);
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 2000 });
     expect(errors()).toEqual([]);
   });
 

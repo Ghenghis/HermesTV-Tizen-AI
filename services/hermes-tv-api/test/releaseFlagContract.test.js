@@ -17,10 +17,9 @@
  *   GET  /api/dvr/recordings         → all rows status='scheduled'
  *                                       (none advance to 'recording'
  *                                       or 'complete')
- *   POST /api/download               → 200 queued envelope with _note
- *                                       referencing Phase 4
- *   GET  /api/download/:job_id/file  → 503
- *                                       status='download_pipeline_not_implemented'
+ *   POST /api/download               → 503 download_pipeline_not_available
+ *                                       with no job_id / size fields
+ *   GET  /api/download/:job_id/file  → 503 download_pipeline_not_available
  *   POST /api/catchup/play           → 501 error='not_implemented'
  *
  * Pattern matches test/epgMappingRestart.test.js — isolated admin in a
@@ -33,6 +32,7 @@ var fs = require('fs');
 var os = require('os');
 
 var hermesApp = null;
+var catalogMerge = null;
 var totalPass = 0;
 var totalFail = 0;
 function pass(label) { console.log('PASS: ' + label); totalPass += 1; }
@@ -139,6 +139,7 @@ async function login(port) {
   var port = 3298;
   try { await bootHermesApi(port); pass('Boot: API listening on ' + port); }
   catch (e) { fail('Boot', e.message); process.exitCode = 1; return; }
+  catalogMerge = require('../src/lib/catalogMerge');
 
   try { await login(port); pass('Boot: admin login'); }
   catch (e) { fail('Boot login', e.message); await closeHermesApi(); process.exitCode = 1; return; }
@@ -197,71 +198,63 @@ async function login(port) {
   }
 
   // ── Downloads contract ──────────────────────────────────────────────────
-  // We need an actual catalog item to schedule a download against. Take the
-  // first item from /api/catalog (or skip honestly if empty).
-  var catalogResp = await call('GET', 'http://127.0.0.1:' + port + '/api/catalog');
-  var firstItem = null;
-  if (catalogResp.status === 200 && catalogResp.body && Array.isArray(catalogResp.body.items) && catalogResp.body.items.length > 0) {
-    firstItem = catalogResp.body.items[0];
-  }
-  if (!firstItem) {
-    pass('Downloads: catalog empty in this test (no providers configured) — skipping POST /api/download');
-    pass('Downloads: skipping with honest note, NOT a fake pass');
+  // Seed only the in-process merged-catalog snapshot with a synthetic test
+  // fixture so the route validates item/profile before proving it refuses to
+  // create a fake queue. No provider URL or credential is used.
+  var firstItem = {
+    id: 'm3u-release-download-contract',
+    type: 'movie',
+    title: 'Release Flag Contract Fixture',
+    provider: 'contract-test',
+    providers: [{ provider_id: 'contract-test', source_id: 'contract-test' }],
+  };
+  catalogMerge.setLastMerged([firstItem]);
 
-    // Even without a catalog we can prove the /file endpoint is alive and
-    // gated: an unknown job MUST return 404 job_not_found, which proves the
-    // route exists and rejects unknown jobs cleanly. The 503 path is then
-    // guaranteed by the route's literal handler (downloads.js:248–254).
-    var unknownFile = await call('GET', 'http://127.0.0.1:' + port + '/api/download/unknown-job-id/file');
-    if (unknownFile.status !== 404) {
-      fail('Downloads: GET /file (unknown job) expected 404', 'status=' + unknownFile.status);
-    } else if (!unknownFile.body || unknownFile.body.error !== 'job_not_found') {
-      fail('Downloads: unknown-job body.error is not "job_not_found"', JSON.stringify(unknownFile.body));
-    } else {
-      pass('Downloads: GET /file unknown-job → 404 job_not_found (route alive, no fake bytes)');
-    }
-    var listResp = await call('GET', 'http://127.0.0.1:' + port + '/api/downloads');
-    if (listResp.status !== 200 || !listResp.body || !Array.isArray(listResp.body.downloads)) {
-      fail('Downloads: GET /api/downloads expected list', 'status=' + listResp.status);
-    } else if (listResp.body.downloads.length !== 0) {
-      fail('Downloads: empty store should yield zero rows', 'count=' + listResp.body.downloads.length);
-    } else {
-      pass('Downloads: GET /api/downloads → { downloads: [], total: 0 } (honest empty)');
-    }
+  var listResp = await call('GET', 'http://127.0.0.1:' + port + '/api/downloads');
+  if (listResp.status !== 200 || !listResp.body || !Array.isArray(listResp.body.downloads)) {
+    fail('Downloads: GET /api/downloads expected list', 'status=' + listResp.status);
+  } else if (listResp.body.downloads.length !== 0 || listResp.body.total !== 0 || listResp.body.pipeline_available !== false) {
+    fail('Downloads: empty store should expose disabled pipeline',
+      'body=' + JSON.stringify(listResp.body));
   } else {
-    var dlResp = await call('POST', 'http://127.0.0.1:' + port + '/api/download', {
-      item_id: firstItem.id,
-      profile_id: 'dave_tv',
-    });
-    if (dlResp.status !== 200) {
-      fail('Downloads: POST /api/download', 'status=' + dlResp.status + ' raw=' + (dlResp.raw || '').slice(0, 200));
-    } else {
-      pass('Downloads: POST /api/download status=200');
-      if (!dlResp.body || dlResp.body.status !== 'queued') {
-        fail('Downloads: envelope status is not "queued"', 'status=' + (dlResp.body && dlResp.body.status));
-      } else {
-        pass('Downloads: envelope.status === "queued" (queued in-memory only)');
-      }
-      if (!dlResp.body._note || !/Phase 4/i.test(dlResp.body._note)) {
-        fail('Downloads: _note missing Phase 4 disclosure', '_note=' + (dlResp.body && dlResp.body._note));
-      } else {
-        pass('Downloads: _note discloses Phase 4 byte stream gap');
-      }
+    pass('Downloads: GET /api/downloads → { downloads: [], total: 0, pipeline_available: false }');
+  }
 
-      // Now hit the /file endpoint — MUST 503 with download_pipeline_not_implemented
-      var fileResp = await call('GET', 'http://127.0.0.1:' + port + '/api/download/' + dlResp.body.job_id + '/file');
-      if (fileResp.status !== 503) {
-        fail('Downloads: GET /file expected 503', 'status=' + fileResp.status);
-      } else {
-        pass('Downloads: GET /file returns 503 (muxer not implemented)');
-        if (!fileResp.body || fileResp.body.status !== 'download_pipeline_not_implemented') {
-          fail('Downloads: /file body.status is not "download_pipeline_not_implemented"',
-            'status=' + (fileResp.body && fileResp.body.status));
-        } else {
-          pass('Downloads: /file body.status === "download_pipeline_not_implemented"');
-        }
-      }
+  var dlResp = await call('POST', 'http://127.0.0.1:' + port + '/api/download', {
+    item_id: firstItem.id,
+    profile_id: 'dave_tv',
+  });
+  if (dlResp.status !== 503) {
+    fail('Downloads: POST /api/download expected 503', 'status=' + dlResp.status + ' raw=' + (dlResp.raw || '').slice(0, 200));
+  } else {
+    pass('Downloads: POST /api/download returns 503 (no fake queue)');
+    if (!dlResp.body || dlResp.body.error !== 'download_pipeline_not_available' || dlResp.body.pipeline_available !== false) {
+      fail('Downloads: POST body is not honest disabled contract', 'body=' + JSON.stringify(dlResp.body));
+    } else {
+      pass('Downloads: POST body.error === "download_pipeline_not_available"');
     }
+    if (dlResp.body && (dlResp.body.job_id || dlResp.body.exact_size_bytes || dlResp.body.exact_size_human || dlResp.body.status === 'queued')) {
+      fail('Downloads: POST leaked fake queue/size fields', 'body=' + JSON.stringify(dlResp.body));
+    } else {
+      pass('Downloads: POST creates no job_id, queued status, or fake exact-size fields');
+    }
+  }
+
+  var unknownFile = await call('GET', 'http://127.0.0.1:' + port + '/api/download/unknown-job-id/file');
+  if (unknownFile.status !== 503) {
+    fail('Downloads: GET /file expected 503 disabled pipeline', 'status=' + unknownFile.status);
+  } else if (!unknownFile.body || unknownFile.body.error !== 'download_pipeline_not_available') {
+    fail('Downloads: /file body.error is not disabled pipeline', JSON.stringify(unknownFile.body));
+  } else {
+    pass('Downloads: GET /file unknown-job → 503 download_pipeline_not_available');
+  }
+
+  var getJobResp = await call('GET', 'http://127.0.0.1:' + port + '/api/download/unknown-job-id');
+  if (getJobResp.status !== 503 || !getJobResp.body || getJobResp.body.error !== 'download_pipeline_not_available') {
+    fail('Downloads: GET /api/download/:job_id expected disabled pipeline',
+      'status=' + getJobResp.status + ' body=' + JSON.stringify(getJobResp.body));
+  } else {
+    pass('Downloads: GET /api/download/:job_id returns disabled pipeline, not fake job state');
   }
 
   // ── Catch-up contract ───────────────────────────────────────────────────

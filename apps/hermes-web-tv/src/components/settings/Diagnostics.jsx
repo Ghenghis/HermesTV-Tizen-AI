@@ -1,6 +1,7 @@
 import React from 'react';
 import * as settingsStore from '../../store/settingsStore.js';
 import * as consoleBuffer from '../../utils/consoleBuffer.js';
+import { resolveApiBase } from '../../api/apiBase.js';
 import {
   CARD_STYLE, CARD_HEADER_STYLE, CARD_TAGLINE_STYLE,
   BUTTON_STYLE,
@@ -19,14 +20,7 @@ import Toggle from './Toggle.jsx';
 //
 // Tizen 6.5 / Chrome 76 safe.
 
-function _apiBase() {
-  if (typeof window === 'undefined') { return ''; }
-  var h = window.location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1') { return 'http://localhost:3001'; }
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) { return 'http://' + h + ':3001'; }
-  if (h === 'hermestv.local') { return 'http://hermestv.local'; }
-  return '';
-}
+function _apiBase() { return resolveApiBase(); }
 
 function _readBuildVersion() {
   // Vite exposes env vars on `import.meta.env`. We avoid optional

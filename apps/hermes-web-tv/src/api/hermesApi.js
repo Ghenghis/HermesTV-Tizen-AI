@@ -1,33 +1,13 @@
-// Local dev (Vite at localhost:5173) → cross-origin to the API on :3001.
-// LAN mirror (Mom's QN85 hitting workstation by IP) → same auto-detect.
-// Production (https://tv.daveai.tech, with hermestv.daveai.tech as an
-// additive alias, both served by host nginx that also proxies /api/ to
-// the API container) → same-origin, so BASE_URL is empty. The browser
-// just hits whichever Host it loaded from.
-var BASE_URL = (function() {
-  if (typeof window === 'undefined') return '';
-  var h = window.location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:3001';
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return 'http://' + h + ':3001';
-  if (h === 'hermestv.local') return 'http://hermestv.local';
-  return '';
-})();
+import { resolveApiBase, buildApiUrl as _buildApiUrl } from './apiBase.js';
+
+var BASE_URL = resolveApiBase();
 
 function getApiBaseUrl() {
   return BASE_URL;
 }
 
 function buildApiUrl(path) {
-  var safePath = String(path || '');
-  if (safePath.charAt(0) !== '/') { safePath = '/' + safePath; }
-  if (/^https?:\/\//i.test(BASE_URL)) { return BASE_URL + safePath; }
-  if (typeof window !== 'undefined' && window.location) {
-    var loc = window.location;
-    var origin = loc.origin;
-    if (!origin && loc.protocol && loc.host) { origin = loc.protocol + '//' + loc.host; }
-    if (origin) { return origin + safePath; }
-  }
-  return safePath;
+  return _buildApiUrl(path, BASE_URL);
 }
 // Cold-cache /api/catalog returns ~540 KB over Cloudflare; on a cold worker
 // the full transfer occasionally crosses 8 s. Bumped to 20 s so Mom doesn't
@@ -394,6 +374,21 @@ function getEpg(channelId) {
   });
 }
 
+function getSeriesDetails(seriesId, profileId) {
+  var qs = profileId ? ('?profile_id=' + encodeURIComponent(profileId)) : '';
+  return fetchWithTimeout(BASE_URL + '/api/series/' + encodeURIComponent(seriesId) + qs).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = makeNetworkError((body && body.message) || ('Series details failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
 function submitCommand(commandEnvelope) {
   return fetchWithTimeout(BASE_URL + '/api/commands', {
     method: 'POST',
@@ -441,14 +436,13 @@ function startPlayback(args) {
 }
 
 /**
- * Queue a download for a movie / episode / series item. Returns the
- * exact-size envelope (job_id, exact_size_human, status: 'queued') so the
- * DownloadModal can show "EXACT DOWNLOAD SIZE NNN MB" and a Proceed button.
+ * Request a download for a movie / episode / series item. Until the real
+ * server-side download worker exists, the API returns an honest 503
+ * download_pipeline_not_available body with no job_id or size fields.
  *
  * Resolves with the server JSON body on any status. Caller is responsible
- * for branching on body.error — that lets the modal distinguish a 503
- * threadfin_proxy_required from a real exception so the UI can present a
- * 'configure THREADFIN_URL' tip instead of a generic error.
+ * for branching on body.error so the UI can present the route's concrete
+ * reason instead of pretending a queue exists.
  */
 function startDownload(args) {
   return fetchWithTimeout(BASE_URL + '/api/download', {
@@ -523,7 +517,7 @@ function getPairingStatus(code) {
 
 export {
   isReachable, getProfile, patchProfile, getProviders, getCatalog, getEpg,
-  submitCommand, validateCommand, startPlayback,
+  getSeriesDetails, submitCommand, validateCommand, startPlayback,
   startDownload, listDownloads, cancelDownload,
   createPairing, getPairingStatus,
   getApiBaseUrl, buildApiUrl,

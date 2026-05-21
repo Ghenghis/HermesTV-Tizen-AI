@@ -32,7 +32,7 @@ import Toggle from './Toggle.jsx';
 
 function VoiceSettings(props) {
   var profile = props.profile || {};
-  var profileId = profile.id;
+  var profileId = profile.id || profile.profile_id;
 
   // Initial state: read merged prefs once at mount. We don't reload on every
   // profile change because the Settings modal is closed + re-opened per

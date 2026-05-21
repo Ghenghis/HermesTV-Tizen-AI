@@ -71,8 +71,9 @@ router.get('/api/providers', function(req, res) {
 // ---------------------------------------------------------------------------
 router.post('/api/providers', function(req, res) {
   var body = req.body || {};
-  providerStore.add({
+  providerRegistry.add({
     type: body.type,
+    provider_id: body.provider_id,
     label: body.label,
     url: body.url,
     username: body.username,
@@ -97,7 +98,7 @@ router.patch('/api/providers/:id', function(req, res) {
   if (!/^prov-[a-f0-9]{1,16}$/.test(id)) {
     return res.status(400).json({ error: 'validation_failed', errors: ['id must match prov-<hex>'] });
   }
-  providerStore.update(id, req.body || {}).then(function(masked) {
+  providerRegistry.update(id, req.body || {}).then(function(masked) {
     if (!masked) { return res.status(404).json({ error: 'not_found', id: id }); }
     res.json({ provider: masked });
   }).catch(function(err) {
@@ -268,7 +269,7 @@ function _testXtream(row) {
 //   1. Plain M3U URL (https:// ... .m3u/.m3u8)
 //   2. Xtream URL scheme: xtream://user:pass@host:port[?label=Name]
 //   3. JSON blob: { url, username, password, epg_url, label, type }
-//   4. Xtream M3U-export form: http(s)://host/get.php?username=...&password=...&type=m3u_plus
+//   4. Xtream M3U-export form: http(s)://host/get.php?username=<value>&password=<value>&type=m3u_plus
 // ---------------------------------------------------------------------------
 function _parseQrText(text) {
   var trimmed = (typeof text === 'string') ? text.trim() : '';

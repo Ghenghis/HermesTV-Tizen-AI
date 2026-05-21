@@ -559,9 +559,8 @@ var INITIAL_STATE = {
   showPlayer: false,
   playerTicket: null,
   playerError: '',
-  // Download modal state — populated by /api/download response. Mirrors the
-  // IPTV Player Zero exact-size disclosure dialog. downloadConfirmed flips
-  // after the user clicks Proceed so the modal switches from review → queued.
+  // Download modal state — gated until /api/download has a real worker.
+  // Disabled-mode responses are error envelopes, never fake queued jobs.
   showDownload: false,
   downloadItem: null,
   downloadEnvelope: null,
@@ -1006,7 +1005,7 @@ function App() {
       if (aborted) { return; }
       patchState({ remotePairCode: code });
       try {
-        es = new EventSource('/api/remote/events?pair_code=' + encodeURIComponent(code));
+        es = new EventSource(hermesApi.buildApiUrl('/api/remote/events?pair_code=' + encodeURIComponent(code)));
         es.onmessage = function(evt) {
           try {
             var payload = JSON.parse(evt.data);
@@ -1036,8 +1035,7 @@ function App() {
       }
     }
 
-    fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-      .then(function(r) { return r.json(); })
+    hermesApi.createPairing()
       .then(function(body) { if (body && body.pairing_code) { attach(body.pairing_code); } })
       .catch(function() { /* offline — silent */ });
 
@@ -1074,10 +1072,22 @@ function App() {
       // mockApi (which previously made the UI look identical regardless of
       // whether the backend was working). Instead, surface a clear error
       // screen unless the dev explicitly opted in by setting
-      // localStorage.hermestv_dev_mock='1'. The Settings data-source badge
-      // also flips to a red 'no-api' state on every mock fallback path so
-      // the operator can see the degradation at a glance.
-      var devMockAllowed = (typeof window !== 'undefined' && window.localStorage &&
+      // localStorage.hermestv_dev_mock='1'.
+      //
+      // HANDOFF blocker #9 (2026-05-21): the dev-mock escape hatch is now
+      // restricted to development builds (import.meta.env.DEV). In a Vite
+      // production build (`npm run build:web`) the flag is inert — the
+      // operator never gets a "looks ok in prod by accident" mode that
+      // hides a real outage. The Settings data-source badge still flips
+      // to a red 'no-api' state during dev mock fallback so the degradation
+      // is visible at a glance.
+      var IS_DEV_BUILD = false;
+      try {
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV === true) {
+          IS_DEV_BUILD = true;
+        }
+      } catch (_) { /* no import.meta — treat as production */ }
+      var devMockAllowed = IS_DEV_BUILD && (typeof window !== 'undefined' && window.localStorage &&
         window.localStorage.getItem('hermestv_dev_mock') === '1');
 
       if (!reachable && !devMockAllowed) {
@@ -1299,7 +1309,7 @@ function App() {
     patchState({ selectedProviderId: providerId });
   }
 
-  function handlePlay(item, providerId) {
+  function handlePlay(item, providerId, opts) {
     // Gate first — anyone calling handlePlay outside MediaDetailPanel
     // (Multiview tile, future shell quick-play, etc.) is also protected.
     // When the user comes from MediaDetailPanel the item is already in
@@ -1307,17 +1317,19 @@ function App() {
     // false and we go straight through.
     if (parentalGate.isContentLocked(item)) {
       parentalGate.requestUnlock(item).then(function(res) {
-        if (res && res.ok) { _startPlayback(item, providerId); }
+        if (res && res.ok) { _startPlayback(item, providerId, opts); }
       });
       return;
     }
-    _startPlayback(item, providerId);
+    _startPlayback(item, providerId, opts);
   }
 
-  function _startPlayback(item, providerId) {
+  function _startPlayback(item, providerId, opts) {
     var profileId = (state.profile && state.profile.profile_id) || 'mom_tv';
     var args = { item_id: item.id, profile_id: profileId };
     if (providerId) { args.provider_id = providerId; }
+    if (opts && opts.episode_item_id) { args.episode_item_id = opts.episode_item_id; }
+    if (opts && opts.episode_id) { args.episode_id = opts.episode_id; }
     patchState({ showPlayer: true, playerTicket: null, playerError: '' });
     hermesApi.startPlayback(args).then(function(ticket) {
       patchState({ playerTicket: ticket, playerError: '' });
@@ -1331,14 +1343,11 @@ function App() {
     patchState({ showPlayer: false, playerTicket: null, playerError: '' });
   }
 
-  // ─── Download flow (Zero-shell 1-click ⤓) ─────────────────────────────────
-  // 1. User clicks ⤓ on a card or in the detail panel
-  // 2. POST /api/download → returns exact size envelope + job_id
-  // 3. Modal opens with "EXACT DOWNLOAD SIZE NNN MB" + Cancel/Proceed
-  // 4. Proceed flips downloadConfirmed → modal switches to "queued" view
-  // 5. Cancel DELETEs the queued job + closes the modal
-  // opts: optional { season, episode } for series downloads. season alone =
-  // "download whole season N"; season + episode = "download S{nn}E{nn}".
+  // ─── Download flow (future offline viewing) ───────────────────────────────
+  // The UI is gated by releaseFlags until a real server-side download worker
+  // exists. If a future call path reaches /api/download early, the API returns
+  // an honest 503 download_pipeline_not_available body with no fake job_id or
+  // exact-size fields.
   function handleStartDownload(item, opts) {
     if (!item || !item.id) { return; }
     // Same gate as handlePlay — protects future call sites that bypass
@@ -1384,17 +1393,14 @@ function App() {
   }
 
   function handleProceedDownload() {
-    // Backend already queued the job on POST /api/download; clicking Proceed is
-    // an explicit consent step. Flip the modal into its "queued" view.
+    // Only meaningful after the real download pipeline lands and returns a
+    // durable job envelope. Disabled-mode responses render as errors instead.
     patchState({ downloadConfirmed: true });
   }
 
   function handleCloseDownload() {
-    // If the user cancelled (downloadConfirmed=false but envelope present)
-    // we'd ideally call hermesApi.cancelDownload — but the in-memory job
-    // table self-trims old jobs, so leaving it is harmless and avoids a
-    // gratuitous round-trip when the user just dismisses. Cancel-as-explicit
-    // can come in a follow-up if the operator asks for it.
+    // In disabled mode there is no server job to cancel. After a real worker
+    // lands, explicit cancellation should call hermesApi.cancelDownload.
     patchState({
       showDownload: false,
       downloadItem: null,
@@ -2361,7 +2367,7 @@ function App() {
             />
           )}
 
-          {/* Download modal — Zero-shell exact-size disclosure */}
+          {/* Download modal — future offline viewing, currently release-gated */}
           {state.showDownload && (
             <DownloadModal
               isOpen={state.showDownload}

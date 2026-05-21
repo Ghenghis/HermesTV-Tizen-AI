@@ -762,7 +762,7 @@ function NuvioShell(props) {
           )}
           <NuvioRail
             title="Movies"
-            items={movies.length > 0 ? movies : visible}
+            items={movies}
             onItemSelect={onItemSelect}
             fontScale={fontScale}
             tier={tier}
@@ -770,7 +770,7 @@ function NuvioShell(props) {
           />
           <NuvioRail
             title="Series"
-            items={series.length > 0 ? series : visible.slice().reverse()}
+            items={series}
             onItemSelect={onItemSelect}
             fontScale={fontScale}
             tier={tier}

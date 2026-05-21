@@ -49,10 +49,12 @@ var LEAK_PAYLOADS = [
   { label: 'Azure TTS env',           payload: 'AZURE_TTS_KEY=longishLookingKeyValueAbcdef0123456789' },
   { label: 'DeepSeek API key',        payload: 'DEEPSEEK_API_KEY=sk-fakeFakeFakeFakeFakeFakeFake' },
   { label: 'Generic api_key',         payload: 'api_key=Fake1234FakeFakeFake1234' },
+  { label: 'Jellyfin api_key query',  payload: 'https://jellyfin.example.test/Videos/movie-1/stream?Static=true&api_key=Fake1234FakeFakeFake1234' },
   { label: 'Generic password=',       payload: 'password=Sup3rSecretPass!2024' },
   { label: 'Bearer token',            payload: 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature' },
   { label: 'OpenAI sk- key',          payload: 'OPENAI_API_KEY=sk-1234567890abcdefghijklmnopqr' },
   { label: 'Azure Speech header',     payload: 'Ocp-Apim-Subscription-Key: someAzureSpeechSubscriptionKeyValue' },
+  { label: 'Jellyfin token header',   payload: 'X-Emby-Token: jellyfinTokenValueThatMustNotLeak123' },
   { label: 'Xtream m3u_plus marker',  payload: 'http://host/path?type=m3u_plus&extra=1' },
 ];
 

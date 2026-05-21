@@ -31,9 +31,10 @@ const { Router } = require('express');
 const router = Router();
 const iptvOrg = require('../lib/iptvOrg');
 const m3uClient = require('../lib/m3uClient');
+const xtreamClient = require('../lib/xtreamClient');
 const catalogMerge = require('../lib/catalogMerge');
+const profileIds = require('../lib/profileIds');
 
-const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const MAX_CONTINUE_WATCHING = 50;
 
 // W17-PURGE: catalog lookups walk the real provider caches via the merged
@@ -72,6 +73,14 @@ var favorites       = {
 };
 var continueWatching = { dave_tv: [], mom_tv: [] };
 
+function _ensureProfileState(profileId) {
+  if (!profileId) { return; }
+  if (!watchedEpisodes[profileId]) { watchedEpisodes[profileId] = new Set(); }
+  if (!watchedMovies[profileId]) { watchedMovies[profileId] = new Set(); }
+  if (!favorites[profileId]) { favorites[profileId] = { series: new Set(), movies: new Set() }; }
+  if (!continueWatching[profileId]) { continueWatching[profileId] = []; }
+}
+
 function _findItem(itemId) {
   var items = _allItems();
   for (var i = 0; i < items.length; i++) {
@@ -82,59 +91,53 @@ function _findItem(itemId) {
 
 function _requireProfile(req, res) {
   const profileId = (req.body && req.body.profile_id) || (req.query && req.query.profile_id);
-  if (!profileId || !VALID_PROFILES.includes(profileId)) {
+  if (!profileId || !profileIds.isValidProfileId(profileId)) {
     res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id is required and must be one of: ' + VALID_PROFILES.join(', '),
+      message: 'profile_id is required. ' + profileIds.profileValidationMessage(),
     });
     return null;
   }
+  _ensureProfileState(profileId);
   return profileId;
 }
 
-// Synthesise season+episode structure for a series item. Real Zero data comes
-// from the Xtream Codes `get_series_info` response which lists every episode
-// with season/episode numbers + watch position. We pre-compute a deterministic
-// structure based on item.metadata.season_count / episode_count so the
-// "next episode" pointer + bulk-mark calls have something coherent to operate
-// on until Threadfin/Xtream is wired.
-function _synthesizeEpisodes(seriesItem) {
-  const meta = seriesItem.metadata || {};
-  const seasonCount = meta.season_count || 2;
-  const episodeCount = meta.episode_count || 8;
-  const out = [];
-  for (var s = 1; s <= seasonCount; s++) {
-    for (var e = 1; e <= episodeCount; e++) {
-      const ss = s < 10 ? '0' + s : String(s);
-      const ee = e < 10 ? '0' + e : String(e);
-      out.push({
-        episode_id: seriesItem.id + '-s' + ss + 'e' + ee,
-        series_id: seriesItem.id,
-        season: s,
-        episode: e,
-        title: 'S' + ss + 'E' + ee,
-        runtime_min: 45,
-      });
-    }
+async function _episodesForItem(seriesItem) {
+  if (!seriesItem || typeof seriesItem.id !== 'string') { return []; }
+  if (seriesItem.id.indexOf('xtream-') === 0) {
+    return xtreamClient.getSeriesEpisodesForItemId(seriesItem.id);
   }
-  return out;
+  return [];
+}
+
+function _seasonCountFromEpisodes(episodes, item) {
+  if (Array.isArray(episodes) && episodes.length > 0) {
+    var seen = {};
+    episodes.forEach(function(ep) {
+      if (ep && ep.season != null) { seen[String(ep.season)] = true; }
+    });
+    return Object.keys(seen).length;
+  }
+  var meta = item && item.metadata ? item.metadata : {};
+  return meta.season_count || meta.seasons || null;
 }
 
 // ─── GET /api/series ─────────────────────────────────────────────────────────
 // Maps to: xtream_list_series
 router.get('/api/series', (req, res) => {
   const profileId = req.query.profile_id;
-  if (profileId !== undefined && !VALID_PROFILES.includes(profileId)) {
+  if (profileId !== undefined && !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
+  _ensureProfileState(profileId);
 
   var series = _allItems().filter(function(i) { return i && i.type === 'series'; });
   if (profileId) {
     series = series.filter(function(i) {
-      return !i.profile_access || i.profile_access.indexOf(profileId) !== -1;
+      return profileIds.itemVisibleToProfile(i, profileId);
     });
   }
 
@@ -156,20 +159,27 @@ router.get('/api/series', (req, res) => {
 });
 
 // ─── GET /api/series/:seriesId ───────────────────────────────────────────────
-router.get('/api/series/:seriesId', (req, res) => {
+router.get('/api/series/:seriesId', async (req, res) => {
   const item = _findItem(req.params.seriesId);
   if (!item || item.type !== 'series') {
     return res.status(404).json({ error: 'series_not_found', series_id: req.params.seriesId });
   }
   const profileId = req.query.profile_id;
-  if (profileId !== undefined && !VALID_PROFILES.includes(profileId)) {
+  if (profileId !== undefined && !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
+  _ensureProfileState(profileId);
 
-  const episodes = _synthesizeEpisodes(item);
+  let episodes = [];
+  try {
+    episodes = await _episodesForItem(item);
+  } catch (err) {
+    console.warn('[series] episode metadata fetch failed: ' + (err && err.message ? err.message : 'unknown'));
+    episodes = [];
+  }
   const watchedSet = profileId ? watchedEpisodes[profileId] : new Set();
   const episodesWithState = episodes.map(function(ep) {
     return { ...ep, viewed: watchedSet.has(ep.episode_id) };
@@ -182,31 +192,48 @@ router.get('/api/series/:seriesId', (req, res) => {
       type: item.type,
       poster_url: item.poster_url,
       category: item.category,
-      season_count: (item.metadata && item.metadata.season_count) || 2,
+      season_count: _seasonCountFromEpisodes(episodes, item),
       episode_count: episodes.length,
       favorite: profileId ? favorites[profileId].series.has(item.id) : false,
     },
     episodes: episodesWithState,
-    _meta: { source: 'providers', profile_filter: profileId || null },
+    _meta: {
+      source: 'providers',
+      episode_source: episodes.length > 0 ? 'provider' : 'unavailable',
+      profile_filter: profileId || null,
+    },
   });
 });
 
 // ─── GET /api/series/:seriesId/next-episode ──────────────────────────────────
 // Returns the first un-viewed episode for the given series + profile.
-router.get('/api/series/:seriesId/next-episode', (req, res) => {
+router.get('/api/series/:seriesId/next-episode', async (req, res) => {
   const item = _findItem(req.params.seriesId);
   if (!item || item.type !== 'series') {
     return res.status(404).json({ error: 'series_not_found' });
   }
   const profileId = req.query.profile_id;
-  if (!profileId || !VALID_PROFILES.includes(profileId)) {
+  if (!profileId || !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id is required and must be one of: ' + VALID_PROFILES.join(', '),
+      message: 'profile_id is required. ' + profileIds.profileValidationMessage(),
     });
   }
+  _ensureProfileState(profileId);
 
-  const episodes = _synthesizeEpisodes(item);
+  let episodes = [];
+  try {
+    episodes = await _episodesForItem(item);
+  } catch (_) {
+    episodes = [];
+  }
+  if (episodes.length === 0) {
+    return res.status(503).json({
+      error: 'episode_metadata_unavailable',
+      message: 'This provider did not return playable episode metadata for the selected series.',
+      series_id: item.id,
+    });
+  }
   const watchedSet = watchedEpisodes[profileId];
   const next = episodes.find(function(ep) { return !watchedSet.has(ep.episode_id); });
 
@@ -313,7 +340,7 @@ router.post('/api/movies/:movieId/watched', (req, res) => {
   const profileId = _requireProfile(req, res);
   if (!profileId) { return; }
   const item = _findItem(req.params.movieId);
-  if (!item || item.type !== 'vod') {
+  if (!item || (item.type !== 'vod' && item.type !== 'movie')) {
     return res.status(404).json({ error: 'movie_not_found' });
   }
   watchedMovies[profileId].add(item.id);
@@ -330,7 +357,7 @@ router.post('/api/movies/:movieId/favorite', (req, res) => {
   const profileId = _requireProfile(req, res);
   if (!profileId) { return; }
   const item = _findItem(req.params.movieId);
-  if (!item || item.type !== 'vod') {
+  if (!item || (item.type !== 'vod' && item.type !== 'movie')) {
     return res.status(404).json({ error: 'movie_not_found' });
   }
   const set = favorites[profileId].movies;
@@ -350,12 +377,13 @@ router.post('/api/movies/:movieId/favorite', (req, res) => {
 // ─── GET /api/continue-watching ──────────────────────────────────────────────
 router.get('/api/continue-watching', (req, res) => {
   const profileId = req.query.profile_id;
-  if (!profileId || !VALID_PROFILES.includes(profileId)) {
+  if (!profileId || !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id is required and must be one of: ' + VALID_PROFILES.join(', '),
+      message: 'profile_id is required. ' + profileIds.profileValidationMessage(),
     });
   }
+  _ensureProfileState(profileId);
   const items = continueWatching[profileId].map(function(entry) {
     const meta = _findItem(entry.item_id);
     return {
@@ -420,12 +448,13 @@ router.post('/api/continue-watching', (req, res) => {
 // ─── DELETE /api/continue-watching/:itemId ───────────────────────────────────
 router.delete('/api/continue-watching/:itemId', (req, res) => {
   const profileId = (req.body && req.body.profile_id) || req.query.profile_id;
-  if (!profileId || !VALID_PROFILES.includes(profileId)) {
+  if (!profileId || !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id is required and must be one of: ' + VALID_PROFILES.join(', '),
+      message: 'profile_id is required. ' + profileIds.profileValidationMessage(),
     });
   }
+  _ensureProfileState(profileId);
   const before = continueWatching[profileId].length;
   continueWatching[profileId] = continueWatching[profileId].filter(function(x) { return x.item_id !== req.params.itemId; });
   const removed = before - continueWatching[profileId].length;

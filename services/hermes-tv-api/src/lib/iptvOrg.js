@@ -201,7 +201,6 @@ function _mapChannelToItem(channel, streamsByChannel, logosByChannel) {
     provider: 'iptv-org',
     category: category,
     logo_url: _bestLogo(channel.id, channel, logosByChannel),
-    profile_access: ['dave_tv', 'mom_tv'],
     providers: [
       {
         provider_id: 'iptv-org',

@@ -40,14 +40,22 @@ services:
   hermes-tv-api:
     image: node:20-alpine
     working_dir: /app
-    volumes: ['./hermes-tv-api:/app:ro']
     command: node src/index.js
     environment:
       NODE_ENV: production
       # Phase 1.5: 3001 → 3011 — VPS port 3001 already bound by Dave's
       # next-server. See docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md.
       PORT: '3011'
+      HERMES_SETTINGS_STORE: /var/lib/hermestv/settings.json
+      HERMES_PROVIDER_DATA_DIR: /var/lib/hermestv/providers
+      DAVETV_AUTH_STORE: /var/lib/hermestv/auth.json
+      IPTV_ORG_ENABLED: 'true'
+      IPTV_ORG_CACHE_DIR: /var/cache/iptv-org
       # Credentials injected at runtime — never in image or compose file
+    volumes:
+      - './hermes-tv-api:/app:ro'
+      - hermestv-data:/var/lib/hermestv
+      - hermestv-iptv-org-cache:/var/cache/iptv-org
     # Phase 2: bind 127.0.0.1:3011 so host nginx can reach us. 127.0.0.1
     # only — never 0.0.0.0 — the public internet must go through host nginx.
     ports:
@@ -90,6 +98,8 @@ networks:
   # and Caddy is gone (host nginx is the edge).
 
 volumes:
+  hermestv-data:
+  hermestv-iptv-org-cache:
   postgres-data:
   redis-data:
   # caddy-data and caddy-config volumes removed in Phase 2 (Caddy gone).

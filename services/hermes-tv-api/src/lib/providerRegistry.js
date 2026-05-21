@@ -174,10 +174,11 @@ function _diskRowsFull() {
       // epg_url / enabled / created_at / last_test / last_error.
       // We add a synthetic provider_id used by catalog merge so multiple disk
       // rows of the same kind ("two xtremehd M3Us") still collapse correctly.
-      var providerId = r.type === 'm3u'    ? ('m3u-' + r.id) :
-                       r.type === 'xtream' ? ('xtream-' + r.id) :
-                       r.type === 'stalker' ? ('stalker-' + r.id) :
-                       r.type;
+      var providerId = r.provider_id ||
+                       (r.type === 'm3u'    ? ('m3u-' + r.id) :
+                        r.type === 'xtream' ? ('xtream-' + r.id) :
+                        r.type === 'stalker' ? ('stalker-' + r.id) :
+                        r.type);
       return {
         id: r.id,
         type: r.type,

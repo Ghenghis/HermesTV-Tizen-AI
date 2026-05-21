@@ -34,11 +34,13 @@ const FORBIDDEN_PATTERNS = [
   /AZURE_TTS_KEY/i,                   // Azure TTS subscription key env var name
   /DEEPSEEK_API_KEY/i,                // DeepSeek API key env var name
   /api[_\-]?key\s*[:=]/i,            // Generic API key assignment
+  /[?&]api[_\-]?key=/i,              // Generic API key query string
   /password\s*[:=]/i,                 // Generic password assignment
   /bearer\s+[A-Za-z0-9\-._~+/]+=*/i, // Bearer token value
   /m3u_plus/i,                        // Xtream Codes flag-laden URL marker (added 2026-05-21 / HANDOFF #7)
   /sk-[A-Za-z0-9_\-]{20,}/i,         // OpenAI-style key prefix (added 2026-05-21 / HANDOFF #7)
   /Ocp-Apim-Subscription-Key/i,       // Azure Speech subscription header (added 2026-05-21 / HANDOFF #7)
+  /X-Emby-Token/i,                    // Jellyfin API token header
 ];
 
 /**

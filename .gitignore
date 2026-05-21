@@ -74,6 +74,7 @@ docs/research/vps-phase-1-audit-RUN-*.md
 # These are produced on every test run and never belong in source control.
 tests/playwright/test-results/
 tests/playwright/report/
+tests/playwright/.auth/
 
 # Wave-20: operator provider credentials live in the API container's writable
 # data/ volume — never committed to git. The lib/providerStore.js write path

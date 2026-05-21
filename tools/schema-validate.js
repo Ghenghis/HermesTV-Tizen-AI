@@ -243,11 +243,18 @@ if (fs.existsSync(playlistsRoutePath) && fs.existsSync(apiIndexPath)) {
   } else {
     fail('playlists name sanitiser missing (must strip <>, script tokens)');
   }
-  // Xtream / Stalker stubs MUST return 501 with explicit not_implemented
-  if (routeText.indexOf("'not_implemented'") !== -1 && routeText.indexOf('501') !== -1) {
-    pass('playlists Xtream/Stalker stubs return 501 not_implemented');
+  // Real provider saves must be durable. URL + Xtream saves are mirrored into
+  // providerStore and return a persisted_provider_id; file uploads are rejected
+  // as not_durable instead of pretending an in-memory row survived restart.
+  if (
+    routeText.indexOf('providerStore.add') !== -1 &&
+    routeText.indexOf('persisted_provider_id') !== -1 &&
+    routeText.indexOf("'provider_persist_failed'") !== -1 &&
+    routeText.indexOf("'not_durable'") !== -1
+  ) {
+    pass('playlists URL/Xtream saves require durable provider persistence');
   } else {
-    fail('playlists Xtream/Stalker stubs missing 501 not_implemented');
+    fail('playlists durable provider persistence guard missing');
   }
 } else {
   fail('routes/playlists.js or index.js not found');

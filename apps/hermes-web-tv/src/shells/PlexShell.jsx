@@ -424,9 +424,9 @@ function PlexShell(props) {
           fontScale={fontScale}
           catalog={filtered}
         />
-        <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, capForProfile(profile, 4))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
-        <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, capForProfile(profile, 10))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
-        <GridSection title="Series" items={series.length > 0 ? series : filtered.slice(4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="On Now" items={liveItems} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="Movies" items={movies} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        <GridSection title="Series" items={series} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
         <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, capForProfile(profile, 8))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
 
         {filtered.length === 0 && (

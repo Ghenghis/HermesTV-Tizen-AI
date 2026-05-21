@@ -25,7 +25,7 @@ var ALLOWED_ACTIONS = [
   'reset_filters',
 ];
 
-var VALID_PROFILE_IDS = ['dave_tv', 'mom_tv'];
+var PROFILE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 // 26-char ULID-like: 01J... or similar — must be exactly 26 alphanumeric chars
 var COMMAND_ID_PATTERN = /^[0-9A-Za-z]{26}$/;
@@ -45,8 +45,8 @@ function validateCommand(envelope) {
     errors.push('action "' + envelope.action + '" is not in the allowed action list');
   }
 
-  if (!envelope.profile_id || VALID_PROFILE_IDS.indexOf(envelope.profile_id) === -1) {
-    errors.push('profile_id must be "dave_tv" or "mom_tv", got: ' + envelope.profile_id);
+  if (!envelope.profile_id || !PROFILE_ID_PATTERN.test(String(envelope.profile_id))) {
+    errors.push('profile_id must be a safe DaveTV profile id');
   }
 
   if (!envelope.command_id || !COMMAND_ID_PATTERN.test(envelope.command_id)) {

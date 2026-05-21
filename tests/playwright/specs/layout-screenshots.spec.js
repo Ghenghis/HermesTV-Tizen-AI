@@ -20,7 +20,7 @@ test.beforeAll(() => {
   }
 });
 
-test.describe('HermesTV Layout Visual Verification', () => {
+test.describe('DaveTV Layout Visual Verification', () => {
 
   test.beforeEach(async ({ page }) => {
     const consoleErrors = [];
@@ -40,16 +40,16 @@ test.describe('HermesTV Layout Visual Verification', () => {
       await profileButtons.first().click();
     }
 
-    await page.waitForSelector('text=HermesTV', { timeout: 10000 });
+    await page.waitForSelector('text=DaveTV', { timeout: 10000 });
   });
 
   for (const layout of LAYOUTS) {
     test(`renders ${layout.label} layout without console errors`, async ({ page }) => {
-      const lookButton = page.locator('button').filter({ hasText: /Look/i }).first();
-      await lookButton.click();
+      const viewButton = page.locator('button').filter({ hasText: /View/i }).first();
+      await viewButton.click();
       await page.waitForTimeout(400);
 
-      const modal = page.locator('text=Choose Your Look').first();
+      const modal = page.locator('text=Choose Your View').first();
       await expect(modal).toBeVisible({ timeout: 5000 });
 
       const layoutButton = page.locator('button', { hasText: layout.label }).filter({ hasText: /(EPG|Cinematic|Library|Minimal|Samsung Smart TV|Senior|Dense)/i }).first();
@@ -69,17 +69,17 @@ test.describe('HermesTV Layout Visual Verification', () => {
     });
   }
 
-  test('layout switcher opens via "Look" button', async ({ page }) => {
+  test('layout switcher opens via "View" button', async ({ page }) => {
     // Note: Ctrl+L is the documented shortcut but Chromium intercepts it for
     // address-bar focus before the page sees it (even headless). The Look
     // button is the visible UI affordance and exercises the same handler.
-    await page.locator('button').filter({ hasText: /Look/i }).first().click();
-    const modal = page.locator('text=Choose Your Look').first();
+    await page.locator('button').filter({ hasText: /View/i }).first().click();
+    const modal = page.locator('text=Choose Your View').first();
     await expect(modal).toBeVisible({ timeout: 3000 });
   });
 
   test('chatbot "show movies" command runs without errors', async ({ page }) => {
-    const chatbotToggle = page.locator('button').filter({ hasText: /Hermes|💬|Chat/i }).first();
+    const chatbotToggle = page.locator('button').filter({ hasText: /DaveTV|Chat/i }).first();
     if (await chatbotToggle.count() > 0) {
       await chatbotToggle.click();
       await page.waitForTimeout(300);

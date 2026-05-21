@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const router = Router();
+const authStore = require('../lib/authStore');
+const profileIds = require('../lib/profileIds');
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
@@ -62,11 +64,94 @@ const profileStore = {
   mom_tv: { ...PROFILES.mom_tv },
 };
 
+function profileIdForDisplayName(name) {
+  var raw = String(name || '').trim();
+  if (/^dave$/i.test(raw)) { return 'dave_tv'; }
+  if (/^(sherri|mom)$/i.test(raw)) { return 'mom_tv'; }
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+}
+
+function baseProfileForUser(user) {
+  var name = (user && user.display_name) || '';
+  var id = profileIdForDisplayName(name);
+  if (id === 'dave_tv') { return { ...PROFILES.dave_tv }; }
+  if (id === 'mom_tv') { return { ...PROFILES.mom_tv }; }
+  return {
+    profile_id: id,
+    display_name: name || id,
+    tv_model: 'UN55CU8000BXZA',
+    tier: 'degraded',
+    is_primary_target: false,
+    mom_mode: false,
+    active_layout: 'grid-standard',
+    active_theme: 'night-blue',
+    font_scale: 1.1,
+    reduced_motion: false,
+    audio_feedback: false,
+    agent_name: 'DaveTV',
+    agent_voice: 'azure-en-us-guy-neural',
+    display_size_inches: 55,
+    quality_preference: {
+      resolution_floor: '720p',
+      prefer_4k: false,
+      hdr_preferred: false,
+      bitrate_floor_kbps: 2000,
+    },
+  };
+}
+
+function ensureProfile(id) {
+  if (profileStore[id]) { return profileStore[id]; }
+  try {
+    var users = authStore.listUsers();
+    for (var i = 0; i < users.length; i++) {
+      var u = users[i];
+      if (profileIdForDisplayName(u && u.display_name) === id) {
+        profileStore[id] = baseProfileForUser(u);
+        return profileStore[id];
+      }
+    }
+  } catch (_) {}
+  if (!profileIds.isValidProfileId(id)) { return null; }
+  profileStore[id] = {
+    ...baseProfileForUser({ display_name: id }),
+    profile_id: id,
+    display_name: id,
+  };
+  return profileStore[id];
+}
+
+function listProfiles() {
+  var seen = {};
+  var out = [];
+  function add(profile) {
+    if (!profile || !profile.profile_id || seen[profile.profile_id]) { return; }
+    seen[profile.profile_id] = true;
+    out.push(profile);
+  }
+  add(ensureProfile('dave_tv'));
+  add(ensureProfile('mom_tv'));
+  try {
+    var users = authStore.listUsers();
+    for (var i = 0; i < users.length; i++) {
+      var id = profileIdForDisplayName(users[i] && users[i].display_name);
+      add(ensureProfile(id));
+    }
+  } catch (_) {}
+  Object.keys(profileStore).sort().forEach(function(id) { add(profileStore[id]); });
+  return out;
+}
+
 // GET /api/profiles — list all profiles (TV-safe metadata only)
 router.get('/api/profiles', (req, res) => {
+  var profiles = listProfiles();
   res.json({
-    profiles: VALID_PROFILES.map((id) => profileStore[id]),
-    total: VALID_PROFILES.length,
+    profiles: profiles,
+    total: profiles.length,
   });
 });
 
@@ -74,14 +159,15 @@ router.get('/api/profiles', (req, res) => {
 router.get('/api/profile/:id', (req, res) => {
   const { id } = req.params;
 
-  if (!VALID_PROFILES.includes(id)) {
+  const profile = ensureProfile(id);
+  if (!profile) {
     return res.status(404).json({
       error: 'not_found',
-      message: `Profile '${id}' does not exist. Valid profiles: dave_tv, mom_tv`,
+      message: profileIds.profileValidationMessage(),
     });
   }
 
-  res.json(profileStore[id]);
+  res.json(profile);
 });
 
 // Fields the management modal is allowed to update via PATCH. Anything not in
@@ -106,10 +192,11 @@ const PATCHABLE_FIELDS = [
 ];
 
 function applyProfilePatch(id, updates, res) {
-  if (!VALID_PROFILES.includes(id)) {
+  var existing = ensureProfile(id);
+  if (!existing) {
     return res.status(404).json({
       error: 'not_found',
-      message: `Profile '${id}' does not exist. Valid profiles: dave_tv, mom_tv`,
+      message: profileIds.profileValidationMessage(),
     });
   }
 
@@ -205,7 +292,7 @@ function applyProfilePatch(id, updates, res) {
   }
 
   // Apply partial update in-memory
-  profileStore[id] = { ...profileStore[id], ...filtered };
+  profileStore[id] = { ...existing, ...filtered, profile_id: id };
 
   return res.json(profileStore[id]);
 }

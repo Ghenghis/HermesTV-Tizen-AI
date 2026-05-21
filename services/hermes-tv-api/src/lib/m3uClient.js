@@ -352,7 +352,6 @@ function _mapToHermes(cacheKey, providerId, parsed) {
       provider: providerId,
       category: _normaliseCategory(group),
       logo_url: logo,
-      profile_access: ['dave_tv', 'mom_tv'],
       providers: [{
         provider_id: providerId,
         source_id: tvgId || localId,

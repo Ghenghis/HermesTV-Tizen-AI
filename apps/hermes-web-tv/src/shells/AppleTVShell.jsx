@@ -366,8 +366,8 @@ function AppleTVShell(props) {
         <div style={{ paddingTop: '24px' }}>
           <HScrollRow title="Up Next" items={filtered} onItemSelect={onItemSelect} cardW={240} cardH={135} fontScale={fontScale} profile={profile} tier={tier} />
           <HScrollRow title="Trending Now" items={filtered.slice(2)} onItemSelect={onItemSelect} cardW={240} cardH={135} fontScale={fontScale} profile={profile} tier={tier} />
-          <HScrollRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(3)} onItemSelect={onItemSelect} cardW={130} cardH={195} fontScale={fontScale} profile={profile} tier={tier} />
-          <HScrollRow title="Live Channels" items={liveItems.length > 0 ? liveItems : filtered.slice(1)} onItemSelect={onItemSelect} cardW={240} cardH={135} fontScale={fontScale} profile={profile} tier={tier} />
+          <HScrollRow title="Movies" items={movies} onItemSelect={onItemSelect} cardW={130} cardH={195} fontScale={fontScale} profile={profile} tier={tier} />
+          <HScrollRow title="Live Channels" items={liveItems} onItemSelect={onItemSelect} cardW={240} cardH={135} fontScale={fontScale} profile={profile} tier={tier} />
         </div>
 
         <footer style={{ textAlign: 'center', padding: '24px', fontSize: 'calc(11px * ' + fontScale + ')', color: '#9fa0a6' }}>DaveTV</footer>

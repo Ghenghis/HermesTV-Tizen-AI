@@ -3,8 +3,8 @@
 Generated: 2026-05-20
 
 Status: BINDING for all Claude/Codex/agent work that uses
-`G:\Github\IPTV-Apps` as evidence, source material, or implementation
-guidance.
+`G:\Github\IPTV-Apps` or `G:\Github\IPTV-web` as evidence, source material,
+or implementation guidance.
 
 This contract extends:
 
@@ -18,21 +18,38 @@ HermesTV test, implementation, and proof artifact.
 
 ## Reference App License Boundary
 
-Use this rule before copying source:
+Use this rule before copying source. Dave accepts upstream license obligations
+for private DaveTV work, but each app's actual license still controls what can
+be copied, modified, redistributed, hosted, or run as-is.
 
 - `G:\Github\IPTV-Apps\iptvnator` is MIT. Code can be adapted if attribution
   and license obligations are preserved. Highest value: Xtream mock server,
   route/test shapes, EPG progress, playback diagnostics.
 - `G:\Github\IPTV-Apps\Extreme-InfiniTV` is GPL-3.0-or-later. Port behavior,
-  tests, and contracts unless the project intentionally accepts GPL obligations.
-- `G:\Github\IPTV-Apps\ynotv` is AGPL-3.0. Use as architecture reference only
-  unless the project intentionally accepts AGPL obligations.
+  tests, and contracts by default. Direct source adoption is allowed only if the
+  adopted files are tracked through `docs/53_UPSTREAM_VIEW_PACK_CONTRACT.md`,
+  the GPL license text is preserved, source availability obligations are
+  accepted, and the adoption is explicitly labeled in attribution.
+- `G:\Github\IPTV-Apps\ynotv` is AGPL-3.0. Use as architecture reference by
+  default. Direct source adoption is allowed only if the adopted files are
+  tracked through `docs/53_UPSTREAM_VIEW_PACK_CONTRACT.md`, AGPL network-source
+  obligations are accepted, and hosted DaveTV users can receive the required
+  source.
 - `G:\Github\IPTV-Apps\NuvioWeb` does not present a settled project license in
   README. Use as wrapper/build/pattern reference only. Its vendored QR library
   states MIT in the file header.
 
-No agent may paste GPL/AGPL/uncleared source into HermesTV and call the task
-done.
+No agent may paste licensed or uncleared source into DaveTV and call the task
+done. Source adoption requires a manifest entry, license attribution, tests,
+and proof. If a license forbids modification or redistribution, or no license
+is present, agents may study the app, run it unmodified as local tooling, or
+rebuild the idea in DaveTV style, but must not modify/paste that source into
+DaveTV.
+
+For the 25-app `G:\Github\IPTV-web` adoption lane, use:
+
+- `docs/53_UPSTREAM_VIEW_PACK_CONTRACT.md`
+- `upstream/web-apps/IPTV_WEB_25_VIEW_PACK_MANIFEST.md`
 
 ## E2E Means The Whole Chain
 

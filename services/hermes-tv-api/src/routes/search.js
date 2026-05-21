@@ -23,8 +23,8 @@ const router = Router();
 const iptvOrg = require('../lib/iptvOrg');
 const m3uClient = require('../lib/m3uClient');
 const catalogMerge = require('../lib/catalogMerge');
+const profileIds = require('../lib/profileIds');
 
-const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const MAX_RESULTS = 100;
 
 // W17-PURGE: search now walks real provider caches via the last merged
@@ -83,7 +83,7 @@ function _scoreItem(item, query) {
 function _filterByProfile(items, profileId) {
   if (!profileId) { return items; }
   return items.filter(function(i) {
-    return !i.profile_access || i.profile_access.indexOf(profileId) !== -1;
+    return profileIds.itemVisibleToProfile(i, profileId);
   });
 }
 
@@ -123,10 +123,10 @@ router.get('/api/search', (req, res) => {
       message: 'q query parameter is required (>= 2 chars)',
     });
   }
-  if (profileId !== undefined && !VALID_PROFILES.includes(profileId)) {
+  if (profileId !== undefined && !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
   const VALID_TYPES = ['live', 'vod', 'series'];
@@ -174,10 +174,10 @@ router.get('/api/search/actor/:actorId', (req, res) => {
   const actorId = req.params.actorId;
   const profileId = req.query.profile_id;
 
-  if (profileId !== undefined && !VALID_PROFILES.includes(profileId)) {
+  if (profileId !== undefined && !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
 
@@ -209,10 +209,10 @@ router.get('/api/search/category/:category', (req, res) => {
   const category = req.params.category;
   const profileId = req.query.profile_id;
 
-  if (profileId !== undefined && !VALID_PROFILES.includes(profileId)) {
+  if (profileId !== undefined && !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
 

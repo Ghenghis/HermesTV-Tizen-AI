@@ -81,19 +81,15 @@ function _buildGroups(items) {
   return list;
 }
 
-// Cheap "now / next" derivation. Real EPG is stitched in by epg.js routes
-// downstream; this is just the fallback for shells that need to render
-// program text immediately. Items may carry `metadata.epg_now / epg_next`
-// from a hydrated provider; if not, we synthesise a placeholder so the
-// row still aligns visually.
+// Cheap "now / next" derivation. Items may carry provider EPG metadata;
+// otherwise the shell renders an honest no-guide state.
 function _nowProgram(item) {
   if (item && item.metadata) {
     if (item.metadata.epg_now) { return item.metadata.epg_now; }
     if (item.metadata.program) { return item.metadata.program; }
   }
-  if (isLive(item)) { return 'Live programming'; }
   if (item && item.title) { return item.title; }
-  return '—';
+  return 'No guide data';
 }
 function _nextProgram(item) {
   if (item && item.metadata && item.metadata.epg_next) { return item.metadata.epg_next; }

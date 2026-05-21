@@ -154,8 +154,8 @@ function CatalogGrid(props) {
 
   // Filter by profile access
   filtered = filtered.filter(function(item) {
-    var access = item.profile_access || [];
-    return !profileId || access.indexOf(profileId) !== -1;
+    var access = item.profile_access;
+    return !profileId || !Array.isArray(access) || access.indexOf(profileId) !== -1;
   });
 
   // When grouping is on, sort items so same-provider entries are contiguous

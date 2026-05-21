@@ -25,12 +25,8 @@ import CategorySidebar from '../components/CategorySidebar.jsx';
 //     current "Now" programme, and a play button. Falls back to a calm
 //     gradient and the chosen-name greeting copy when nothing is focused.
 //   - Bottom strip (50 px, `position: relative` — Tizen webview is unreliable
-//     with `position: fixed`): current-channel chip, transport controls
-//     (prev / pause / next / volume) and the external-player chooser:
-//     "🎬 mpv", "🔵 VLC", "📺 In-app". Only In-app is active; mpv/VLC show a
-//     tooltip explaining external player support is a v2 follow-up. Transport
-//     buttons console.log for now — wiring into the player surface is a
-//     follow-up task because it touches the playback layer outside the shell.
+//     with `position: fixed`): current-channel chip, working prev / play /
+//     next controls, and the active in-app player indicator.
 //
 // All copy is DaveTV branding — never reference "iptvnator" in user-visible
 // strings.
@@ -51,19 +47,13 @@ var COLOR_MUTED = '#8b949e';
 var COLOR_ACCENT = '#26a69a';
 var COLOR_ACCENT_DIM = 'rgba(38, 166, 154, 0.18)';
 
-// External player chooser modes. We keep all three visible because IPTV
-// power-users (Dave) recognise the affordance from desktop players. Only
-// in-app is functional today; mpv/VLC are a v2 follow-up. The labels carry
-// no third-party copy that would imply a partnership.
 var PLAYER_MODES = [
-  { id: 'mpv', icon: '🎬', label: 'mpv', external: true },
-  { id: 'vlc', icon: '🔵', label: 'VLC', external: true },
-  { id: 'inapp', icon: '📺', label: 'In-app', external: false },
+  { id: 'inapp', icon: '📺', label: 'In-app' },
 ];
 
 // ─── Sidebar inventory ───────────────────────────────────────────────────────
 // Top-level rail items. EPG and Settings link to the same surfaces the rest of
-// the app uses (today they're stubs the wider shell engine swaps in).
+// the app uses.
 function _buildRailSections(counts) {
   return [
     { id: 'playlists', icon: '☰', label: 'Playlists', count: counts.playlists },
@@ -93,7 +83,7 @@ function _isRadio(item) {
 //
 // Channels with no guide data render an empty programme line; the user can
 // still see the channel itself + the channel number. Replacing the seeded
-// placeholder with REAL provider EPG aligns this shell with LiveTVShell's
+// fallback with REAL provider EPG aligns this shell with LiveTVShell's
 // honest empty-state contract.
 function _currentProgrammeText(channel, nowByChannelId) {
   if (!channel || !nowByChannelId) { return ''; }
@@ -186,10 +176,6 @@ function IptvnatorShell(props) {
   var playerMode = playerModeState[0];
   var setPlayerMode = playerModeState[1];
 
-  var tooltipState = React.useState(null);
-  var tooltipPlayer = tooltipState[0];
-  var setTooltipPlayer = tooltipState[1];
-
   // Category quick-filter — chips render as a horizontal strip above the
   // channel list (existing left rail keeps its Playlists/Favorites/Recent
   // sections). 'all' = no filter; otherwise the slug must match the
@@ -256,29 +242,38 @@ function IptvnatorShell(props) {
   };
   var rail = _buildRailSections(railCounts);
 
-  // ─── Player-mode click handler ─────────────────────────────────────────────
-  // Only "inapp" actually flips the mode. The other two surface a tooltip we
-  // auto-dismiss after 2.5s so the explanation doesn't linger.
   function _onPlayerMode(mode) {
     if (mode.id === 'inapp') {
       setPlayerMode('inapp');
-      setTooltipPlayer(null);
-      return;
     }
-    setTooltipPlayer(mode.id);
-    // Auto-dismiss
-    setTimeout(function() {
-      setTooltipPlayer(function(curr) { return curr === mode.id ? null : curr; });
-    }, 2500);
   }
 
-  // ─── Transport — stubs ─────────────────────────────────────────────────────
-  // Real wiring touches the playback surface (outside this shell). We log so
-  // future agents can grep for the integration point.
-  function _logTransport(action) {
-    try {
-      console.log('[IptvnatorShell] transport: ' + action + ' (stub — wire into player surface in follow-up)');
-    } catch (e) { /* ignore */ }
+  function _selectVisibleChannel(offset) {
+    if (!visibleChannels || visibleChannels.length === 0) { return; }
+    var currentIndex = 0;
+    if (focusedChannel) {
+      for (var i = 0; i < visibleChannels.length; i++) {
+        if (visibleChannels[i] && visibleChannels[i].id === focusedChannel.id) {
+          currentIndex = i;
+          break;
+        }
+      }
+    }
+    var nextIndex = currentIndex + offset;
+    if (nextIndex < 0) { nextIndex = visibleChannels.length - 1; }
+    if (nextIndex >= visibleChannels.length) { nextIndex = 0; }
+    var next = visibleChannels[nextIndex];
+    if (!next) { return; }
+    setFocusedChannel(next);
+    if (typeof onItemSelect === 'function') { onItemSelect(next); }
+  }
+
+  function _handleTransport(action) {
+    if (action === 'prev') { _selectVisibleChannel(-1); return; }
+    if (action === 'next') { _selectVisibleChannel(1); return; }
+    if (action === 'play' && focusedChannel && typeof onItemSelect === 'function') {
+      onItemSelect(focusedChannel);
+    }
   }
 
   var focusedTitle = focusedChannel ? (focusedChannel.title || 'Untitled') : '';
@@ -862,16 +857,15 @@ function IptvnatorShell(props) {
             { id: 'prev', label: 'Previous channel', glyph: '⏮' },
             { id: 'play', label: 'Play / pause', glyph: '⏯' },
             { id: 'next', label: 'Next channel', glyph: '⏭' },
-            { id: 'vol', label: 'Volume', glyph: '🔊' },
           ].map(function(btn) {
             return (
               <button
                 key={btn.id}
                 tabIndex={0}
                 aria-label={btn.label}
-                onClick={function() { _logTransport(btn.id); }}
+                onClick={function() { _handleTransport(btn.id); }}
                 onKeyDown={function(e) {
-                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _logTransport(btn.id); }
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _handleTransport(btn.id); }
                 }}
                 style={{
                   width: '34px',
@@ -910,7 +904,6 @@ function IptvnatorShell(props) {
         >
           {PLAYER_MODES.map(function(mode) {
             var isActive = playerMode === mode.id;
-            var isTooltipped = tooltipPlayer === mode.id;
             return (
               <div key={mode.id} style={{ position: 'relative' }}>
                 <button
@@ -929,7 +922,7 @@ function IptvnatorShell(props) {
                     background: isActive ? COLOR_ACCENT_DIM : 'transparent',
                     border: '1px solid ' + (isActive ? COLOR_ACCENT : COLOR_BORDER),
                     borderRadius: '6px',
-                    color: mode.external ? COLOR_MUTED : COLOR_TEXT,
+                    color: COLOR_TEXT,
                     cursor: 'pointer',
                     fontSize: 'calc(0.68rem * var(--font-scale, 1))',
                     fontWeight: 600,
@@ -941,28 +934,6 @@ function IptvnatorShell(props) {
                   <span aria-hidden="true">{mode.icon}</span>
                   <span>{mode.label}</span>
                 </button>
-                {isTooltipped && (
-                  <div
-                    role="tooltip"
-                    style={{
-                      position: 'absolute',
-                      bottom: 'calc(100% + 6px)',
-                      right: 0,
-                      width: '220px',
-                      padding: '0.5rem 0.6rem',
-                      background: COLOR_BG,
-                      border: '1px solid ' + COLOR_ACCENT,
-                      borderRadius: '6px',
-                      color: COLOR_TEXT,
-                      fontSize: 'calc(0.65rem * var(--font-scale, 1))',
-                      lineHeight: 1.4,
-                      boxShadow: '0 6px 18px rgba(0,0,0,0.4)',
-                      zIndex: 10,
-                    }}
-                  >
-                    External player support coming in v2.
-                  </div>
-                )}
               </div>
             );
           })}

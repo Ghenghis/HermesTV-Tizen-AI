@@ -410,9 +410,40 @@ test.describe('Overnight swarm — provider-reload UI proof against sidecar API'
     await page.waitForLoadState('networkidle').catch(() => {});
     await page.screenshot({ path: shot('provui-01-after-boot'), fullPage: true });
 
-    // Diagnostics — record what was intercepted on boot.
+    // Diagnostics — record what was intercepted on boot, plus any console
+    // errors that might explain BUG-SWARM-009.
     console.log('[provui-diag] all API-shaped requests seen:', allRequests.slice(0, 12));
     console.log('[provui-diag] intercepted by route handler:', interceptedUrls.slice(0, 12));
+
+    // Read the actual user object from the page-side fetch (separate from
+    // what the proxy logged). Two fetches: one normal, one with cache:
+    // 'no-store' to confirm whether the page is reading a cached response.
+    const pageView = await page.evaluate(async () => {
+      try {
+        // Use ABSOLUTE URL so we go through page.route, not Vite's SPA fallback.
+        const r1 = await fetch('http://localhost:3001/api/auth/me');
+        const b1 = await r1.json();
+        return {
+          status: r1.status,
+          rawUserType: typeof b1.user,
+          rawUserId: b1.user && b1.user.id ? '<set>' : '<unset>',
+          rawUserRole: b1.user && b1.user.role,
+          rawUserEmail: (b1.user && typeof b1.user.email === 'string') ? '<set>' : '<unset>',
+          authConfigured: b1.auth && b1.auth.configured,
+          authRequired: b1.auth && b1.auth.required,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+    console.log('[provui-diag] page-side absolute /api/auth/me parsed ->', JSON.stringify(pageView));
+
+    // Wait LONGER for React to commit the state update. StrictMode double-
+    // invokes effects so two /api/auth/me calls land in quick succession;
+    // the second commit can land 100s of ms after the first.
+    await page.waitForTimeout(2500);
+    const finalBody = await page.locator('body').innerText();
+    console.log('[provui-diag] body text after 2.5s wait (first 300 chars) ->', finalBody.slice(0, 300).replace(/\s+/g, ' '));
 
     const bodyA = await page.locator('body').innerText();
     expectNoLeaks(bodyA, 'body after boot');

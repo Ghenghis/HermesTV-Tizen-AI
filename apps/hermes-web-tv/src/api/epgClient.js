@@ -1,4 +1,5 @@
 // epgClient — Electronic Program Guide REST client.
+import { resolveApiBase } from './apiBase.js';
 //
 // Mirrors the IPTV Player Zero EPG data model (channels + programs +
 // time-window query) but reshaped into a single GET that returns both
@@ -17,17 +18,7 @@
 // in params, no template literals (string concatenation only), no optional
 // chaining, no nullish coalescing.
 
-// Base URL detection mirrors hermesApi.js so dev (cross-origin :3001),
-// LAN mirror (192.168.x.x:3001), and prod (same-origin via host nginx)
-// all resolve correctly. Kept in lock-step with hermesApi.js's auto-detect.
-var BASE_URL = (function() {
-  if (typeof window === 'undefined') { return ''; }
-  var h = window.location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1') { return 'http://localhost:3001'; }
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) { return 'http://' + h + ':3001'; }
-  if (h === 'hermestv.local') { return 'http://hermestv.local'; }
-  return '';
-})();
+var BASE_URL = resolveApiBase();
 
 var DEFAULT_TIMEOUT_MS = 8000;
 

@@ -1,4 +1,4 @@
-# HermesTV — End-to-End Test Plan (Playwright)
+# DaveTV — End-to-End Test Plan (Playwright)
 
 **Version:** 0.1.0 (initial bootstrap)
 **Date:** 2026-05-19

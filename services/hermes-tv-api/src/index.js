@@ -11,6 +11,7 @@ const healthRouter = require('./routes/health');
 const profilesRouter = require('./routes/profiles');
 const providersRouter = require('./routes/providers');
 const catalogRouter = require('./routes/catalog');
+const jellyfinRouter = require('./routes/jellyfin');
 const channelsRouter = require('./routes/channels');
 const epgRouter = require('./routes/epg');
 const epgGridRouter = require('./routes/epgGrid');
@@ -41,7 +42,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // --- CORS ---
-// Allows localhost, hermestv.local (mDNS), any LAN 192.168.x.x origin for
+// Allows localhost/127.0.0.1, hermestv.local (mDNS), any LAN 192.168.x.x origin for
 // QN85 mirror testing, AND the production Cloudflare-fronted daveai.tech
 // origins (tv.daveai.tech canonical + hermestv.daveai.tech alias). In
 // production the browser is same-origin with the API (host nginx fronts
@@ -53,7 +54,7 @@ const PORT = process.env.PORT || 3001;
 // Origin) and same-origin GETs always worked while the browser POSTs
 // silently 500'd. See route audit W5-CORS-1.
 // Auth cookies are HttpOnly and sent only for the allowlisted DaveTV origins.
-const LAN_ORIGIN = /^http:\/\/(localhost|hermestv\.local|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+const LAN_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|hermestv\.local|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
 const PROD_ORIGIN = /^https:\/\/(tv|hermestv)\.daveai\.tech$/;
 app.use(
   cors({
@@ -97,6 +98,7 @@ app.use(authRouter.authMiddleware);
 app.use('/', healthRouter);
 app.use('/', profilesRouter);
 app.use('/', providersRouter);
+app.use('/', jellyfinRouter);
 app.use('/', catalogRouter);
 app.use('/api/channels', channelsRouter);
 app.use('/', epgRouter);

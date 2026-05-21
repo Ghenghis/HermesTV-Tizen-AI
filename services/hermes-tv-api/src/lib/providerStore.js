@@ -24,6 +24,7 @@
  *     username: '<...>'  | undefined,
  *     password: '<...>'  | undefined,
  *     epg_url:  '<...>'  | undefined,   // optional XMLTV URL
+ *     provider_id: '<canonical provider id>' | undefined,
  *     enabled:  true,
  *     created_at: '<ISO>',
  *     last_test:  '<ISO> | null',       // last successful catalog fetch
@@ -61,6 +62,23 @@ var DEFAULT_DATA_DIR = path.join(__dirname, '..', '..', 'data');
 var DATA_FILE_NAME = 'providers.json';
 
 var VALID_TYPES = { m3u: true, xtream: true, stalker: true };
+var PROVIDER_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+function _normaliseProviderId(providerId) {
+  if (typeof providerId !== 'string') { return ''; }
+  var p = providerId.trim().toLowerCase();
+  if (!p) { return ''; }
+  if (p === 'apollo' || p === 'apollo-group' || p === 'apollo_group_tv' || p === 'apollo group') {
+    return 'apollo_group';
+  }
+  if (p === 'iptv_org' || p === 'iptvorg' || p === 'iptv-org-public') {
+    return 'iptv-org';
+  }
+  if (p === 'extreme' || p === 'xtreme' || p === 'xtreme-hd' || p === 'xtreme_hd') {
+    return 'xtremehd';
+  }
+  return p;
+}
 
 // In-memory cache: lazy-loaded on first read, written-through on every mutate.
 // Single-operator deployment means we don't need cross-process locking — the
@@ -105,6 +123,7 @@ function _mask(row) {
   return {
     id: row.id,
     type: row.type,
+    provider_id: row.provider_id || undefined,
     label: row.label,
     url_host: _urlHost(row.url),
     has_username: !!(row.username && String(row.username).length > 0),
@@ -235,6 +254,12 @@ function _validateInput(input) {
       errors.push('disable_provider_epg must be a boolean');
     }
   }
+  if (input.provider_id !== undefined && input.provider_id !== null && input.provider_id !== '') {
+    var providerId = _normaliseProviderId(input.provider_id);
+    if (!providerId || !PROVIDER_ID_RE.test(providerId)) {
+      errors.push('provider_id must be a lowercase provider key <= 64 chars');
+    }
+  }
   return errors;
 }
 
@@ -261,6 +286,7 @@ async function listFull() {
     return {
       id: r.id,
       type: r.type,
+      provider_id: r.provider_id,
       label: r.label,
       url: r.url,
       username: r.username,
@@ -286,6 +312,7 @@ async function add(input) {
   var row = {
     id: _hexId(),
     type: input.type,
+    provider_id: _normaliseProviderId(input.provider_id) || undefined,
     label: String(input.label).trim().slice(0, 80),
     url: String(input.url).trim(),
     username: (typeof input.username === 'string' && input.username.length > 0) ? input.username : undefined,
@@ -343,6 +370,11 @@ async function update(id, patch) {
     }
     if (typeof patch.enabled === 'boolean') { row.enabled = patch.enabled; }
     if (typeof patch.type === 'string' && VALID_TYPES[patch.type]) { row.type = patch.type; }
+    if (patch.provider_id !== undefined) {
+      var providerId = _normaliseProviderId(patch.provider_id);
+      if (providerId && PROVIDER_ID_RE.test(providerId)) { row.provider_id = providerId; }
+      else if (patch.provider_id === null || patch.provider_id === '') { row.provider_id = undefined; }
+    }
   }
   await _persist();
   return _mask(row);

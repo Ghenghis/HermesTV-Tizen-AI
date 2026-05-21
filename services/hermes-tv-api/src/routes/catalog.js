@@ -20,10 +20,10 @@ var m3uClient = require('../lib/m3uClient');
 var xtreamClient = require('../lib/xtreamClient');
 var catalogMerge = require('../lib/catalogMerge');
 var sanitizeLog = require('../lib/sanitizeLog').sanitizeForLog;
+var profileIds = require('../lib/profileIds');
 
 var router = Router();
 
-var VALID_PROFILES = ['dave_tv', 'mom_tv'];
 var VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'xtream', 'iptv-org', 'jellyfin', 'all'];
 
 // X-Catalog-Source header values surfaced to the client so DevTools / Settings
@@ -322,7 +322,7 @@ function itemHasAnyProvider(item, providerIds) {
 // ---------------------------------------------------------------------------
 // GET /api/catalog
 // Optional query params:
-//   ?profile_id=dave_tv|mom_tv   — filters by profile_access (when present)
+//   ?profile_id=<safe profile id> — filters by profile_access (when present)
 //   ?provider_id=apollo_group|xtremehd|iptv-org|jellyfin|all — provider filter
 //   ?provider_ids=xtremehd,apollo_group,iptv-org — multi-provider filter
 //   ?hide_providers=A,B,C        — wave-16 visibility toggle (server-side)
@@ -333,10 +333,10 @@ router.get('/api/catalog', async function(req, res) {
   var providerIds = providerParse.ids;
   var hiddenSet = parseHideProviders(req.query.hide_providers);
 
-  if (profile_id !== undefined && VALID_PROFILES.indexOf(profile_id) === -1) {
+  if (profile_id !== undefined && !profileIds.isValidProfileId(profile_id)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: "Invalid profile_id '" + profile_id + "'. Valid values: dave_tv, mom_tv",
+      message: profileIds.profileValidationMessage(),
     });
   }
 
@@ -360,18 +360,16 @@ router.get('/api/catalog', async function(req, res) {
   // Filtering by profile_access only meaningfully applies to items that
   // carry the field (legacy seed used to set it; iptv-org / m3uClient may
   // or may not). When the field is absent we keep the item.
-  var isJellyfin = resolved.source === SRC_JELLYFIN;
-  if (profile_id && !isJellyfin) {
+  if (profile_id) {
     items = items.filter(function(item) {
-      if (!Array.isArray(item.profile_access)) { return true; }
-      return item.profile_access.indexOf(profile_id) !== -1;
+      return profileIds.itemVisibleToProfile(item, profile_id);
     });
   }
 
   // Provider filter. "all" is a no-op; specific provider ids filter by any
   // legacy providers[], post-merge sources[], flat provider_id/provider, or
   // provider_tags entry.
-  if (providerIds.length > 0 && !isJellyfin) {
+  if (providerIds.length > 0) {
     items = items.filter(function(item) {
       return itemHasAnyProvider(item, providerIds);
     });
@@ -416,7 +414,7 @@ router.get('/api/catalog', async function(req, res) {
   }
 
   // Mom-mode quality sort: 4K first, HDR-flagged higher.
-  if (profile_id === 'mom_tv' && !isJellyfin) {
+  if (profile_id === 'mom_tv') {
     items.sort(function(a, b) {
       var resA = (a && a.metadata && RESOLUTION_ORDER[a.metadata.resolution]) || 0;
       var resB = (b && b.metadata && RESOLUTION_ORDER[b.metadata.resolution]) || 0;

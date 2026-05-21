@@ -14,7 +14,7 @@ test.describe('Settings tabbed panel', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const tile = page.locator('button[aria-label*="profile"]').first();
     if (await tile.count()) await tile.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
   });
 
   test('gear opens panel, every tab renders, Esc closes', async ({ page }) => {

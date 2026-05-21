@@ -1,17 +1,15 @@
 import { test, expect, Page } from '@playwright/test';
 import { collectConsoleErrors } from '../helpers/console';
 
-// J13: VOD card → MediaDetailPanel → ⤓ Download → DownloadModal.
-// Modal shows "Exact download size" + size value + Cancel/Proceed.
-// Proceed flips to "queued" view (DownloadModal.jsx: confirmed && envelope
-// .status === 'queued'). Close — verify POST /api/download carried
-// item_id + profile_id.
+// J13: VOD card → MediaDetailPanel → Download → DownloadModal.
+// Downloads are release-gated until a real server-side worker exists. The
+// proof must see an honest blocked panel, not a fake exact-size/queued flow.
 
 async function bootAsDave(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const dave = page.locator('button[aria-label*="Dave"]').first();
   if (await dave.count()) await dave.click();
-  await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
 }
 
 async function openVod(page: Page) {
@@ -23,7 +21,7 @@ async function openVod(page: Page) {
 }
 
 test.describe('Download flow (J13)', () => {
-  test('proceeds through exact-size disclosure to queued', async ({ page }) => {
+  test('renders the disabled-pipeline contract, not a fake queue', async ({ page }) => {
     const errors = collectConsoleErrors(page);
     const posts: any[] = [];
     page.on('request', (req) => {
@@ -36,15 +34,11 @@ test.describe('Download flow (J13)', () => {
     await openVod(page);
 
     await page.locator('button[aria-label^="Download "]').first().click();
-    await expect(page.getByText(/Exact download size/i).first()).toBeVisible({ timeout: 6000 });
-    await expect(page.getByRole('button', { name: /^Cancel$/ })).toBeVisible();
-    const proceed = page.getByRole('button', { name: /^Proceed$/ });
-    await expect(proceed).toBeEnabled({ timeout: 6000 });
-
-    await proceed.click();
-    await expect(page.getByText(/Download queued/i).first()).toBeVisible({ timeout: 4000 });
-    await expect(page.getByText(/Job ID:/i).first()).toBeVisible();
-
+    await expect(page.getByText(/Download blocked/i).first()).toBeVisible({ timeout: 6000 });
+    await expect(page.getByText(/Downloads aren't live yet/i).first()).toBeVisible();
+    await expect(page.getByText(/Exact download size/i).first()).toHaveCount(0);
+    await expect(page.getByText(/Download queued/i).first()).toHaveCount(0);
+    await expect(page.getByText(/Job ID:/i).first()).toHaveCount(0);
     await page.getByRole('button', { name: /^Close$/ }).click();
     expect(posts.length).toBeGreaterThanOrEqual(1);
     expect(posts[0].item_id).toBeTruthy();
@@ -52,16 +46,21 @@ test.describe('Download flow (J13)', () => {
     expect(errors()).toEqual([]);
   });
 
-  test('bad item_id renders the error envelope', async ({ page }) => {
+  test('disabled gate wins over any accidental fake success envelope', async ({ page }) => {
     await bootAsDave(page);
     await page.route('**/api/download', (route) => route.fulfill({
-      status: 400,
+      status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ error: 'invalid_item', message: 'unknown item_id' }),
+      body: JSON.stringify({
+        job_id: 'fake-job',
+        status: 'queued',
+        exact_size_human: '999 MB',
+      }),
     }));
     await openVod(page);
     await page.locator('button[aria-label^="Download "]').first().click();
     await expect(page.getByText(/Download blocked/i).first()).toBeVisible({ timeout: 6000 });
-    await expect(page.getByText(/invalid_item/).first()).toBeVisible();
+    await expect(page.getByText(/fake-job/).first()).toHaveCount(0);
+    await expect(page.getByText(/Download queued/i).first()).toHaveCount(0);
   });
 });

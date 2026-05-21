@@ -601,13 +601,9 @@ function MediaDetailPanel(props) {
               </button>
             )}
 
-            {/* Download button — Zero-shell parity. Opens the exact-size
-                modal which calls POST /api/download. Disabled when no
-                provider serves the item (same gate as the Watch button)
-                because the streamResolver path is the data source for
-                both flows. Hidden for live channels — operators don't
-                download live broadcasts; they record them, and that
-                surface lands with the Phase 4 recording pipeline. */}
+            {/* Download button — future offline viewing. The modal is gated
+                by releaseFlags until /api/download has a real byte-writing
+                worker. Hidden for live channels; those belong to DVR. */}
             {item.type !== 'live' && (
               <button
                 tabIndex={0}
@@ -809,6 +805,7 @@ function MediaDetailPanel(props) {
           {item.type === 'series' && (
             <SeriesEpisodesBlock
               item={item}
+              profileId={profileId}
               onPlay={onPlay}
               onDownload={onDownload}
             />

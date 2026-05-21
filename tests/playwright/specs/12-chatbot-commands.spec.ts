@@ -29,7 +29,7 @@ test.describe('Chatbot commands (J12)', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const dave = page.locator('button[aria-label*="Dave"]').first();
     if (await dave.count()) await dave.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
   });
 
   test('"show apollo group" → filter_provider', async ({ page }) => {

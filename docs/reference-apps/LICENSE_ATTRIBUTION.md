@@ -18,9 +18,11 @@ App License Boundary"). Sibling extracts in `docs/reference-apps/08_*` ...
    lines from any reference app may appear in DaveTV source. Identifier names,
    external API shapes, and 4xx/5xx response codes are not copyrightable and
    are exempt.
-2. **GPL / AGPL → pattern-only.** We never copy or fork GPL-3.0 or AGPL-3.0
-   source into our tree. We read tests as behavior contracts and re-express
-   the contract in our own CommonJS test files.
+2. **GPL / AGPL default → pattern-only.** By default we do not copy or fork
+   GPL-3.0 or AGPL-3.0 source into our tree. Dave now accepts upstream
+   obligations for private DaveTV work, so direct source adoption is allowed
+   only through `docs/53_UPSTREAM_VIEW_PACK_CONTRACT.md` with manifest,
+   attribution, source-availability obligations, tests, and proof.
 3. **MIT → adapt with attribution.** MIT source may be adapted into our tree
    if (a) attribution is preserved in the file header, (b) the MIT notice is
    reproduced in this document, (c) the adapted file is rewritten in
@@ -157,9 +159,10 @@ project but cannot link to it.
 
 ### What we DID NOT adopt
 
-- **No ynotv source files appear in our tree, full stop.** AGPL would
-  require us to publish DaveTV server source under AGPL if we incorporated
-  any ynotv source — that is unacceptable for the project today.
+- No ynotv source files appear in our tree as of this attribution snapshot.
+  Direct ynotv source adoption is allowed only through
+  `docs/53_UPSTREAM_VIEW_PACK_CONTRACT.md` with explicit AGPL network-source
+  compliance and attribution.
 - No Tauri shell, no Rust, no React component code, no `packages/core/src/*`
   TypeScript.
 - No SQLite migration scripts.

@@ -51,7 +51,8 @@ function loadAzureSdk() {
 }
 
 function azureConfigured() {
-  return !!(process.env.AZURE_TTS_KEY && process.env.AZURE_TTS_REGION);
+  const config = azureVoices.azureSpeechConfig();
+  return !!(config.key && config.region);
 }
 
 // ── GET /api/tts/voices ──────────────────────────────────────────────────────
@@ -195,7 +196,8 @@ router.post('/api/tts/speak', async (req, res) => {
   }
 
   try {
-    const config = sdk.SpeechConfig.fromSubscription(process.env.AZURE_TTS_KEY, process.env.AZURE_TTS_REGION);
+    const speechConfig = azureVoices.azureSpeechConfig();
+    const config = sdk.SpeechConfig.fromSubscription(speechConfig.key, speechConfig.region);
     config.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz96KBitRateMonoMp3;
     config.speechSynthesisVoiceName = selectedVoice;
 
