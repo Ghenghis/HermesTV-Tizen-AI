@@ -4,7 +4,7 @@ Status: **IN_PROGRESS** (continuation of 20260521-0423 — same swarm,
 deeper Wave 2 walk per user's "PRs are checkpoints, not completion" rule).
 
 PR: https://github.com/Ghenghis/HermesTV-Tizen-AI/pull/150 (draft)
-Branch: `claude/swarm-20260521-0423` — 9 commits at last push:
+Branch: `claude/swarm-20260521-0423` — 12 commits at last push:
 
   1. `576b5dc` — initial swarm (secret-scan + e2e-smoke + boundary spec)
   2. `752916f` — Wave 2.1-2.6 audits + sidecar API spec (6/0)
@@ -15,6 +15,9 @@ Branch: `claude/swarm-20260521-0423` — 9 commits at last push:
   7. `5eeee0d` — HANDOFF blocker #2 (DVR/Downloads/Catch-up gate)
   8. `298c357` — HANDOFF blocker #5 (Tizen scaffold dedup guard)
   9. `fd3aab8` — BUG-SWARM-009 fix (Origin-preserving proxy)
+ 10. `8bffa93` — ledger truthing for commits 7-9
+ 11. `b07b76e` — TTS contract test (Wave 2.18 — Azure-only honesty)
+ 12. `baef432` — Remote relay contract test (Wave 2.19 — SSE round-trip)
 
 ## HANDOFF blockers from docs/HANDOFF_FOR_CODEX.md §2 status
 
@@ -47,7 +50,8 @@ Branch: `claude/swarm-20260521-0423` — 9 commits at last push:
 
 ## API test suite (npm test --prefix services/hermes-tv-api)
 
-27 test files, EXIT=0 across the whole chain (new: releaseFlagContract):
+29 test files, EXIT=0 across the whole chain (new: releaseFlagContract,
+ttsContract, remoteRelayContract):
 
 ```
 schema-validate.js                131 PASS / 0 FAIL
@@ -78,6 +82,8 @@ setupProviderRestart.e2e.test     16 PASS / 0 FAIL  ← new (this swarm)
 credentialGuardSync.test.js       32 PASS / 0 FAIL  ← new (this swarm)
 epgMappingRestart.test.js         10 PASS / 0 FAIL  ← new (this swarm)
 releaseFlagContract.test.js       15 PASS / 0 FAIL  ← new (HANDOFF #2)
+ttsContract.test.js               17 PASS / 0 FAIL  ← new (Wave 2.18)
+remoteRelayContract.test.js       11 PASS / 0 FAIL  ← new (Wave 2.19)
 ```
 
 ## Playwright suites passing under both projects (chromium-1080p + samsung-qn85-mock)
