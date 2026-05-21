@@ -101,12 +101,35 @@ Status: open | in_progress | fixed | blocked | rejected
 
 ## BUG-SWARM-006 — provider-live proof needs a per-deploy smoke probe step in deploy-vps.yml
 
-- Severity: **P1** per docs/49 P0-2 — currently flagged in the contract; spec exists in docs but not enforced
+- Severity: **P1** per docs/49 P0-2 — initially logged based on incomplete reading of the workflow
 - Area: deploy pipeline
-- File/line: `.github/workflows/deploy-vps.yml` (deploy smoke job)
-- Observed failure: I cannot trigger deploy from this swarm. Need to verify `live` mode is enforced for the deploy-promote path.
-- Expected behavior: every successful deploy runs `HERMES_PROVIDER_E2E_BASE=https://tv.daveai.tech PROVIDER_E2E_MODE=live node tools/test-provider-e2e.js` against the production host and FAILS the deploy if no provider produces a live ticket+stream
-- Proof command: would need a VPS deploy run; agent has no authorization to trigger one in this session
-- Suspected cause: contract spec not yet wired into the deploy workflow
-- Fix owner: **Dave** (deploy authorization) + agent (wiring)
-- Status: **blocked** — awaiting deploy authorization
+- File/line: `.github/workflows/deploy-vps.yml`
+- **CORRECTION (Wave 2.2 static check):** The live-provider gate IS already wired:
+  - `run_provider_live` workflow_dispatch input (line 25-26)
+  - "Mark release promotion blocked when provider-live proof is skipped" step (line 366-381)
+  - "Provider-live truth proof (against deployed VPS)" step runs `tools/test-provider-e2e.js` with `PROVIDER_E2E_MODE=live` against the deployed host (line 397-441)
+  - "Enforce provider-live PASS (no skip allowed)" step explicitly fails if log isn't `=== Results: N PASS, 0 FAIL` with N>=1 (line 443-456)
+  - Proof artifacts uploaded sanitized
+- Status: **rejected (already-implemented)** — the gate is wired correctly. The original BUG was an incorrect reading of the workflow by this swarm. Operator just needs to dispatch with `run_provider_live=true` and provide `DAVETV_PROOF_EMAIL` + `DAVETV_PROOF_PASSWORD` secrets for an invited account.
+
+## BUG-SWARM-007 — Web app BASE_URL is hard-coded; isolated sidecar UI proof needs Lane A change
+
+- Severity: **P2**
+- Area: Web app API base resolution
+- File/line: `apps/hermes-web-tv/src/api/hermesApi.js:7-14`
+- Observed behavior: `BASE_URL` is determined at module load by sniffing `window.location.hostname`. There is no env override, build flag, or localStorage override.
+- Implication: a sidecar API on `:3299` (per Codex postmortem's "isolated API" guidance) cannot be reached by the running Vite at `:5173` without patching this file (Lane A territory).
+- Workaround used: Wave 2.3 sidecar API proof runs via Playwright's `request.newContext()` against the sidecar directly (covers auth → providers → catalog → layouts → logout end-to-end at the HTTP level — see `specs/swarm-20260521-sidecar-api.spec.ts`).
+- Fix owner: **agent (after Lane A merges)** — add a `VITE_API_BASE` or localStorage `hermestv:api_base_override` escape hatch for E2E test contexts only (production behaviour unchanged).
+- Status: **open** — deferred to post-Lane-A swarm
+
+## BUG-SWARM-004 — partial remediation update (Wave 2.3)
+
+- Earlier status: partially fixed (global-setup tolerant); deep authed UI still BLOCKED
+- **Wave 2.3 progress:** Created `tests/playwright/specs/swarm-20260521-sidecar-api.spec.ts` which spins up an isolated API on `:3299` with a throwaway admin, then runs deep authenticated proof via Playwright's HTTP request fixture. Result: **3/3 PASS**, no secret leaks.
+- Coverage now provided at the API protocol level:
+  - auth-required boundary (401 without session)
+  - admin login → session cookie → providers/catalog/layouts (all 200)
+  - logout invalidates session (401 again)
+  - honest empty-state (no providers → total:0, source:no-providers; no "mock"/"seed" fields)
+- Still blocked: deep **browser** UI proof against the isolated API. Needs BUG-SWARM-007 first. Per Codex postmortem corrections, this is documented honestly rather than skipped.
