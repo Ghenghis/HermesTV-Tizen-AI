@@ -1,0 +1,13 @@
+HTTP/1.1 200
+Content-Type: application/x-mpegURL
+Bytes-Proven: 342
+Redirects-Followed: 1
+Truncated-Probe: false
+X-Provider-Used:
+
+# body first 200b (redacted):
+#EXTM3U
+#EXT-X-VERSION:6
+#EXT-X-INDEPENDENT-SEGMENTS
+#EXT-X-STREAM-INF:BANDWIDTH=2751289,AVERAGE-BANDWIDTH=1790760,RESOLUTION=854x480,FRAME-RATE=29.970,CODECS="avc1.4D401F,mp4a.40.2",AUDIO="audio_0"
+i

@@ -15,7 +15,7 @@ Status: In Progress
   - Files: `services/hermes-tv-api/src/routes/agent.js`,
     `services/hermes-tv-api/src/index.js`,
     `services/hermes-tv-api/test/agent.route.test.js`
-  - Proof: `node services/hermes-tv-api/test/agent.route.test.js` -> 13 PASS,
+  - Proof: `node services/hermes-tv-api/test/agent.route.test.js` -> 19 PASS,
     0 FAIL. Route tests show real validation, no fake provider/search results,
     and no raw utterance echo.
 
@@ -42,11 +42,13 @@ Status: In Progress
     provider filtering, strips unsafe media URLs, and returns honest empty
     candidates when no provider item matches.
 
-- [ ] T006: Implement intent planner and confidence model.
+- [x] T006: Implement intent planner and confidence model.
   - Files: `services/hermes-tv-api/src/lib/agentIntentPlanner.js`,
     `services/hermes-tv-api/test/agentIntentPlanner.test.js`
-  - Proof: natural utterance tests for movies, providers, sports, settings,
-    wrong-result correction, and ambiguity.
+  - Proof: `node services/hermes-tv-api/test/agentIntentPlanner.test.js` ->
+    18 PASS, 0 FAIL. Natural utterance tests cover movies, providers,
+    sports, settings, wrong-result correction, ambiguity, and public intent
+    redaction.
 
 - [ ] T007: Implement action policy and safe command mapping.
   - Files: `services/hermes-tv-api/src/lib/agentActionPolicy.js`,
@@ -109,6 +111,10 @@ Status: In Progress
   - Files: proof docs and tools only unless bugs are found
   - Proof: real provider search -> play -> wrong-result stop -> background
     follow-up, with secret scan clean.
+  - Partial proof: `docs/proof/provider-truth/20260521-002234/summary.md`
+    proves real VPS auth, provider registry, catalog, play ticket, stream HEAD,
+    stream GET, source-health, and zero credential leaks. Wrong-result stop and
+    background follow-up remain blocked on T008/T009/T013/T014.
 
 ## Integration Order
 

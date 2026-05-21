@@ -1,0 +1,48 @@
+{
+  "overall_status": "offline",
+  "providers": [
+    {
+      "id": "apollo_group",
+      "display_name": "Apollo Group",
+      "status": "offline",
+      "last_check_utc": "2026-05-21T00:07:55.000Z",
+      "latency_ms": 0,
+      "uptime_24h_pct": 0,
+      "credential_bearing": true,
+      "items_live": 0,
+      "items_vod": 0,
+      "items_series": 0
+    },
+    {
+      "id": "iptv-org",
+      "display_name": "iptv-org",
+      "status": "ok",
+      "last_check_utc": "2026-05-21T00:23:09.759Z",
+      "latency_ms": 0,
+      "uptime_24h_pct": 99.5,
+      "credential_bearing": false,
+      "items_live": 500,
+      "items_vod": 0,
+      "items_series": 0
+    },
+    {
+      "id": "xtremehd",
+      "display_name": "xTremeHD",
+      "status": "degraded",
+      "last_check_utc": "2026-05-21T00:09:30.312Z",
+      "latency_ms": 30,
+      "uptime_24h_pct": 92,
+      "credential_bearing": true,
+      "items_live": 1500,
+      "items_vod": 0,
+      "items_series": 0
+    }
+  ],
+  "summary": {
+    "total_providers": 3,
+    "providers_ok": 1,
+    "providers_degraded": 1,
+    "providers_offline": 1,
+    "computed_at_utc": "2026-05-21T00:23:09.759Z"
+  }
+}

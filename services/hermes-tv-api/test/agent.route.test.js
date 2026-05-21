@@ -126,7 +126,66 @@ function request(srv, method, urlPath, body) {
       utterance.text);
     ok('utterance route does not echo raw utterance', utterance.text.indexOf('Hey DaveTV, find Batman from 1989') === -1, utterance.text);
     ok('utterance route includes configured trigger phrase', utterance.body && utterance.body.config && utterance.body.config.trigger_phrase === 'Computer Dave', utterance.text);
+    ok('utterance route includes public media intent without query text',
+      utterance.body && utterance.body.intent &&
+        utterance.body.intent.name === 'media_search' &&
+        utterance.body.intent.media_type === 'vod' &&
+        utterance.body.intent.has_search_query === true &&
+        utterance.body.intent.search_query === undefined,
+      utterance.text);
     ok('utterance route reports catalog snapshot search source', utterance.body && utterance.body.search && utterance.body.search.source === 'catalog_snapshot', utterance.text);
+
+    var sports = await request(srv, 'POST', '/api/agent/utterance', {
+      profile_id: 'warren',
+      utterance: 'Hey DaveTV when do the Chiefs play next',
+      input_mode: 'voice',
+    });
+    ok('sports utterance is research-required, not fake answer',
+      sports.status === 200 &&
+        sports.body &&
+        sports.body.status === 'research_required' &&
+        sports.body.intent &&
+        sports.body.intent.name === 'sports_lookup' &&
+        sports.body.intent.requires_research === true &&
+        Array.isArray(sports.body.candidates) &&
+        sports.body.candidates.length === 0 &&
+        Array.isArray(sports.body.actions) &&
+        sports.body.actions.length === 0,
+      sports.text);
+
+    var settingVoice = await request(srv, 'POST', '/api/agent/utterance', {
+      profile_id: 'warren',
+      utterance: 'DaveTV change trigger phrase to Living Room Dave',
+      input_mode: 'voice',
+    });
+    ok('settings utterance is planned without mutating config',
+      settingVoice.status === 200 &&
+        settingVoice.body &&
+        settingVoice.body.status === 'planned' &&
+        settingVoice.body.intent &&
+        settingVoice.body.intent.name === 'settings_update' &&
+        settingVoice.body.intent.settings_patch &&
+        settingVoice.body.intent.settings_patch.trigger_phrase === 'Living Room Dave' &&
+        settingVoice.body.config &&
+        settingVoice.body.config.trigger_phrase === 'Computer Dave' &&
+        Array.isArray(settingVoice.body.actions) &&
+        settingVoice.body.actions.length === 0,
+      settingVoice.text);
+
+    var wrong = await request(srv, 'POST', '/api/agent/utterance', {
+      profile_id: 'warren',
+      utterance: 'wrong one',
+      input_mode: 'voice',
+    });
+    ok('wrong-result utterance requires playback context',
+      wrong.status === 200 &&
+        wrong.body &&
+        wrong.body.status === 'needs_context' &&
+        wrong.body.intent &&
+        wrong.body.intent.name === 'wrong_result' &&
+        wrong.body.intent.should_stop_playback === true &&
+        wrong.body.intent.requires_context === true,
+      wrong.text);
 
     var job = await request(srv, 'GET', '/api/agent/jobs/job_test');
     ok('job route is honest blocked', job.status === 501 && job.body && job.body.error === 'agent_jobs_unavailable', job.text);
