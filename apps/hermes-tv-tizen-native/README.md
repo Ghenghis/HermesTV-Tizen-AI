@@ -23,6 +23,26 @@
 > Do not delete this directory without explicit operator sign-off — the
 > AVPlay integration is non-trivial to re-derive.
 
+## Build guard (HANDOFF #5 — "only canonical path can produce .wgt")
+
+`npm run build`, `npm run build:watch`, and `npm run package` are gated by
+[`scripts/refuse-guard.js`](scripts/refuse-guard.js). Calling them with
+no env produces a clear refusal pointing to the canonical Tizen build
+path at `apps/hermes-tv-tizen/`.
+
+If you genuinely need the legacy native build (reference for the AVPlay
+engine, focus engine, or EPG grid in `src/ui/`), pass the explicit
+override:
+
+```bash
+ALLOW_LEGACY_TIZEN_NATIVE_BUILD=1 npm run build
+ALLOW_LEGACY_TIZEN_NATIVE_BUILD=1 npm run package
+```
+
+CI must NEVER set that env. The guard is enforced because operators can
+otherwise accidentally ship the wrong `.wgt` (B1 native scaffold instead
+of the current web-wrapped build).
+
 ---
 
 # Original README — apps/tizen-hermes-tv (renamed)
