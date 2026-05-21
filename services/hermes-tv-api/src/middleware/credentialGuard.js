@@ -20,6 +20,12 @@
 
 // Patterns that must NEVER appear in API responses going to TV clients.
 // Ordered from most-specific to least-specific for fast short-circuit.
+//
+// HANDOFF blocker #7 (2026-05-21): mirror lib/sanitizeLog.FORBIDDEN_PATTERNS.
+// If a string is dangerous to log it is dangerous to return; divergence between
+// these two lists is a real release-blocker. Equivalence is exercised by
+// services/hermes-tv-api/test/credentialGuardSync.test.js — any new pattern
+// must be added to BOTH files.
 const FORBIDDEN_PATTERNS = [
   /\/get\.php\?username=/i,           // Xtreme Codes / IPTV M3U credential URL
   /\/player_api\.php/i,               // Xtreme Codes player API endpoint
@@ -30,6 +36,9 @@ const FORBIDDEN_PATTERNS = [
   /api[_\-]?key\s*[:=]/i,            // Generic API key assignment
   /password\s*[:=]/i,                 // Generic password assignment
   /bearer\s+[A-Za-z0-9\-._~+/]+=*/i, // Bearer token value
+  /m3u_plus/i,                        // Xtream Codes flag-laden URL marker (added 2026-05-21 / HANDOFF #7)
+  /sk-[A-Za-z0-9_\-]{20,}/i,         // OpenAI-style key prefix (added 2026-05-21 / HANDOFF #7)
+  /Ocp-Apim-Subscription-Key/i,       // Azure Speech subscription header (added 2026-05-21 / HANDOFF #7)
 ];
 
 /**
@@ -37,7 +46,7 @@ const FORBIDDEN_PATTERNS = [
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
-module.exports = function credentialGuard(req, res, next) {
+function credentialGuard(req, res, next) {
   var originalJson = res.json.bind(res);
 
   res.json = function(body) {
@@ -69,4 +78,10 @@ module.exports = function credentialGuard(req, res, next) {
   };
 
   next();
-};
+}
+
+// Exported for the credentialGuardSync test — kept underscore-prefixed so
+// downstream consumers don't accidentally rely on the internal pattern list.
+credentialGuard._FORBIDDEN_PATTERNS = FORBIDDEN_PATTERNS;
+
+module.exports = credentialGuard;

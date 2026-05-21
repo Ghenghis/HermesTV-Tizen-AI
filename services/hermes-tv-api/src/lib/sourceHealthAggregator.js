@@ -193,6 +193,9 @@ function getSourceHealth() {
   catch (_) { m3uStatus = {}; }
 
   var providers = [];
+  // Well-known env providers always appear (apollo_group + xtremehd) so the
+  // UI can render their "not configured" state explicitly when the operator
+  // hasn't pasted credentials yet.
   try { providers.push(_m3uEntry('apollo_group', m3uStatus)); }
   catch (_) {
     providers.push({
@@ -217,6 +220,43 @@ function getSourceHealth() {
       credential_bearing: true, items_live: 0, items_vod: 0, items_series: 0,
     });
   }
+
+  // HANDOFF blocker #6 — disk-backed providers added via /setup/provider/submit
+  // appear in m3uClient.getProviderStatus() under their canonical provider_id
+  // (m3uClient.js lines 568-583 — every registry-backed row is added to the
+  // status map alongside the well-known env keys). Iterate the remaining keys
+  // so the source-health roll-up reflects every saved provider, not just the
+  // hard-coded triplet.
+  //
+  // Status entries carry `registry_id` + `source` when they come from the
+  // registry; we use that to flag credential_bearing honestly (xtream types
+  // need credentials, m3u-URL types do not necessarily) and to emit a stable
+  // id the UI can map back to the provider list.
+  var alreadyEmitted = { 'apollo_group': true, 'xtremehd': true, 'iptv-org': true };
+  Object.keys(m3uStatus).forEach(function(pid) {
+    if (alreadyEmitted[pid]) { return; }
+    try {
+      var entry = _m3uEntry(pid, m3uStatus);
+      // The aggregator's DISPLAY_NAMES table is intentionally small; for disk
+      // rows we surface the user-pasted label, which _m3uEntry already picks up
+      // via `ps.label`. credential_bearing defaults to false for unknown ids;
+      // for xtream-type disk rows the registry source signals it.
+      var ps = m3uStatus[pid] || {};
+      if (ps.source === 'disk' || ps.registry_id) {
+        // Disk providers always carry credentials at-rest (even URL-only m3u
+        // rows may bear tokens in the URL), so mark them as credential-bearing
+        // so the UI shows the "needs config" badge correctly.
+        entry.credential_bearing = true;
+      }
+      providers.push(entry);
+    } catch (_) {
+      providers.push({
+        id: pid, display_name: pid, status: 'offline',
+        last_check_utc: _nowIso(), latency_ms: 0, uptime_24h_pct: 0,
+        credential_bearing: true, items_live: 0, items_vod: 0, items_series: 0,
+      });
+    }
+  });
 
   var statuses = providers.map(function(p) { return p.status; });
   var overall = _rollupStatus(statuses);
