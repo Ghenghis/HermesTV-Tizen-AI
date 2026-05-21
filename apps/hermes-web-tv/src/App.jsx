@@ -2479,18 +2479,30 @@ function App() {
             <PlaylistImportModal
               isOpen={state.showPlaylistImport}
               onClose={function() { patchState({ showPlaylistImport: false }); }}
-              onSaved={function() {
+              onSaved={function(saved) {
                 // Refresh provider list so the new playlist tag appears in
                 // ProviderFilter / FilterBar selects. We re-open Settings so
                 // the user sees the new entry in the Playlists tab list.
                 var api = hermesApi;
-                api.getProviders().then(function(payload) {
+                return api.getProviders().then(function(payload) {
                   var list = payload && payload.providers
                     ? payload.providers
                     : (Array.isArray(payload) ? payload : []);
+                  var persistedProviderId = saved && saved.persisted_provider_id;
+                  if (persistedProviderId) {
+                    var found = list.some(function(row) {
+                      return row && (row.id === persistedProviderId || row.persisted_provider_id === persistedProviderId);
+                    });
+                    if (!found) {
+                      var missing = new Error('Provider save reached the API, but /api/providers did not return the durable provider row. Nothing was confirmed.');
+                      missing.code = 'provider_refresh_missing';
+                      throw missing;
+                    }
+                  }
                   patchState({ providers: list, showPlaylistImport: false, showSettings: true });
                 }).catch(function() {
-                  patchState({ showPlaylistImport: false, showSettings: true });
+                  patchState({ showPlaylistImport: true, showSettings: false });
+                  throw new Error('Provider save reached the API, but DaveTV could not refresh /api/providers to prove it. Please do not re-enter credentials until this is fixed.');
                 });
               }}
             />

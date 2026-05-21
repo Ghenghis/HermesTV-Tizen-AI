@@ -768,11 +768,37 @@ function PlaylistImportModal(props) {
       }
       patch({ pending: false, saved: saved, error: null });
       // Brief delay so the success state is visible, then trigger the
-      // parent's redirect / refresh callback. The modal stays open just
-      // long enough for the user to register "yes, that worked".
+      // parent's redirect / refresh callback. If the parent returns a
+      // promise, it must resolve only after the durable provider row is
+      // visible through /api/providers; otherwise this modal stays open with
+      // an actionable error instead of giving a false "saved" finish.
       setTimeout(function() {
-        if (typeof onSaved === 'function') { onSaved(saved); }
-        if (typeof onClose === 'function') { onClose(); }
+        var result = null;
+        try {
+          if (typeof onSaved === 'function') { result = onSaved(saved); }
+        } catch (err) {
+          patch({
+            pending: false,
+            saved: null,
+            error: {
+              message: err.message || 'Provider saved, but DaveTV could not confirm it from /api/providers.',
+              code: err.code || 'provider_refresh_failed',
+            },
+          });
+          return;
+        }
+        Promise.resolve(result).then(function() {
+          if (typeof onClose === 'function') { onClose(); }
+        }).catch(function(err) {
+          patch({
+            pending: false,
+            saved: null,
+            error: {
+              message: err.message || 'Provider saved, but DaveTV could not confirm it from /api/providers.',
+              code: err.code || 'provider_refresh_failed',
+            },
+          });
+        });
       }, 1200);
     }).catch(function(err) {
       patch({ pending: false, error: { message: err.message || 'Save failed', code: err.code || 'save_error' } });
