@@ -80,6 +80,15 @@ ok('PlayerModal converts ticket stream endpoints through API base resolver',
 ok('PlayerModal stream probes include DaveTV session credentials',
   /fetch\(endpoint, \{ method: 'HEAD', credentials: 'include' \}\)/.test(playerModal)
     && /fetch\(endpoint, \{ credentials: 'include' \}\)/.test(playerModal));
+ok('PlayerModal keeps user playback intent separate from element pause state',
+  /var desiredPlaybackRef = React\.useRef\(true\);/.test(playerModal)
+    && /function handleVideoPause\(\)[\s\S]*desiredPlaybackRef\.current[\s\S]*schedulePlaybackResume\(\);/.test(playerModal)
+    && /function togglePlay\(\)[\s\S]*desiredPlaybackRef\.current = true;[\s\S]*desiredPlaybackRef\.current = false;/.test(playerModal));
+ok('PlayerModal retries playback after stream readiness and visibility recovery',
+  /function startPlaybackIfDesired\(\)[\s\S]*v\.play\(\);/.test(playerModal)
+    && /setInterval\(function\(\)[\s\S]*startPlaybackIfDesired\(\);[\s\S]*2500\);/.test(playerModal)
+    && /document\.addEventListener\('visibilitychange', onVisibilityChange\);/.test(playerModal)
+    && /onCanPlay=\{startPlaybackIfDesired\}/.test(playerModal));
 ok('hls.js requests include session credentials for local API playback',
   /xhrSetup: function\(xhr\)[\s\S]*xhr\.withCredentials = true;/.test(hlsHook));
 ok('API CORS allows HEAD probes for playback tickets',

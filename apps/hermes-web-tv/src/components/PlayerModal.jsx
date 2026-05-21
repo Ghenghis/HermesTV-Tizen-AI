@@ -264,6 +264,11 @@ function PlayerModal(props) {
   var idleTimerRef = React.useRef(null);
   // Holds the active retry setTimeout id so a re-mount can cancel it.
   var retryTimerRef = React.useRef(null);
+  // Keep "what DaveTV should be doing" separate from the media element's
+  // momentary state. Browsers and Tizen can pause during source attach,
+  // visibility changes, or HLS recovery without the user pressing Pause.
+  var desiredPlaybackRef = React.useRef(true);
+  var resumeTimerRef = React.useRef(null);
 
   var item = (ticket && ticket.item) || {};
   var provider = (ticket && ticket.provider) || {};
@@ -299,6 +304,12 @@ function PlayerModal(props) {
     // so a fresh ticket starts with a clean attempt budget.
     setRetryCount(0);
     setManualSourceIndex(-1);
+    setPlaying(true);
+    desiredPlaybackRef.current = true;
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
@@ -310,6 +321,10 @@ function PlayerModal(props) {
   React.useEffect(function() {
     return function cleanup() {
       try { playbackPositionStore.flush(); } catch (_e) { /* */ }
+      if (resumeTimerRef.current) {
+        clearTimeout(resumeTimerRef.current);
+        resumeTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -495,6 +510,34 @@ function PlayerModal(props) {
     return undefined;
   }, [streamUrl]);
 
+  // ── Playback intent / recovery ────────────────────────────────────────
+  React.useEffect(function() {
+    if (!isOpen || !streamUrl || streamState.status !== 'streaming') { return undefined; }
+    startPlaybackIfDesired();
+
+    var id = setInterval(function() {
+      var v = videoRef.current;
+      if (!v || !desiredPlaybackRef.current) { return; }
+      if (v.paused && !v.ended) {
+        startPlaybackIfDesired();
+      }
+    }, 2500);
+
+    function onVisibilityChange() {
+      if (!document.hidden) { startPlaybackIfDesired(); }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return function() {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (resumeTimerRef.current) {
+        clearTimeout(resumeTimerRef.current);
+        resumeTimerRef.current = null;
+      }
+    };
+  }, [isOpen, streamUrl, streamState.status]); // eslint-disable-line
+
   // ── Probe audio/text tracks once the video has metadata ───────────────
   function refreshTracks() {
     var v = videoRef.current;
@@ -667,9 +710,43 @@ function PlayerModal(props) {
 
   // Mark watched + clear resume point when the user finishes the asset.
   function handleEnded() {
+    desiredPlaybackRef.current = false;
     setPlaying(false);
     if (!isLive && item && item.id) {
       try { playbackPositionStore.clearPosition(profileId, String(item.id)); } catch (_e) { /* */ }
+    }
+  }
+
+  function startPlaybackIfDesired() {
+    var v = videoRef.current;
+    if (!v || !desiredPlaybackRef.current) { return; }
+    if (!streamUrl || streamState.status !== 'streaming') { return; }
+    try {
+      if (!v.paused && !v.ended) {
+        setPlaying(true);
+        return;
+      }
+      var pp = v.play();
+      if (pp && pp.then) {
+        pp.then(function() { setPlaying(true); }).catch(function() { setPlaying(false); });
+      } else {
+        setPlaying(true);
+      }
+    } catch (_e) { /* play() can throw on some WebKit builds */ }
+  }
+
+  function schedulePlaybackResume() {
+    if (!desiredPlaybackRef.current || resumeTimerRef.current) { return; }
+    resumeTimerRef.current = setTimeout(function() {
+      resumeTimerRef.current = null;
+      startPlaybackIfDesired();
+    }, 700);
+  }
+
+  function handleVideoPause() {
+    setPlaying(false);
+    if (desiredPlaybackRef.current && streamState.status === 'streaming') {
+      schedulePlaybackResume();
     }
   }
 
@@ -678,10 +755,20 @@ function PlayerModal(props) {
     if (!v) { return; }
     try {
       if (v.paused) {
+        desiredPlaybackRef.current = true;
+        if (resumeTimerRef.current) {
+          clearTimeout(resumeTimerRef.current);
+          resumeTimerRef.current = null;
+        }
         var pp = v.play();
         if (pp && pp.then) { pp.then(function() { setPlaying(true); }).catch(function() { /* autoplay blocked */ }); }
         else { setPlaying(true); }
       } else {
+        desiredPlaybackRef.current = false;
+        if (resumeTimerRef.current) {
+          clearTimeout(resumeTimerRef.current);
+          resumeTimerRef.current = null;
+        }
         v.pause();
         setPlaying(false);
       }
@@ -990,10 +1077,18 @@ function PlayerModal(props) {
                 autoPlay
                 playsInline
                 onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleLoadedMetadata}
+                onLoadedMetadata={function() { handleLoadedMetadata(); startPlaybackIfDesired(); }}
+                onLoadedData={startPlaybackIfDesired}
+                onCanPlay={startPlaybackIfDesired}
                 onEnded={handleEnded}
-                onPlay={function() { setPlaying(true); }}
-                onPause={function() { setPlaying(false); }}
+                onPlay={function() {
+                  setPlaying(true);
+                  if (resumeTimerRef.current) {
+                    clearTimeout(resumeTimerRef.current);
+                    resumeTimerRef.current = null;
+                  }
+                }}
+                onPause={handleVideoPause}
                 onVolumeChange={function() {
                   var v = videoRef.current;
                   if (!v) { return; }
