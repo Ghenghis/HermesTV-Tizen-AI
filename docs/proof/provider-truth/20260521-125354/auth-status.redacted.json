@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "api_enforced": true,
+  "configured": true,
+  "oauth_providers": [],
+  "smtp_configured": false
+}

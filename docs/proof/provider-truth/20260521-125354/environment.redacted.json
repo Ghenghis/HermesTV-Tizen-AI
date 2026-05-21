@@ -1,0 +1,24 @@
+{
+  "timestamp": "20260521-125354",
+  "mode": "live",
+  "base": "https://tv.daveai.tech",
+  "env": {
+    "APOLLO_M3U_URL": null,
+    "XTREMEHD_M3U_URL": null,
+    "XTREAM_URL": null,
+    "XTREAM_USERNAME": null,
+    "XTREAM_PASSWORD": null,
+    "JELLYFIN_URL": null,
+    "JELLYFIN_API_KEY": null,
+    "IPTV_ORG_ENABLED": null,
+    "DAVETV_PROOF_EMAIL": "<set>",
+    "DAVETV_PROOF_PASSWORD": "<set>",
+    "HERMES_PROVIDER_E2E_EMAIL": null,
+    "HERMES_PROVIDER_E2E_PASSWORD": null
+  },
+  "pass": [],
+  "fail": [
+    "auth_login_failed"
+  ],
+  "notes": []
+}

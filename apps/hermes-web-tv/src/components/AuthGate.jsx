@@ -108,6 +108,21 @@ function LoadingAuth() {
   );
 }
 
+function LocalAdminDisabledView(props) {
+  var onExit = props.onExit;
+  return (
+    <div style={PANEL}>
+      <div style={CARD}>
+        {brandHeader('Admin panel', 'Local development is running with DaveTV login disabled.')}
+        <div style={{ background: 'rgba(227,179,65,0.12)', border: '1px solid rgba(227,179,65,0.45)', color: '#f0d58a', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', lineHeight: 1.45 }}>
+          Family account management requires the API auth gate and an active Dave admin session. Keep local no-login mode for fast UI work, or enable auth locally when testing account creation.
+        </div>
+        <button type="button" style={SECONDARY} onClick={onExit}>Open DaveTV</button>
+      </div>
+    </div>
+  );
+}
+
 function LoginView(props) {
   var auth = props.auth || {};
   var onAuthed = props.onAuthed;
@@ -330,6 +345,9 @@ function AdminPanel(props) {
   var msgState = React.useState('');
   var msg = msgState[0];
   var setMsg = msgState[1];
+  var actionLinkState = React.useState('');
+  var actionLink = actionLinkState[0];
+  var setActionLink = actionLinkState[1];
   var emailState = React.useState('');
   var email = emailState[0];
   var setEmail = emailState[1];
@@ -357,6 +375,7 @@ function AdminPanel(props) {
   function create(e) {
     e.preventDefault();
     setMsg('');
+    setActionLink('');
     hermesApi.createUserAccount({
       email: email,
       display_name: displayName,
@@ -364,16 +383,23 @@ function AdminPanel(props) {
       role: displayName === 'Dave' ? 'admin' : 'viewer',
     }).then(function(body) {
       setEmail('');
-      setMsg(body.reset_url ? ('Account ready. SMTP is not configured, use this reset link: ' + body.reset_url) : 'Account ready and reset link emailed.');
+      if (body.reset_url) {
+        setMsg('Account ready. SMTP is not configured yet, so open the reset form for this account.');
+        setActionLink(body.reset_url);
+      } else {
+        setMsg('Account ready and reset link emailed.');
+      }
       load();
     }).catch(function(err) {
       setMsg(err.message || 'Account creation failed.');
+      setActionLink('');
     });
   }
 
   function setUserPassword(userId) {
     var nextPass = passwordById[userId] || '';
     setMsg('');
+    setActionLink('');
     hermesApi.adminSetPassword(userId, nextPass).then(function() {
       setPasswordById(Object.assign({}, passwordById, { [userId]: '' }));
       setMsg('Password updated.');
@@ -387,7 +413,14 @@ function AdminPanel(props) {
     <div style={PANEL}>
       <div style={Object.assign({}, CARD, { width: 'min(980px, 100%)' })}>
         {brandHeader('Admin panel', 'Signed in as ' + (me.display_name || 'Dave'))}
-        {msg ? <div style={{ background: 'rgba(31,111,235,0.12)', border: '1px solid rgba(31,111,235,0.45)', color: '#b9d4ff', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', wordBreak: 'break-word' }}>{msg}</div> : null}
+        {msg ? (
+          <div style={{ background: 'rgba(31,111,235,0.12)', border: '1px solid rgba(31,111,235,0.45)', color: '#b9d4ff', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', wordBreak: 'break-word' }}>
+            <div>{msg}</div>
+            {actionLink ? (
+              <a href={actionLink} style={Object.assign({}, SECONDARY, { display: 'inline-flex', marginTop: '0.75rem', textDecoration: 'none' })}>Open reset form</a>
+            ) : null}
+          </div>
+        ) : null}
         <form onSubmit={create} style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) 180px 160px auto', gap: '0.75rem', alignItems: 'end', marginBottom: '1.2rem' }}>
           {field('Email', email, setEmail, 'email', 'email')}
           <label style={{ display: 'block', marginBottom: '0.85rem' }}>
@@ -488,9 +521,14 @@ function AuthGate(props) {
   }, []);
 
   if (loading) { return <LoadingAuth />; }
-  if (auth && auth.required === false) { return children; }
   if (registerToken) { return <RegisterView token={registerToken} auth={auth} onAuthed={function(u) { setUser(u); }} />; }
   if (resetToken) { return <ResetView token={resetToken} onAuthed={function(u) { setUser(u); }} />; }
+  if (auth && auth.required === false) {
+    if (adminMode) {
+      return <LocalAdminDisabledView onExit={function() { setAdminMode(false); cleanUrl(); }} />;
+    }
+    return children;
+  }
   if (!user) { return <LoginView auth={auth} adminMode={adminMode} onAuthed={function(u) { setUser(u); }} />; }
   if (adminMode) {
     if (user.role !== 'admin') {

@@ -2450,6 +2450,9 @@ function App() {
               onResetDefaults={handleResetDefaults}
               onReplayOnboarding={handleReplayOnboarding}
               onManageProfiles={handleManageProfiles}
+              onOpenAdminPanel={function() {
+                if (typeof window !== 'undefined') { window.location.href = '/?admin=1'; }
+              }}
               onThemeChange={function(themeName) {
                 applyThemeByName(themeName);
                 patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
