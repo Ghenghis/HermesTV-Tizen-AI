@@ -85,24 +85,21 @@ function _isRadio(item) {
   return false;
 }
 
-// ─── Current programme — placeholder ─────────────────────────────────────────
-// /api/epg/grid integration lives in LiveTVShell. For this shell we keep the
-// "now" line deterministic so two renders show the same value (no flicker on
-// focus restore). When EPG is plumbed in we'll switch this to the real feed.
-function _placeholderNow(channel) {
-  if (!channel) { return ''; }
-  var seed = 0;
-  var key = channel.id || channel.title || 'x';
-  for (var i = 0; i < key.length; i++) { seed = (seed + key.charCodeAt(i)) | 0; }
-  if (seed < 0) { seed = -seed; }
-  var titles = [
-    'Now: Top of the Hour',
-    'Now: Headlines',
-    'Now: Feature Programme',
-    'Now: Local Update',
-    'Now: Late Edition',
-  ];
-  return titles[seed % titles.length];
+// ─── Current programme — honest empty when no EPG data ─────────────────────
+// HANDOFF blocker #10 (2026-05-21): removed `_placeholderNow` synthetic-title
+// generator (seeded 5-string array that looked real on every render). Now
+// programmes only show when /api/epg/grid returns real data for the channel;
+// otherwise the line is empty rather than a fabricated "Now: Headlines".
+//
+// Channels with no guide data render an empty programme line; the user can
+// still see the channel itself + the channel number. Replacing the seeded
+// placeholder with REAL provider EPG aligns this shell with LiveTVShell's
+// honest empty-state contract.
+function _currentProgrammeText(channel, nowByChannelId) {
+  if (!channel || !nowByChannelId) { return ''; }
+  var key = channel.id;
+  if (!key) { return ''; }
+  return nowByChannelId[key] || nowByChannelId['live.' + key] || '';
 }
 
 function IptvnatorShell(props) {
@@ -137,6 +134,53 @@ function IptvnatorShell(props) {
   var recentState = React.useState([]);
   var recentItems = recentState[0];
   var setRecentItems = recentState[1];
+
+  // EPG: { channel_id: "Now title" } map populated by /api/epg/grid. Empty
+  // string for any channel lookup that isn't in the map.
+  var epgState = React.useState({});
+  var nowByChannelId = epgState[0];
+  var setNowByChannelId = epgState[1];
+
+  // Fetch EPG once per profile + channel set change. Single request for the
+  // full window (3h ahead); filter to "now" per row in JS. Honest failure:
+  // on error or empty response, leave the map empty so the UI shows empty
+  // programme lines rather than synthetic titles.
+  React.useEffect(function() {
+    if (typeof fetch !== 'function') { return; }
+    var aborted = false;
+    var profileId = (profile && profile.id) || 'dave_tv';
+    var start = new Date();
+    start.setSeconds(0, 0);
+    var end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+    var url = '/api/epg/grid?profile_id=' + encodeURIComponent(profileId)
+      + '&start=' + encodeURIComponent(start.toISOString())
+      + '&end=' + encodeURIComponent(end.toISOString());
+    fetch(url)
+      .then(function(r) { if (!r || !r.ok) { throw new Error('epg-unavailable'); } return r.json(); })
+      .then(function(body) {
+        if (aborted) { return; }
+        var progs = (body && body.programs) || [];
+        var now = Date.now();
+        var map = {};
+        for (var i = 0; i < progs.length; i++) {
+          var p = progs[i];
+          if (!p || !p.channel_id) { continue; }
+          var s = Date.parse(p.start_utc);
+          var e = Date.parse(p.end_utc);
+          if (isNaN(s) || isNaN(e)) { continue; }
+          if (s <= now && now < e) {
+            // First match wins — programs are sorted by start_utc per
+            // /api/epg/grid contract, so "current" is the earliest matching.
+            if (!map[p.channel_id]) { map[p.channel_id] = p.title || ''; }
+          }
+        }
+        setNowByChannelId(map);
+      })
+      .catch(function() {
+        if (!aborted) { setNowByChannelId({}); }
+      });
+    return function() { aborted = true; };
+  }, [profile && profile.id, catalog && catalog.length]);
 
   var playerModeState = React.useState('inapp');
   var playerMode = playerModeState[0];
@@ -643,7 +687,7 @@ function IptvnatorShell(props) {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {_placeholderNow(ch)}
+                      {_currentProgrammeText(ch, nowByChannelId)}
                     </span>
                   </span>
                   <span
@@ -702,7 +746,7 @@ function IptvnatorShell(props) {
               {focusedTitle}
             </div>
             <div style={{ fontSize: 'calc(0.72rem * var(--font-scale, 1))', color: COLOR_MUTED }}>
-              {_placeholderNow(focusedChannel)}
+              {_currentProgrammeText(focusedChannel, nowByChannelId)}
             </div>
             <button
               tabIndex={0}
