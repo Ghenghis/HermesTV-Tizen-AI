@@ -69,34 +69,92 @@
  */
 
 var SANITIZE = require('./sanitizeLog').sanitizeForLog;
+// Provider truth contract: all provider config flows through the registry,
+// not directly through env or providerStore. Each panel gets its own cache
+// namespace via cfg.id so multiple paid providers never collide.
+var providerRegistry = require('./providerRegistry');
 
 var LIST_CACHE_TTL_MS = 5 * 60 * 1000;  // 5 minutes for catalog endpoints
 var EPG_CACHE_TTL_MS = 60 * 1000;       // 60 s for EPG (now/next moves fast)
 var FETCH_TIMEOUT_MS = 8000;            // matches m3uClient.js
 
-// Unified cache: keyed by canonical endpoint+args string.
+// Unified cache: keyed by `<cfgId>|<endpoint+args>` string.
 // Value shape: { data: <whatever fetch returned>, fetchedAt: <ms>, ttl: <ms>, error: <string|null> }
 var _cache = {};
 var _inFlight = {};
+
+// Snapshot of providerRegistry xtream rows. Refreshed via _refreshRegistrySnapshot
+// at the top of every multi-config aggregator call.
+var _registrySnapshot = [];
+
+async function _refreshRegistrySnapshot() {
+  try {
+    var rows = await providerRegistry.listFull();
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r && r.type === 'xtream' && r.enabled !== false &&
+          typeof r.url === 'string' && r.url.length > 0 &&
+          typeof r.username === 'string' && r.username.length > 0 &&
+          typeof r.password === 'string' && r.password.length > 0) {
+        out.push({
+          id: r.source === 'env' ? 'env' : r.id,
+          registry_id: r.id,
+          provider_id: r.provider_id || 'xtream',
+          source: r.source || 'config',
+          label: r.label || r.id,
+          base: r.url.trim().replace(/\/+$/, ''),
+          username: r.username,
+          password: r.password,
+        });
+      }
+    }
+    _registrySnapshot = out;
+  } catch (e) {
+    console.warn('[xtreamClient] registry snapshot refresh failed: ' + SANITIZE(e && e.message ? e.message : 'unknown'));
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Env / config
 // ---------------------------------------------------------------------------
 
-function _cfg() {
+// Env-configured panel — keeps the legacy single-panel deployment working.
+function _envCfg() {
   var url = process.env.XTREAM_URL;
   var username = process.env.XTREAM_USERNAME;
   var password = process.env.XTREAM_PASSWORD;
   if (typeof url !== 'string' || url.trim().length === 0) { return null; }
   if (typeof username !== 'string' || username.trim().length === 0) { return null; }
   if (typeof password !== 'string' || password.trim().length === 0) { return null; }
-  // Strip trailing slash so we can append `/player_api.php` cleanly.
   var base = url.trim().replace(/\/+$/, '');
-  return { base: base, username: username.trim(), password: password.trim() };
+  // cfgId 'env' so it never collides with store-backed `prov-<hex>` ids.
+  return { id: 'env', label: 'Xtream Codes', base: base, username: username.trim(), password: password.trim() };
+}
+
+// _cfg is preserved for backward compat (the legacy single-panel helpers
+// below still use it). Returns the env-configured panel only.
+function _cfg() {
+  return _envCfg();
+}
+
+// _allConfigs returns every active xtream panel — env + every enabled store
+// row. Used by the multi-config aggregators added in wave-20.
+function _allConfigs() {
+  var cfgs = [];
+  var env = _envCfg();
+  if (env) { cfgs.push(env); }
+  for (var i = 0; i < _registrySnapshot.length; i++) {
+    // Avoid double-adding the env panel when the registry snapshot includes it.
+    if (_registrySnapshot[i].source === 'env') { continue; }
+    cfgs.push(_registrySnapshot[i]);
+  }
+  return cfgs;
 }
 
 function isEnabled() {
-  return _cfg() !== null;
+  if (_cfg() !== null) { return true; }
+  return _registrySnapshot.length > 0;
 }
 
 function _now() { return Date.now(); }
@@ -122,8 +180,12 @@ function _buildUrl(cfg, action, params) {
   return cfg.base + '/player_api.php?' + qs;
 }
 
-function _cacheKey(action, params) {
-  var key = action || 'auth';
+function _cacheKey(action, params, cfgId) {
+  // Wave-20: prefix every cache key with the cfgId so multi-panel deployments
+  // (env + N store rows) never share cache entries. Legacy callers pass no
+  // cfgId — we fall back to 'env' so the env-only cache layout is unchanged.
+  var prefix = cfgId || 'env';
+  var key = prefix + '|' + (action || 'auth');
   if (params && typeof params === 'object') {
     var keys = Object.keys(params).sort();
     for (var i = 0; i < keys.length; i++) {
@@ -143,11 +205,16 @@ function _getCached(key) {
 // _fetchAction returns a Promise that resolves to whatever JSON the
 // Xtream panel returned (array, object, or {} on error). NEVER rejects —
 // transient failures resolve to [] or null per the soft-fail contract.
-function _fetchAction(action, params, ttlMs) {
-  var cfg = _cfg();
+//
+// `optCfg` lets the multi-config aggregator pass a non-env config (a store-
+// backed panel). When omitted we use the env-configured panel — that
+// preserves the original single-panel contract for legacy callers like
+// catalog.js's existing getLiveStreams / getVodStreams / getSeriesList calls.
+function _fetchAction(action, params, ttlMs, optCfg) {
+  var cfg = optCfg || _cfg();
   if (!cfg) { return Promise.resolve(null); }
 
-  var key = _cacheKey(action, params);
+  var key = _cacheKey(action, params, cfg.id);
   var fresh = _getCached(key);
   if (fresh) { return Promise.resolve(fresh.data); }
 
@@ -357,25 +424,38 @@ function getSimpleEpg(streamId) {
 // Stream URL resolution — INTERNAL, never exported on module.exports root
 // ---------------------------------------------------------------------------
 
-// Hermes ID shape: `xtream-<type>-<stream_id>` where type ∈ {live,vod,series}.
-// streamResolver.js will dispatch on the `xtream-` prefix the same way it
-// dispatches `m3u-` and `iptv-`.
+// Hermes ID shape (env panel):    `xtream-<type>-<stream_id>`
+// Hermes ID shape (store panel):  `xtream-prov-<hex>-<type>-<stream_id>`
+// streamResolver.js dispatches on the `xtream-` prefix; we re-parse here.
 function _resolveStreamUrl(hermesChannelId) {
   if (typeof hermesChannelId !== 'string') { return null; }
-  var cfg = _cfg();
+
+  var cfg = null;
+  var type = null;
+  var streamId = null;
+
+  // Try the store-backed pattern first (more specific).
+  var ms = /^xtream-(prov-[a-f0-9]+)-(live|vod|series)-(.+)$/.exec(hermesChannelId);
+  if (ms) {
+    var pid = ms[1];
+    type = ms[2];
+    streamId = ms[3];
+    for (var i = 0; i < _registrySnapshot.length; i++) {
+      if (_registrySnapshot[i].id === pid) { cfg = _registrySnapshot[i]; break; }
+    }
+  } else {
+    var me = /^xtream-(live|vod|series)-(.+)$/.exec(hermesChannelId);
+    if (!me) { return null; }
+    type = me[1];
+    streamId = me[2];
+    cfg = _cfg();
+  }
   if (!cfg) { return null; }
-  var m = /^xtream-(live|vod|series)-(.+)$/.exec(hermesChannelId);
-  if (!m) { return null; }
-  var type = m[1];
-  var streamId = m[2];
+
   // URL templates by type:
   //   live:   /live/<u>/<p>/<stream_id>.ts
   //   vod:    /movie/<u>/<p>/<stream_id>.<container_extension>
   //   series: /series/<u>/<p>/<episode_id>.<container_extension>
-  // For VOD/series we'd need the container_extension from get_vod_info /
-  // get_series_info — for now we default to .mp4 (the most common
-  // container_extension Xtream panels use). A future enhancement: read
-  // from cached VOD metadata.
   if (type === 'live') {
     return cfg.base + '/live/' +
       encodeURIComponent(cfg.username) + '/' +
@@ -412,7 +492,7 @@ function _resolveStreamUrl(hermesChannelId) {
  * so the catalog merge in routes/catalog.js can treat all three sources
  * interchangeably (W13-MERGE dedupe + auto-fallback work out of the box).
  */
-function toHermesItem(x, type) {
+function toHermesItem(x, type, cfgRef) {
   if (!x || typeof x !== 'object') { return null; }
   if (type !== 'live' && type !== 'vod' && type !== 'series') { return null; }
 
@@ -425,7 +505,19 @@ function toHermesItem(x, type) {
   }
   if (rawId == null) { return null; }
   var sid = String(rawId);
-  var hermesId = 'xtream-' + type + '-' + sid;
+  // Wave-20: store-backed panels embed their `prov-<hex>` cfgId so the
+  // resolver can find the right credentials. Env panel keeps the legacy
+  // shape so existing tests + saved playback positions remain valid.
+  var hermesId;
+  var cfgId = typeof cfgRef === 'object' && cfgRef ? cfgRef.id : cfgRef;
+  var providerId = (typeof cfgRef === 'object' && cfgRef && cfgRef.provider_id)
+    ? cfgRef.provider_id
+    : 'xtream';
+  if (typeof cfgId === 'string' && cfgId.indexOf('prov-') === 0) {
+    hermesId = 'xtream-' + cfgId + '-' + type + '-' + sid;
+  } else {
+    hermesId = 'xtream-' + type + '-' + sid;
+  }
 
   var title = x.name || x.title || ('Xtream ' + type + ' ' + sid);
   var logo = x.stream_icon || x.cover || x.cover_big || null;
@@ -455,14 +547,19 @@ function toHermesItem(x, type) {
     id: hermesId,
     type: type === 'series' ? 'series' : (type === 'vod' ? 'movie' : 'live'),
     title: title,
-    provider: 'xtream',
+    provider: providerId,
     category: category,
     logo_url: logo,
     poster_url: logo,
     profile_access: ['dave_tv', 'mom_tv'],
     metadata: metadata,
+    providers: [{
+      provider_id: providerId,
+      source_id: sid,
+      source_health: { status: 'ok', latency_ms: null, checked_utc: null },
+    }],
     sources: [{
-      provider_id: 'xtream',
+      provider_id: providerId,
       source_id: sid,
       resolution: metadata.resolution,
       is_seed_placeholder: false,
@@ -485,11 +582,13 @@ function getProviderStatus() {
     if (e && e.fetchedAt > latestAt) { latestAt = e.fetchedAt; }
     if (e && e.error) { lastError = e.error; }
   }
-  // Count live streams in cache (most useful diagnostic).
+  // Count live streams across every cached panel.
   var liveCount = 0;
-  var liveKey = _cacheKey('get_live_streams', null);
-  if (_cache[liveKey] && Array.isArray(_cache[liveKey].data)) {
-    liveCount = _cache[liveKey].data.length;
+  for (var ck in _cache) {
+    if (!Object.prototype.hasOwnProperty.call(_cache, ck)) { continue; }
+    if (ck.indexOf('|get_live_streams') !== -1 && _cache[ck] && Array.isArray(_cache[ck].data)) {
+      liveCount += _cache[ck].data.length;
+    }
   }
   return {
     configured: configured,
@@ -497,7 +596,66 @@ function getProviderStatus() {
     count: liveCount,
     error: lastError,
     age_ms: latestAt > 0 ? (_now() - latestAt) : null,
+    panel_count: _allConfigs().length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Wave-20: multi-config aggregators — used by routes/catalog.js so a single
+// /api/catalog request collects items from every active panel (env + N
+// store rows). Each panel is fetched in parallel, errors swallowed per
+// panel, returning a flat array of HermesTV items shaped via toHermesItem.
+// ---------------------------------------------------------------------------
+
+async function fetchAllLive() {
+  await _refreshRegistrySnapshot();
+  var cfgs = _allConfigs();
+  if (cfgs.length === 0) { return []; }
+  var out = [];
+  await Promise.all(cfgs.map(function(cfg) {
+    return _fetchAction('get_live_streams', null, LIST_CACHE_TTL_MS, cfg).then(function(data) {
+      if (!Array.isArray(data)) { return; }
+      for (var i = 0; i < data.length; i++) {
+        var shaped = toHermesItem(data[i], 'live', cfg);
+        if (shaped) { out.push(shaped); }
+      }
+    }).catch(function() { /* per-panel failure already logged in _fetchAction */ });
+  }));
+  return out;
+}
+
+async function fetchAllVod() {
+  await _refreshRegistrySnapshot();
+  var cfgs = _allConfigs();
+  if (cfgs.length === 0) { return []; }
+  var out = [];
+  await Promise.all(cfgs.map(function(cfg) {
+    return _fetchAction('get_vod_streams', null, LIST_CACHE_TTL_MS, cfg).then(function(data) {
+      if (!Array.isArray(data)) { return; }
+      for (var i = 0; i < data.length; i++) {
+        var shaped = toHermesItem(data[i], 'vod', cfg);
+        if (shaped) { out.push(shaped); }
+      }
+    }).catch(function() { /* swallow */ });
+  }));
+  return out;
+}
+
+async function fetchAllSeries() {
+  await _refreshRegistrySnapshot();
+  var cfgs = _allConfigs();
+  if (cfgs.length === 0) { return []; }
+  var out = [];
+  await Promise.all(cfgs.map(function(cfg) {
+    return _fetchAction('get_series', null, LIST_CACHE_TTL_MS, cfg).then(function(data) {
+      if (!Array.isArray(data)) { return; }
+      for (var i = 0; i < data.length; i++) {
+        var shaped = toHermesItem(data[i], 'series', cfg);
+        if (shaped) { out.push(shaped); }
+      }
+    }).catch(function() { /* swallow */ });
+  }));
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -528,6 +686,12 @@ module.exports = {
   getSimpleEpg: getSimpleEpg,
   toHermesItem: toHermesItem,
   getProviderStatus: getProviderStatus,
+  // Wave-20: multi-panel aggregators — env config + every enabled
+  // operator-onboarded store row. routes/catalog.js uses these in place of
+  // the env-only getLiveStreams / getVodStreams / getSeriesList.
+  fetchAllLive: fetchAllLive,
+  fetchAllVod: fetchAllVod,
+  fetchAllSeries: fetchAllSeries,
   // INTERNAL — only lib/streamResolver.js should call this. Never expose on
   // any HTTP route. Same audit boundary as m3uClient.internal.
   internal: {

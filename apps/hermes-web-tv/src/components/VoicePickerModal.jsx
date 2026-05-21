@@ -13,9 +13,9 @@ function VoicePickerModal(props) {
   var currentVoiceId = props.currentVoiceId;
   var onClose = props.onClose;
   var onVoiceChange = props.onVoiceChange;
-  // Agent name flows through props from App.jsx; falls back to 'Hermes'
+  // Agent name flows through props from App.jsx; falls back to 'DaveTV'
   // so existing call sites without the prop continue to work.
-  var agentName = props.agentName || 'Hermes';
+  var agentName = props.agentName || 'DaveTV';
 
   var voicesResult = React.useState([]);
   var voices = voicesResult[0];

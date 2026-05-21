@@ -9,11 +9,11 @@ import useFavorites from '../hooks/useFavorites.js';
 import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PlexShell — HermesTV's media-server-style layout.
+// PlexShell — DaveTV's media-server-style layout.
 //
 // Visual identity: amber/gold sidebar with landscape tile grid (16:9), drawing
 // from the home-media-server design language without copying brand assets.
-// HermesTV branding only — never reference upstream player names in copy.
+// DaveTV branding only — never reference upstream player names in copy.
 //
 // SOTA polish per PR #75: design tokens (--radius-*, --shadow-*, --gradient-*,
 // --ease-out), hover-lift cards (.hermes-card-hover style transform), focus-
@@ -233,7 +233,7 @@ function PlexShell(props) {
 
       {/* Sidebar */}
       <div style={{ background: '#191b1d', borderRight: '1px solid #2a2c2f', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Wordmark — HermesTV branding only, never reference upstream player
+        {/* Wordmark — DaveTV branding only, never reference upstream player
             names in user-visible strings. Gold gradient text echoes the
             shell's amber identity without claiming the upstream brand. */}
         <div style={{
@@ -246,7 +246,7 @@ function PlexShell(props) {
           WebkitBackgroundClip: 'text',
           color: 'transparent',
           letterSpacing: '0.04em',
-        }}>HermesTV</div>
+        }}>DaveTV</div>
 
         <div style={{ overflowY: 'auto', flex: 1 }}>
           <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Library</div>

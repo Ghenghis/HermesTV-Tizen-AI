@@ -13,7 +13,8 @@
  *
  * W17-PURGE: the seed catalog (LIVE_DEFS) was the previous channel source.
  * Under the no-fakes rule we now derive live channels from the same real
- * providers that /api/catalog uses (iptv-org + operator-pasted M3U).
+ * providers that /api/catalog uses (iptv-org + operator-pasted M3U +
+ * Xtream Codes panels).
  * When NO provider is configured the channel list is honestly empty —
  * never a synthetic ESPN/CNN/HBO list.
  */
@@ -21,56 +22,108 @@
 var express = require('express');
 var iptvOrg = require('../lib/iptvOrg');
 var m3uClient = require('../lib/m3uClient');
+var xtreamClient = require('../lib/xtreamClient');
+var catalogMerge = require('../lib/catalogMerge');
 
 var router = express.Router();
 
 var VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
-// Pull live channels from real provider caches. Never throws. Returns an
-// array in /api/channels shape with no stream URLs.
-function _collectLiveChannels() {
-  var out = [];
+// Pull live channels from the same real provider/catalog adapters that
+// /api/catalog uses. Never throws. Returns an array in /api/channels shape
+// with no stream URLs.
+async function _collectLiveChannels() {
+  var items = [];
+
   // iptv-org public CDN channels first (free, no credentials).
   if (iptvOrg.isEnabled()) {
     try {
-      var orgItems = iptvOrg.fetchCatalog({ limit: 500 });
+      var orgItems = iptvOrg.fetchCatalog({ limit: 300 });
       if (Array.isArray(orgItems)) {
         for (var i = 0; i < orgItems.length; i++) {
           var it = orgItems[i];
           if (!it || it.type !== 'live') { continue; }
-          out.push(_toChannelShape(it, 'iptv-org'));
+          items.push(it);
         }
       }
     } catch (_) { /* skip silently — diagnostic surfaces via /api/source-health */ }
   }
-  // Operator-pasted M3U providers (Apollo Group, xTremeHD).
-  if (m3uClient.isEnabled()) {
-    try {
-      // m3uClient.fetchCatalog is async; we can't await here without
-      // making the helper async. The caller is sync so we rely on the
-      // already-warm cache. /api/catalog primes the cache on startup.
-      var cached = m3uClient.getCachedCatalog && m3uClient.getCachedCatalog();
-      if (Array.isArray(cached)) {
-        for (var j = 0; j < cached.length; j++) {
-          var ci = cached[j];
-          if (!ci || ci.type !== 'live') { continue; }
-          var providerLabel = (Array.isArray(ci.providers) && ci.providers[0] && ci.providers[0].provider_id) || 'm3u';
-          out.push(_toChannelShape(ci, providerLabel));
-        }
+
+  // Operator-pasted M3U providers. Always call fetchCatalog: disk-backed
+  // provider rows are discovered through providerRegistry asynchronously, so
+  // a cold-start isEnabled() check can be stale before the first snapshot.
+  try {
+    var m3uItems = await m3uClient.fetchCatalog({ limit: 600 });
+    if (Array.isArray(m3uItems)) {
+      for (var j = 0; j < m3uItems.length; j++) {
+        var mi = m3uItems[j];
+        if (!mi || mi.type !== 'live') { continue; }
+        items.push(mi);
       }
-    } catch (_) { /* skip silently */ }
+    }
+  } catch (_) { /* skip silently */ }
+
+  // Xtream Codes panels. /api/catalog also pulls VOD + series, but channels
+  // only expose live rows.
+  try {
+    var xtreamItems = await xtreamClient.fetchAllLive();
+    if (Array.isArray(xtreamItems)) {
+      for (var k = 0; k < xtreamItems.length; k++) {
+        var xi = xtreamItems[k];
+        if (!xi || xi.type !== 'live') { continue; }
+        items.push(xi);
+      }
+    }
+  } catch (_) { /* skip silently */ }
+
+  var merged;
+  try {
+    merged = catalogMerge.mergeByTitle(items);
+  } catch (_) {
+    merged = items;
+  }
+
+  var out = [];
+  for (var n = 0; n < merged.length; n++) {
+    var item = merged[n];
+    if (!item || item.type !== 'live') { continue; }
+    out.push(_toChannelShape(item));
   }
   return out;
 }
 
-function _toChannelShape(item, providerTag) {
+function _providerTags(item) {
+  var tags = [];
+  var seen = {};
+
+  function add(tag) {
+    if (typeof tag !== 'string' || tag.length === 0 || seen[tag]) { return; }
+    seen[tag] = true;
+    tags.push(tag);
+  }
+
+  if (Array.isArray(item.sources)) {
+    for (var i = 0; i < item.sources.length; i++) {
+      add(item.sources[i] && item.sources[i].provider_id);
+    }
+  }
+  if (Array.isArray(item.providers)) {
+    for (var j = 0; j < item.providers.length; j++) {
+      add(item.providers[j] && item.providers[j].provider_id);
+    }
+  }
+  add(item.provider);
+  return tags;
+}
+
+function _toChannelShape(item) {
   return {
     channel_id: typeof item.id === 'string' ? item.id : 'live.' + String(item.id || 'unknown'),
     channel_number: item.channel_number ? String(item.channel_number) : '',
     display_name: item.title || 'Unknown',
     // Provider may serve a logo URL on the item; never substitute a fake URL.
     logo_url: item.logo_url || null,
-    provider_tags: [providerTag],
+    provider_tags: _providerTags(item),
     catch_up_available: !!(item.metadata && item.metadata.has_catchup),
     epg_status: (item.metadata && item.metadata.has_catchup) ? 'matched' : 'unknown',
     category: item.category || 'unknown',
@@ -80,7 +133,7 @@ function _toChannelShape(item, providerTag) {
 }
 
 // ── GET /api/channels?profile_id=dave_tv|mom_tv ───────────────────────────────
-router.get('/', function(req, res) {
+router.get('/', async function(req, res) {
   var profile_id = req.query.profile_id;
 
   if (!profile_id) {
@@ -96,7 +149,7 @@ router.get('/', function(req, res) {
     });
   }
 
-  var channels = _collectLiveChannels();
+  var channels = await _collectLiveChannels();
   var visible = channels.filter(function(ch) {
     return !ch.profile_access || ch.profile_access.indexOf(profile_id) !== -1;
   });
@@ -112,9 +165,9 @@ router.get('/', function(req, res) {
 });
 
 // ── GET /api/channels/:channel_id ─────────────────────────────────────────────
-router.get('/:channel_id', function(req, res) {
+router.get('/:channel_id', async function(req, res) {
   var channel_id = req.params.channel_id;
-  var channels = _collectLiveChannels();
+  var channels = await _collectLiveChannels();
   var found = null;
   for (var i = 0; i < channels.length; i++) {
     if (channels[i].channel_id === channel_id) { found = channels[i]; break; }

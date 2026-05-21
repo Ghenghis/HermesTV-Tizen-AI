@@ -1,12 +1,13 @@
 import React from 'react';
+import QRCode from 'qrcode';
 import * as hermesApi from '../api/hermesApi.js';
 import * as voiceClient from '../api/azureVoiceClient.js';
 import * as voicePrefStore from '../store/voicePrefStore.js';
 
-// W17-PURGE: previously this modal fell back to a fake "HRM-MOCK" pairing
-// code when offline. Under the no-fakes rule we now surface an honest
-// "needs network" envelope instead — a QR code that points nowhere would
-// be exactly the kind of placeholder UI the project bans.
+// W17-PURGE: previously this modal fell back to a made-up pairing code when
+// offline. Under the no-fakes rule we now surface an honest "needs network"
+// envelope instead — a QR code that points nowhere would be exactly the kind
+// of placeholder UI the project bans.
 var OFFLINE_PAIRING = {
   createPairing: function() {
     return Promise.reject(new Error('Pairing requires a live connection to the DaveTV server.'));
@@ -70,6 +71,16 @@ function _buildRemotePairUrl(pairingCode) {
   return origin + path;
 }
 
+function _buildProviderSetupUrl(pairingCode, setupUrl) {
+  var direct = (typeof setupUrl === 'string') ? setupUrl.trim() : '';
+  if (direct) {
+    if (/^https?:\/\//i.test(direct)) { return direct; }
+    return hermesApi.buildApiUrl(direct.charAt(0) === '/' ? direct : ('/' + direct));
+  }
+  if (!pairingCode) { return ''; }
+  return hermesApi.buildApiUrl('/api/setup/provider?code=' + encodeURIComponent(pairingCode));
+}
+
 // ── QR sizing ───────────────────────────────────────────────────────────────
 // Mom-mode (font-scale ≥ 1.25) must scan from the couch, so the QR has a
 // 256 px floor and scales up with font-scale. We pin the inner SVG to the
@@ -85,91 +96,80 @@ function _resolveFontScale() {
   return 1;
 }
 
-// Simple static SVG QR code placeholder — black squares pattern.
-// Phase 2 will replace this with a real QR encoding the pairing URL
-// (tv.daveai.tech/setup/provider?code=HRM-XXXX in provider mode, or
-// /remote.html?pair=HRM-XXXX in remote-pair mode). For Phase 1 the pairing
-// code itself is the surface the operator types into their phone — the
-// QR pattern is decorative. We expose the resolved target URL via
-// aria-label + data-qr-target so the real encoder swap is a one-liner,
-// and screen readers can still announce the destination today.
-// Size is driven by props so the parent can honour Mom's font-scale
-// (min 256 px).
-function QRPlaceholder(props) {
+function GeneratedQRCode(props) {
   var size = (props && typeof props.size === 'number' && props.size > 0) ? props.size : QR_BASE_PX;
   var targetUrl = (props && typeof props.targetUrl === 'string') ? props.targetUrl : '';
-  var label = targetUrl
-    ? 'Pairing QR code — scan with your phone camera, opens ' + targetUrl
-    : 'Pairing QR code — scan with your phone camera';
+  var qrHook = React.useState({ targetUrl: '', dataUrl: '', error: '' });
+  var qrState = qrHook[0];
+  var setQrState = qrHook[1];
+
+  React.useEffect(function() {
+    var cancelled = false;
+    if (!targetUrl) {
+      setQrState({ targetUrl: '', dataUrl: '', error: 'No pairing URL available.' });
+      return function() { cancelled = true; };
+    }
+    setQrState({ targetUrl: targetUrl, dataUrl: '', error: '' });
+    QRCode.toDataURL(targetUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 4,
+      width: size,
+      color: { dark: '#000000', light: '#ffffff' },
+    }).then(function(dataUrl) {
+      if (!cancelled) {
+        setQrState({ targetUrl: targetUrl, dataUrl: dataUrl, error: '' });
+      }
+    }).catch(function(err) {
+      if (!cancelled) {
+        setQrState({
+          targetUrl: targetUrl,
+          dataUrl: '',
+          error: (err && err.message) ? err.message : 'QR generation failed.',
+        });
+      }
+    });
+    return function() { cancelled = true; };
+  }, [targetUrl, size]);
+
+  if (qrState.error) {
+    return (
+      <div
+        role="alert"
+        aria-label="Pairing QR unavailable"
+        style={{
+          width: size,
+          height: size,
+          color: '#7f1d1d',
+          background: '#fff1f2',
+          border: '2px solid #fecdd3',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '1rem',
+          fontSize: 'calc(0.82rem * var(--font-scale, 1))',
+          lineHeight: 1.35,
+        }}
+      >
+        {qrState.error}
+      </div>
+    );
+  }
+
+  if (!qrState.dataUrl || qrState.targetUrl !== targetUrl) {
+    return <div data-qr-skeleton><QRSkeleton size={size} /></div>;
+  }
+
   return (
-    <svg
+    <img
+      src={qrState.dataUrl}
       width={size}
       height={size}
-      viewBox="0 0 100 100"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-label={label}
-      data-qr-target={targetUrl || undefined}
-      style={{ display: 'block', shapeRendering: 'crispEdges' }}
-    >
-      <rect width="100" height="100" fill="#ffffff" />
-      {/* Top-left finder pattern */}
-      <rect x="5" y="5" width="25" height="25" fill="#000000" />
-      <rect x="10" y="10" width="15" height="15" fill="#ffffff" />
-      <rect x="13" y="13" width="9" height="9" fill="#000000" />
-      {/* Top-right finder pattern */}
-      <rect x="70" y="5" width="25" height="25" fill="#000000" />
-      <rect x="75" y="10" width="15" height="15" fill="#ffffff" />
-      <rect x="78" y="13" width="9" height="9" fill="#000000" />
-      {/* Bottom-left finder pattern */}
-      <rect x="5" y="70" width="25" height="25" fill="#000000" />
-      <rect x="10" y="75" width="15" height="15" fill="#ffffff" />
-      <rect x="13" y="78" width="9" height="9" fill="#000000" />
-      {/* Mock data modules */}
-      <rect x="35" y="5" width="5" height="5" fill="#000000" />
-      <rect x="45" y="5" width="5" height="5" fill="#000000" />
-      <rect x="55" y="5" width="5" height="5" fill="#000000" />
-      <rect x="35" y="15" width="5" height="5" fill="#000000" />
-      <rect x="50" y="15" width="5" height="5" fill="#000000" />
-      <rect x="40" y="25" width="5" height="5" fill="#000000" />
-      <rect x="55" y="25" width="5" height="5" fill="#000000" />
-      <rect x="5" y="35" width="5" height="5" fill="#000000" />
-      <rect x="15" y="35" width="5" height="5" fill="#000000" />
-      <rect x="35" y="35" width="5" height="5" fill="#000000" />
-      <rect x="45" y="35" width="5" height="5" fill="#000000" />
-      <rect x="60" y="35" width="5" height="5" fill="#000000" />
-      <rect x="70" y="35" width="5" height="5" fill="#000000" />
-      <rect x="80" y="35" width="5" height="5" fill="#000000" />
-      <rect x="90" y="35" width="5" height="5" fill="#000000" />
-      <rect x="5" y="45" width="5" height="5" fill="#000000" />
-      <rect x="20" y="45" width="5" height="5" fill="#000000" />
-      <rect x="40" y="45" width="5" height="5" fill="#000000" />
-      <rect x="55" y="45" width="5" height="5" fill="#000000" />
-      <rect x="65" y="45" width="5" height="5" fill="#000000" />
-      <rect x="80" y="45" width="5" height="5" fill="#000000" />
-      <rect x="10" y="55" width="5" height="5" fill="#000000" />
-      <rect x="25" y="55" width="5" height="5" fill="#000000" />
-      <rect x="35" y="55" width="5" height="5" fill="#000000" />
-      <rect x="50" y="55" width="5" height="5" fill="#000000" />
-      <rect x="60" y="55" width="5" height="5" fill="#000000" />
-      <rect x="75" y="55" width="5" height="5" fill="#000000" />
-      <rect x="90" y="55" width="5" height="5" fill="#000000" />
-      <rect x="35" y="65" width="5" height="5" fill="#000000" />
-      <rect x="45" y="65" width="5" height="5" fill="#000000" />
-      <rect x="60" y="65" width="5" height="5" fill="#000000" />
-      <rect x="75" y="65" width="5" height="5" fill="#000000" />
-      <rect x="90" y="65" width="5" height="5" fill="#000000" />
-      <rect x="35" y="75" width="5" height="5" fill="#000000" />
-      <rect x="50" y="75" width="5" height="5" fill="#000000" />
-      <rect x="65" y="75" width="5" height="5" fill="#000000" />
-      <rect x="80" y="75" width="5" height="5" fill="#000000" />
-      <rect x="40" y="85" width="5" height="5" fill="#000000" />
-      <rect x="55" y="85" width="5" height="5" fill="#000000" />
-      <rect x="70" y="85" width="5" height="5" fill="#000000" />
-      <rect x="85" y="85" width="5" height="5" fill="#000000" />
-      <rect x="35" y="90" width="5" height="5" fill="#000000" />
-      <rect x="50" y="90" width="5" height="5" fill="#000000" />
-    </svg>
+      alt={'Pairing QR code - opens ' + targetUrl}
+      data-qr-target={targetUrl}
+      style={{ display: 'block', width: size, height: size }}
+    />
   );
 }
 
@@ -227,7 +227,9 @@ function QROnboarding(props) {
   var isRemotePairMode = mode === 'remote-pair';
 
   var initialState = {
-    pairingCode: null,        // string from POST /api/pair (or 'HRM-MOCK' offline)
+    pairingCode: null,        // string from POST /api/pair
+    setupUrl: '',             // real phone setup URL returned by POST /api/pair
+    remoteUrl: '',            // optional remote-control URL returned by API
     status: 'loading',        // 'loading' | 'pending' | 'completed' | 'expired' | 'error'
     expiresAt: null,          // ISO timestamp
     issuedAt: null,           // ISO timestamp — used to flag stale codes (>5 min)
@@ -286,6 +288,8 @@ function QROnboarding(props) {
       if (cancelled) { return; }
       patchPair({
         pairingCode: envelope.pairing_code,
+        setupUrl: envelope.setup_url || '',
+        remoteUrl: envelope.remote_url || '',
         status: envelope.status || 'pending',
         expiresAt: envelope.expires_at,
         issuedAt: envelope.issued_at || new Date().toISOString(),
@@ -397,6 +401,8 @@ function QROnboarding(props) {
     api.createPairing().then(function(envelope) {
       patchPair({
         pairingCode: envelope.pairing_code,
+        setupUrl: envelope.setup_url || '',
+        remoteUrl: envelope.remote_url || '',
         status: envelope.status || 'pending',
         expiresAt: envelope.expires_at,
         issuedAt: envelope.issued_at || new Date().toISOString(),
@@ -501,9 +507,9 @@ function QROnboarding(props) {
   var showSpeakButton = !!profile && voiceEnabled && pairState.status !== 'completed';
 
   // Mode-driven copy: heading, dialog aria-label, instruction sub-text and
-  // the spoken script for the TTS button. The QR data target also flips —
-  // in provider mode the static placeholder stays, in remote-pair mode the
-  // SVG carries the deep link into /remote.html?pair=<code>.
+  // the spoken script for the TTS button. The QR target is always concrete:
+  // provider mode uses the backend setup URL; remote-pair mode uses the
+  // phone remote deep link.
   var headingText = isRemotePairMode
     ? REMOTE_PAIR_HEADING
     : 'Add a Provider to ' + BRAND_LABEL;
@@ -512,8 +518,8 @@ function QROnboarding(props) {
     : 'Add a Provider to ' + BRAND_LABEL;
   var subTextLine = isRemotePairMode ? REMOTE_PAIR_SUBTEXT : null;
   var qrTargetUrl = isRemotePairMode
-    ? _buildRemotePairUrl(pairState.pairingCode)
-    : '';
+    ? (pairState.remoteUrl || _buildRemotePairUrl(pairState.pairingCode))
+    : _buildProviderSetupUrl(pairState.pairingCode, pairState.setupUrl);
 
   var statusBlock;
   if (pairState.status === 'completed') {
@@ -743,7 +749,7 @@ function QROnboarding(props) {
         >
           {isLoading
             ? <div data-qr-skeleton><QRSkeleton size={qrPixelSize} /></div>
-            : <QRPlaceholder size={qrPixelSize} targetUrl={qrTargetUrl} />}
+            : <GeneratedQRCode size={qrPixelSize} targetUrl={qrTargetUrl} />}
         </div>
 
         {/* Pairing code */}

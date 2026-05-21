@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node ../../tools/schema-validate.js && node ./test/playlists.smoke.js && node ./test/xmltv.smoke.js && node ./test/hlsProxy.test.js && node ./test/catalogMerge.test.js"
+    "test": "node ../../tools/schema-validate.js && node ./test/health.test.js && node ./test/playlists.smoke.js && node ./test/xmltv.smoke.js && node ./test/hlsProxy.test.js && node ./test/playbackProxy.test.js && node ./test/catalogMerge.test.js && node ./test/m3uParser.test.js && node ./test/epgWaterfall.test.js && node ./test/epgGridMapping.test.js && node ./test/epgProviderSources.test.js && node ./test/providerStore.test.js && node ./test/providerRegistry.test.js && node ./test/providers.route.test.js && node ./test/providerQrSetup.test.js && node ./test/catalogProviders.test.js && node ./test/agentConfigStore.test.js && node ./test/agentProviderSearch.test.js && node ./test/agentIntentPlanner.test.js && node ./test/agent.route.test.js && node ./test/authStoreBootstrap.test.js && node ./test/auth.test.js && node ./test/xtreamFixture.e2e.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -75,7 +75,7 @@ function scrubOutbound(text) {
 // imports) so the LLM contract stays explicit.
 // ---------------------------------------------------------------------------
 var ALLOWED_ACTIONS = {
-  filter_provider:    { provider_id: ['apollo_group', 'xtremehd', 'all'] },
+  filter_provider:    { provider_id: ['apollo_group', 'xtremehd', 'iptv-org', 'all'] },
   filter_content:     { content_type: ['movies', 'series', 'live', 'sports', 'action', 'family', 'mysteries', 'hallmark'] },
   filter_quality:     { quality: ['4K'] },
   switch_profile:     { profile_id: ['dave_tv', 'mom_tv'] },
@@ -129,7 +129,7 @@ function validateCandidate(candidate) {
 // ---------------------------------------------------------------------------
 function buildSystemPrompt() {
   var lines = [
-    'You are a strict intent parser for HermesTV, a Samsung TV streaming UI.',
+    'You are a strict intent parser for DaveTV, a Samsung TV streaming UI.',
     'Map the user request to exactly ONE of the allowed actions below, or return null if no confident match.',
     '',
     'Allowed actions and their parameter values:',

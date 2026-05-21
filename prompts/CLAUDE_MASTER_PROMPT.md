@@ -29,6 +29,15 @@ Thin Samsung Tizen TV app (remote-first, dark-first UI shell + player) talks onl
 - Apollo Group (`apollo`) — Xtream/M3U/VOD/Series
 - XtremeHD (`xtremehd`) — Xtream/M3U/VOD/Series
 - Credentials live in `G:\private\` — agents never read, display, or transmit vault contents
+- Provider completion must follow `docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md`
+  and `prompts/CLAUDE_PROVIDER_FINISH_PROMPT.md`. Skipped provider tests,
+  mocked catalogs, static provider lists, or 501 endpoints are not proof.
+- Remaining release/E2E work must follow
+  `docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md` and
+  `prompts/CLAUDE_E2E_20_AGENT_SWARM_PROMPT.md`.
+- Any work using `G:\Github\IPTV-Apps` as reference material must follow
+  `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md` and
+  `prompts/CLAUDE_REFERENCE_APPS_E2E_SWARM_PROMPT.md`.
 
 ## Profiles
 
@@ -57,6 +66,9 @@ Read these in order — they supersede any generic assumption:
 11. `docs/11_USER_AGENT_PERSONA_NAMING_CONTRACT.md` — Dave/Mom profiles, agent naming, Azure TTS
 12. `docs/12_EPG_CONTENT_DISCOVERY_CONTRACT.md` — EPG, XMLTV, fuzzy match, catch-up
 13. `docs/13_VPS_ISOLATION_DEPLOYMENT_CONTRACT.md` — VPS isolation, AI routing policy, vault protection
+14. `docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md` — provider truth gate, root issues, proof artifacts
+15. `docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md` — remaining E2E release gates and 20-agent lane plan
+16. `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md` — reference-app adoption gates, missing IPTV features, and E2E proof matrix
 
 ## Safe execution mode
 
@@ -82,7 +94,7 @@ Stop and ask before: deleting files, docker prune/rm, stopping VPS services, tou
 | B1 — Repo scaffold | In progress (schemas, mock, web-tv shell, tizen app skeleton committed) |
 | B2 — MVP | Not started |
 | B3 — Full UX | Not started |
-| B4 — Provider integration | Not started |
+| B4 — Provider integration | Partially implemented, not complete; blocked until `docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md` passes |
 
 ## Agent 24-lane assignments (from doc 00)
 
@@ -115,3 +127,11 @@ tools/                    — Dev/operator tooling
 7. The project is built for the 85" and 95" Samsung QLED TVs at full enhanced tier capacity.
 8. Claims require proof. Screenshots, CLI output, schema validation — not assertions.
 9. Mark unverifiable findings `<!-- NEEDS VERIFICATION: <what to check> -->` rather than guessing.
+10. Provider claims require live-provider proof: non-zero catalog, real provider
+   registry, play ticket, stream response, sanitized proof artifacts, and no
+   skipped provider-live path.
+11. E2E/release claims require the remaining E2E contract: web build, Tizen
+   packaged API/player proof, source-health/EPG alignment, CI/deploy gates, and
+   sanitized proof artifacts.
+12. Reference-app work must use tests and behavior contracts first. Do not copy
+   GPL/AGPL/uncleared source into HermesTV.

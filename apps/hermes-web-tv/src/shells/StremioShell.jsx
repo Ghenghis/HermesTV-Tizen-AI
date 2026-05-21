@@ -6,7 +6,7 @@ import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StremioShell — HermesTV's 10th layout, modelled on the open-source Stremio
+// StremioShell — DaveTV's 10th layout, modelled on the open-source Stremio
 // media-streaming player's tab-driven discovery surface.
 //
 // Cloned design language (NOT cloned assets):
@@ -27,7 +27,7 @@ import { capForProfile } from '../utils/isSystemLimited.js';
 //     health badge. We do NOT fake Stremio's addon system here — we simply
 //     surface the operator-configured IPTV providers.
 //
-// All copy is HermesTV branding — never reference "Stremio" in user-visible
+// All copy is DaveTV branding — never reference "Stremio" in user-visible
 // strings. The visual language is inspired by the public app; no proprietary
 // assets are bundled.
 //

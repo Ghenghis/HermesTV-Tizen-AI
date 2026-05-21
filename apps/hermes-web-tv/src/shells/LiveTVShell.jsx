@@ -6,7 +6,7 @@ import CategorySidebar from '../components/CategorySidebar.jsx';
 import CatchupRail from '../components/CatchupRail.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LiveTVShell — HermesTV's live-first layout shell.
+// LiveTVShell — DaveTV's live-first layout shell.
 //
 // The existing shells treat live TV as a side-tab. This one inverts the
 // hierarchy: live channels are the entire page. The design takes the
@@ -29,8 +29,8 @@ import CatchupRail from '../components/CatchupRail.jsx';
 //                  programme title.
 //   4. RIGHT     — Mini EPG for the focused channel: 4–6 upcoming programmes
 //                  with start time, title, duration. Uses `/api/epg/grid` when
-//                  it answers; falls back to a deterministic placeholder list
-//                  so an empty EPG never blanks the right rail.
+//                  it answers; if the guide is unavailable, the rail says so
+//                  plainly instead of inventing programme data.
 //   5. BOTTOM    — 3×4 channel-number quick-jump pad. Typing digits also
 //                  works from the keyboard; the buffer settles after 1.5 s and
 //                  tunes to the channel whose `channel_number` matches.
@@ -78,48 +78,6 @@ function _channelNumberOf(item, idx) {
 // The shared CategorySidebar component now derives the rail's chip list from
 // the live items the shell passes in, so this file no longer needs its own
 // helper. The accent / variant / mom-mode whitelisting all live in one place.
-
-// ─── Mini EPG fallback ──────────────────────────────────────────────────────
-// When /api/epg/grid is unreachable or returns nothing for this channel we
-// still want the right rail populated — a blank rail makes the shell look
-// broken on a freshly-deployed VPS. Generate a deterministic sequence keyed
-// by the channel id so the same channel always shows the same placeholder
-// schedule (no flicker between focus restores).
-function _placeholderEPG(channel) {
-  if (!channel) { return []; }
-  var seed = 0;
-  var key = channel.id || channel.title || 'x';
-  for (var i = 0; i < key.length; i++) { seed = (seed + key.charCodeAt(i)) | 0; }
-  if (seed < 0) { seed = -seed; }
-  var titles = [
-    'Top of the Hour',
-    'Headlines',
-    'Feature Programme',
-    'Local Update',
-    'Behind the Scenes',
-    'Late Edition',
-    'Special Report',
-  ];
-  var now = new Date();
-  // Round to the next half-hour so the schedule looks plausible.
-  var slot = new Date(now.getTime());
-  slot.setSeconds(0, 0);
-  var mins = slot.getMinutes();
-  slot.setMinutes(mins < 30 ? 30 : 60);
-  var out = [];
-  for (var k = 0; k < EPG_ENTRIES; k++) {
-    var dur = 30 + ((seed + k * 7) % 4) * 15; // 30 / 45 / 60 / 75 min
-    var start = new Date(slot.getTime() + k * 30 * 60 * 1000);
-    var end = new Date(start.getTime() + dur * 60 * 1000);
-    out.push({
-      title: titles[(seed + k) % titles.length],
-      start: start,
-      end: end,
-      duration_min: dur,
-    });
-  }
-  return out;
-}
 
 function _formatClock(date) {
   if (!date || typeof date.getHours !== 'function') { return ''; }
@@ -177,7 +135,7 @@ function LiveTVShell(props) {
   var jumpBuffer = bufferState[0];
   var setJumpBuffer = bufferState[1];
 
-  var epgState = React.useState([]);
+  var epgState = React.useState({ status: 'idle', programs: [], errorMessage: '' });
   var miniEPG = epgState[0];
   var setMiniEPG = epgState[1];
 
@@ -251,11 +209,14 @@ function LiveTVShell(props) {
   }, [focusedChannel]);
 
   // ─── Mini EPG fetch ───────────────────────────────────────────────────────
-  // Try /api/epg/grid for the focused channel; on any failure (no profile_id,
-  // 503, network), fall back to the deterministic placeholder schedule. We
-  // never let an EPG error blank the right rail.
+  // Try /api/epg/grid for the focused channel. On empty data or failure, keep
+  // the right rail honest with a no-guide/error state rather than fabricated
+  // programme titles and times.
   React.useEffect(function() {
-    if (!focusedChannel) { setMiniEPG([]); return; }
+    if (!focusedChannel) {
+      setMiniEPG({ status: 'idle', programs: [], errorMessage: '' });
+      return;
+    }
     var aborted = false;
     var profileId = (profile && profile.id) || 'dave_tv';
     var start = new Date();
@@ -265,16 +226,22 @@ function LiveTVShell(props) {
       + '&start=' + encodeURIComponent(start.toISOString())
       + '&end=' + encodeURIComponent(end.toISOString());
     if (typeof fetch !== 'function') {
-      setMiniEPG(_placeholderEPG(focusedChannel));
+      setMiniEPG({ status: 'error', programs: [], errorMessage: 'Guide unavailable on this device.' });
       return;
     }
+    setMiniEPG({ status: 'loading', programs: [], errorMessage: '' });
     fetch(url)
-      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(r) {
+        if (!r || !r.ok) {
+          throw new Error('Guide request failed.');
+        }
+        return r.json();
+      })
       .then(function(body) {
         if (aborted) { return; }
         var progs = body && body.programs;
         if (!progs || progs.length === 0) {
-          setMiniEPG(_placeholderEPG(focusedChannel));
+          setMiniEPG({ status: 'empty', programs: [], errorMessage: '' });
           return;
         }
         // Filter to this channel and normalise.
@@ -283,7 +250,7 @@ function LiveTVShell(props) {
           return p.channel_id === channelMatchId || p.channel_id === focusedChannel.id;
         });
         if (mine.length === 0) {
-          setMiniEPG(_placeholderEPG(focusedChannel));
+          setMiniEPG({ status: 'empty', programs: [], errorMessage: '' });
           return;
         }
         var slice = mine.slice(0, EPG_ENTRIES).map(function(p) {
@@ -292,11 +259,15 @@ function LiveTVShell(props) {
           var dur = Math.round((e.getTime() - s.getTime()) / 60000);
           return { title: p.title, start: s, end: e, duration_min: dur };
         });
-        setMiniEPG(slice);
+        setMiniEPG({ status: 'ready', programs: slice, errorMessage: '' });
       })
-      .catch(function() {
+      .catch(function(err) {
         if (aborted) { return; }
-        setMiniEPG(_placeholderEPG(focusedChannel));
+        setMiniEPG({
+          status: 'error',
+          programs: [],
+          errorMessage: (err && err.message) ? err.message : 'Guide request failed.',
+        });
       });
     return function() { aborted = true; };
   }, [focusedChannel, profile]);
@@ -772,12 +743,20 @@ function LiveTVShell(props) {
         <div style={{ fontSize: 'calc(0.85rem * ' + fontScale + ')', fontWeight: 700, marginBottom: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {focusedChannel ? (focusedChannel.title || 'Untitled') : '—'}
         </div>
-        {miniEPG.length === 0 ? (
+        {miniEPG.status === 'loading' ? (
+          <div style={{ color: 'var(--muted, #8b949e)', fontSize: 'calc(0.72rem * ' + fontScale + ')' }}>
+            Loading guide…
+          </div>
+        ) : miniEPG.status === 'error' ? (
+          <div role="status" style={{ color: 'var(--muted, #8b949e)', fontSize: 'calc(0.72rem * ' + fontScale + ')', lineHeight: 1.4 }}>
+            Could not load guide data.
+          </div>
+        ) : !miniEPG.programs || miniEPG.programs.length === 0 ? (
           <div style={{ color: 'var(--muted, #8b949e)', fontSize: 'calc(0.72rem * ' + fontScale + ')' }}>
             No schedule available.
           </div>
         ) : (
-          miniEPG.map(function(p, i) {
+          miniEPG.programs.map(function(p, i) {
             var isNow = i === 0;
             return (
               <div

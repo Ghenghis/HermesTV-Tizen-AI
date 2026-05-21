@@ -9,9 +9,9 @@ import useFavorites from '../hooks/useFavorites.js';
 import { capForProfile } from '../utils/isSystemLimited.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NetflixShell — HermesTV's cinematic horizontal-rail layout, inspired by the
+// NetflixShell — DaveTV's cinematic horizontal-rail layout, inspired by the
 // streaming-service visual vocabulary (bold red accent, dark canvas, hero
-// banner, dense card rows). All copy is HermesTV branding — never reference
+// banner, dense card rows). All copy is DaveTV branding — never reference
 // "Netflix" in user-visible strings. Polish pass mirrors the SOTA shared
 // vocabulary from index.css + design/tokens.js:
 //   - Radii consume var(--radius-sm/md/lg/xl/pill) for parity with other shells.
@@ -219,7 +219,7 @@ function NetflixShell(props) {
       {/* Top nav */}
       <header style={{ position: 'relative', zIndex: 10, background: 'linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(20,20,20,0.8) 100%)', padding: '0 24px', height: '56px', display: 'flex', alignItems: 'center', gap: '32px', flexShrink: 0 }}>
         <div style={{ fontWeight: 800, fontSize: 'calc(20px * ' + fontScale + ')', letterSpacing: '0.05em' }}>
-          Hermes<span style={{ color: '#e50914' }}>TV</span>
+          Dave<span style={{ color: '#e50914' }}>TV</span>
         </div>
         <nav style={{ display: 'flex', gap: '20px' }}>
           {NAV_TABS.map(function(tab, i) {

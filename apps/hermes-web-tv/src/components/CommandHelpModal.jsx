@@ -15,6 +15,7 @@ var COMMAND_GROUPS = [
     commands: [
       { text: 'show apollo', desc: 'Apollo Group content only' },
       { text: 'show xtremehd', desc: 'XtremeHD content only' },
+      { text: 'show iptv-org', desc: 'iptv-org content only' },
       { text: 'show all providers', desc: 'Show all providers' },
     ],
   },
@@ -26,12 +27,12 @@ var COMMAND_GROUPS = [
     ],
   },
   {
-    category: 'Theme & Layout',
+    category: 'Theme & View',
     commands: [
       { text: 'dark theme', desc: 'Apply Night Blue dark theme' },
       { text: 'light theme', desc: 'Apply Mom Calm light theme' },
       { text: 'premium theme', desc: 'Apply Cinema Amber theme' },
-      { text: 'bigger tiles', desc: 'Switch to large tile layout' },
+      { text: 'bigger tiles', desc: 'Switch to large tile View' },
     ],
   },
   {

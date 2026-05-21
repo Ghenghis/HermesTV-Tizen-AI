@@ -353,9 +353,124 @@ function streamSegment(opts) {
     });
 }
 
+/**
+ * Proxy a credential-bearing direct media stream (TS/MP4/etc.) without
+ * treating it as an HLS playlist. This is the path Xtream live streams need:
+ * /live/<user>/<pass>/<id>.ts is already media bytes, not a manifest.
+ *
+ * Supports GET and HEAD, forwards Range, and mirrors the media headers the
+ * TV/browser needs for playback and seeking.
+ */
+function proxyDirectStream(opts) {
+  opts = opts || {};
+  var res = opts.res;
+  var req = opts.req || null;
+  var upstreamUrl = opts.upstreamUrl;
+  var ticket = opts.ticket || '';
+  var fetchImpl = opts.fetchImpl || fetch;
+  var deferErrors = opts.deferErrors === true;
+
+  if (!res || typeof res.status !== 'function') {
+    return Promise.reject(new Error('hlsProxy.proxyDirectStream: res required'));
+  }
+  if (typeof upstreamUrl !== 'string' || upstreamUrl.length === 0) {
+    if (deferErrors) { return Promise.reject(new Error('upstream_url_required')); }
+    res.status(400).json({ error: 'upstream_url_required' });
+    return Promise.resolve();
+  }
+  if (!/^https?:\/\//i.test(upstreamUrl)) {
+    if (deferErrors) { return Promise.reject(new Error('upstream_scheme_invalid')); }
+    res.status(400).json({ error: 'upstream_scheme_invalid' });
+    return Promise.resolve();
+  }
+
+  var method = req && req.method === 'HEAD' ? 'HEAD' : 'GET';
+  var headers = {
+    'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
+    'Accept': '*/*',
+    'Accept-Encoding': 'identity'
+  };
+  if (req && req.headers && req.headers.range) {
+    headers.Range = req.headers.range;
+  }
+
+  var ctrl = new AbortController();
+  var timer = setTimeout(function() { ctrl.abort(); }, 20000);
+
+  return fetchImpl(upstreamUrl, {
+    method: method,
+    signal: ctrl.signal,
+    headers: headers
+  })
+    .then(function(upstreamRes) {
+      clearTimeout(timer);
+      if (upstreamRes.status < 200 || upstreamRes.status >= 400) {
+        if (deferErrors) {
+          var err = new Error('directProxy: upstream HTTP ' + upstreamRes.status);
+          err.status = upstreamRes.status;
+          throw err;
+        }
+        res.status(502).json({
+          error: 'upstream_stream_error',
+          upstream_status: upstreamRes.status,
+          ticket: ticket
+        });
+        return null;
+      }
+
+      var passHeaders = [
+        'content-type',
+        'content-length',
+        'content-range',
+        'accept-ranges',
+        'cache-control',
+        'last-modified',
+        'etag'
+      ];
+      for (var i = 0; i < passHeaders.length; i++) {
+        var h = passHeaders[i];
+        var v = upstreamRes.headers && typeof upstreamRes.headers.get === 'function'
+          ? upstreamRes.headers.get(h)
+          : null;
+        if (v) { res.setHeader(h, v); }
+      }
+      if (!upstreamRes.headers || !upstreamRes.headers.get || !upstreamRes.headers.get('cache-control')) {
+        res.setHeader('Cache-Control', 'no-store');
+      }
+
+      res.status(upstreamRes.status);
+      if (method === 'HEAD' || !upstreamRes.body) {
+        res.end();
+        return null;
+      }
+
+      var Readable = require('stream').Readable;
+      var nodeStream = Readable.fromWeb(upstreamRes.body);
+      nodeStream.on('error', function(err) {
+        console.warn('[hlsProxy] direct stream error ticket=' + ticket + ': ' + SANITIZE(err && err.message ? err.message : 'unknown'));
+        try { res.end(); } catch (_) { /* socket already closed */ }
+      });
+      nodeStream.pipe(res);
+      return null;
+    })
+    .catch(function(err) {
+      clearTimeout(timer);
+      console.warn('[hlsProxy] proxyDirectStream fetch failed ticket=' + ticket + ': ' + SANITIZE(err && err.message ? err.message : 'unknown'));
+      if (deferErrors && !res.headersSent) {
+        return Promise.reject(err);
+      }
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'upstream_stream_fetch_failed' });
+      } else {
+        try { res.end(); } catch (_) { /* noop */ }
+      }
+    });
+}
+
 module.exports = {
   proxyPlaylist: proxyPlaylist,
   streamSegment: streamSegment,
+  proxyDirectStream: proxyDirectStream,
   // Exported for unit tests + introspection.
   _internal: {
     rewritePlaylist: rewritePlaylist,

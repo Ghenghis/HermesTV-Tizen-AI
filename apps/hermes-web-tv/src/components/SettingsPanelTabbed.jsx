@@ -523,14 +523,14 @@ function SettingsPanelTabbed(props) {
             })}
           </div>
         </_Card>
-        <_Card icon="◧" header="Layout" tagline="Switch between the 8 layout shells (TiviMate, Netflix, Plex, Apple TV, Samsung, Mom Mode, Dave Power, Zero).">
+        <_Card icon="◧" header="Views" tagline="Switch between TV Views such as TiviMate, Netflix, Plex, Apple TV, Samsung, Mom Mode, Dave Power, and Zero.">
           <button
             tabIndex={0}
             onClick={onOpenLayoutSwitcher}
             style={zeroButtonStyle('filled')}
             onFocus={zeroButtonFocus}
             onBlur={zeroButtonBlur}
-          >🎨 Open layout switcher</button>
+          >Open View picker</button>
         </_Card>
       </div>
     );
@@ -599,7 +599,7 @@ function SettingsPanelTabbed(props) {
       /* eslint-enable no-undef */
     } catch (_) { /* ignore */ }
     return (
-      <_Card icon="ⓘ" header="HermesTV">
+      <_Card icon="ⓘ" header="DaveTV">
         <_Row label="Web build" value={<span style={{ fontFamily: 'monospace', color: 'var(--accent, #00d4ff)' }}>{buildVersion}</span>} />
         <_Row label="App name" value="hermes-web-tv" />
         <_Row label="API service" value="hermes-tv-api" />
@@ -620,7 +620,7 @@ function SettingsPanelTabbed(props) {
                 textDecoration: 'none',
                 fontWeight: 700,
               }}
-            >GitHub · Ghenghis/HermesTV-Tizen-AI ↗</a>
+            >Source repository ↗</a>
           }
         />
         <div style={{ marginTop: '0.6rem', fontSize: 'calc(0.78rem * var(--font-scale, 1))', color: 'var(--muted)' }}>

@@ -1,46 +1,82 @@
 import React from 'react';
-
-var TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'apollo', label: 'Apollo' },
-  { id: 'xtremehd', label: 'XtremeHD' },
-];
+import {
+  buildProviderFilterOptions,
+  providerFilterToIds,
+  providerIdsToFilter,
+} from '../utils/providerIdentity.js';
 
 function ProviderFilter(props) {
-  var activeTab = props.activeTab || 'all';
-  var onTabChange = props.onTabChange;
+  var providerFilter = props.providerFilter || 'all';
+  var providers = props.providers || [];
+  var onProviderChange = props.onProviderChange;
+  var options = buildProviderFilterOptions(providers);
+  var selected = providerFilterToIds(providerFilter);
+  var allActive = selected.length === 0;
 
-  function handleClick(tabId) {
-    if (onTabChange) {
-      onTabChange(tabId);
+  function apply(ids) {
+    if (onProviderChange) {
+      onProviderChange(providerIdsToFilter(ids));
     }
   }
 
-  function handleKeyDown(e, tabId) {
+  function toggle(id) {
+    if (allActive) {
+      apply([id]);
+      return;
+    }
+    var next = selected.slice();
+    var idx = next.indexOf(id);
+    if (idx === -1) { next.push(id); }
+    else { next.splice(idx, 1); }
+    apply(next);
+  }
+
+  function isActive(id) {
+    return !allActive && selected.indexOf(id) !== -1;
+  }
+
+  function handleKeyDown(e, id) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      handleClick(tabId);
+      if (id === 'all') { apply([]); }
+      else { toggle(id); }
+      return;
     }
-    // D-pad left/right navigation between tabs
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      var idx = TABS.findIndex(function(t) { return t.id === tabId; });
-      var next = TABS[(idx + 1) % TABS.length];
-      var nextBtn = e.currentTarget.parentElement.querySelector('[data-tab="' + next.id + '"]');
-      if (nextBtn) { nextBtn.focus(); }
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
+    e.preventDefault();
+    var buttons = e.currentTarget.parentElement.querySelectorAll('[data-provider-filter]');
+    if (!buttons || buttons.length === 0) { return; }
+    var current = -1;
+    for (var i = 0; i < buttons.length; i++) {
+      if (buttons[i] === e.currentTarget) { current = i; break; }
     }
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      var idx = TABS.findIndex(function(t) { return t.id === tabId; });
-      var prev = TABS[(idx - 1 + TABS.length) % TABS.length];
-      var prevBtn = e.currentTarget.parentElement.querySelector('[data-tab="' + prev.id + '"]');
-      if (prevBtn) { prevBtn.focus(); }
-    }
+    if (current === -1) { return; }
+    var nextIndex = e.key === 'ArrowRight'
+      ? (current + 1) % buttons.length
+      : (current - 1 + buttons.length) % buttons.length;
+    buttons[nextIndex].focus();
+  }
+
+  function styleFor(active) {
+    return {
+      padding: '0.5rem 1.05rem',
+      borderRadius: '999px',
+      border: active ? '2px solid var(--accent)' : '2px solid var(--border)',
+      backgroundColor: active ? 'var(--accent)' : 'var(--surface-raised, var(--surface))',
+      color: active ? '#ffffff' : 'var(--muted)',
+      fontSize: 'calc(0.9rem * var(--font-scale, 1))',
+      fontWeight: active ? '700' : '500',
+      cursor: 'pointer',
+      transition: 'border-color 0.15s, background-color 0.15s, color 0.15s',
+      outline: 'none',
+      letterSpacing: '0',
+      whiteSpace: 'nowrap',
+    };
   }
 
   return (
     <div
-      role="tablist"
+      role="group"
       aria-label="Provider filter"
       style={{
         display: 'flex',
@@ -49,41 +85,42 @@ function ProviderFilter(props) {
         backgroundColor: 'var(--surface)',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
+        overflowX: 'auto',
       }}
     >
-      {TABS.map(function(tab) {
-        var isActive = activeTab === tab.id;
+      <button
+        type="button"
+        aria-pressed={allActive}
+        data-provider-filter="all"
+        onClick={function() { apply([]); }}
+        onKeyDown={function(e) { handleKeyDown(e, 'all'); }}
+        style={styleFor(allActive)}
+        onFocus={function(e) {
+          e.currentTarget.style.outline = '2px solid var(--accent)';
+          e.currentTarget.style.outlineOffset = '2px';
+        }}
+        onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
+      >
+        All Providers
+      </button>
+      {options.map(function(option) {
+        var active = isActive(option.id);
         return (
           <button
-            key={tab.id}
-            role="tab"
-            aria-selected={isActive}
-            data-tab={tab.id}
-            tabIndex={isActive ? 0 : -1}
-            onClick={function() { handleClick(tab.id); }}
-            onKeyDown={function(e) { handleKeyDown(e, tab.id); }}
-            style={{
-              padding: '0.5rem 1.25rem',
-              borderRadius: '999px',
-              border: isActive ? '2px solid var(--accent)' : '2px solid var(--border)',
-              backgroundColor: isActive ? 'var(--accent)' : 'var(--surface-raised, var(--surface))',
-              color: isActive ? '#ffffff' : 'var(--muted)',
-              fontSize: 'calc(0.9rem * var(--font-scale, 1))',
-              fontWeight: isActive ? '600' : '400',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              outline: 'none',
-              letterSpacing: '0.01em',
-            }}
+            key={option.id}
+            type="button"
+            aria-pressed={active}
+            data-provider-filter={option.id}
+            onClick={function() { toggle(option.id); }}
+            onKeyDown={function(e) { handleKeyDown(e, option.id); }}
+            style={styleFor(active)}
             onFocus={function(e) {
               e.currentTarget.style.outline = '2px solid var(--accent)';
               e.currentTarget.style.outlineOffset = '2px';
             }}
-            onBlur={function(e) {
-              e.currentTarget.style.outline = 'none';
-            }}
+            onBlur={function(e) { e.currentTarget.style.outline = 'none'; }}
           >
-            {tab.label}
+            {option.label}
           </button>
         );
       })}

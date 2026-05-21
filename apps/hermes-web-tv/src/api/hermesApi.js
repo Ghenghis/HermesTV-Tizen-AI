@@ -12,6 +12,23 @@ var BASE_URL = (function() {
   if (h === 'hermestv.local') return 'http://hermestv.local';
   return '';
 })();
+
+function getApiBaseUrl() {
+  return BASE_URL;
+}
+
+function buildApiUrl(path) {
+  var safePath = String(path || '');
+  if (safePath.charAt(0) !== '/') { safePath = '/' + safePath; }
+  if (/^https?:\/\//i.test(BASE_URL)) { return BASE_URL + safePath; }
+  if (typeof window !== 'undefined' && window.location) {
+    var loc = window.location;
+    var origin = loc.origin;
+    if (!origin && loc.protocol && loc.host) { origin = loc.protocol + '//' + loc.host; }
+    if (origin) { return origin + safePath; }
+  }
+  return safePath;
+}
 // Cold-cache /api/catalog returns ~540 KB over Cloudflare; on a cold worker
 // the full transfer occasionally crosses 8 s. Bumped to 20 s so Mom doesn't
 // see "Profile load failed: Request timed out" on cold boot. The /health
@@ -33,13 +50,174 @@ function fetchWithTimeout(url, options, timeoutMs) {
       reject(makeNetworkError('Request timed out: ' + url));
     }, timeout);
 
-    fetch(url, options || {}).then(function(response) {
+    var finalOptions = Object.assign({ credentials: 'include' }, options || {});
+    fetch(url, finalOptions).then(function(response) {
       clearTimeout(timer);
       resolve(response);
     }).catch(function(err) {
       clearTimeout(timer);
       var networkErr = makeNetworkError('Network error: ' + (err.message || 'unknown'));
       reject(networkErr);
+    });
+  });
+}
+
+function getAuthMe() {
+  return fetchWithTimeout(BASE_URL + '/api/auth/me', { method: 'GET' }, HEALTH_TIMEOUT).then(function(response) {
+    if (!response.ok) {
+      throw makeNetworkError('Auth status failed: HTTP ' + response.status);
+    }
+    return response.json();
+  });
+}
+
+function login(email, password) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Login failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function logout() {
+  return fetchWithTimeout(BASE_URL + '/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  }).then(function(response) {
+    if (!response.ok) { throw makeNetworkError('Logout failed: HTTP ' + response.status); }
+    return response.json();
+  });
+}
+
+function registerWithToken(token, password) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Registration failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function requestPasswordReset(email) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/password/forgot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Reset request failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function resetPassword(token, password) {
+  return fetchWithTimeout(BASE_URL + '/api/auth/password/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Password reset failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function getAdminUsers() {
+  return fetchWithTimeout(BASE_URL + '/api/admin/users').then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Admin users failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function createInvite(args) {
+  return fetchWithTimeout(BASE_URL + '/api/admin/invites', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {}),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Invite failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function createUserAccount(args) {
+  return fetchWithTimeout(BASE_URL + '/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args || {}),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Account creation failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    });
+  });
+}
+
+function adminSetPassword(userId, password) {
+  return fetchWithTimeout(BASE_URL + '/api/admin/users/' + encodeURIComponent(userId) + '/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: password }),
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        var err = new Error((body && body.message) || ('Password update failed: HTTP ' + response.status));
+        err.status = response.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
     });
   });
 }
@@ -95,6 +273,102 @@ function getProviders() {
   });
 }
 
+// Wave-20 — multi-provider CRUD endpoints backing the AddProviderModal.
+// Every payload is JSON. The server returns MASKED rows (no username /
+// password) on every endpoint except /parse-qr (which returns the parsed
+// candidate fields back to the same client that just submitted the raw
+// QR text, so the confirm sub-step can pre-fill the form).
+function listProviders() {
+  return fetchWithTimeout(BASE_URL + '/api/providers').then(function(response) {
+    if (!response.ok) { throw makeNetworkError('Providers list failed: HTTP ' + response.status); }
+    return response.json();
+  });
+}
+
+function addProvider(body) {
+  return fetchWithTimeout(BASE_URL + '/api/providers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  }).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      if (!response.ok && response.status !== 201) {
+        var msg = (parsed && parsed.errors && parsed.errors.length > 0)
+          ? parsed.errors.join('; ')
+          : ('Add provider failed: HTTP ' + response.status);
+        var err = new Error(msg);
+        err.status = response.status;
+        err.body = parsed;
+        throw err;
+      }
+      return parsed;
+    });
+  });
+}
+
+function updateProvider(id, patch) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  }).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      if (!response.ok) {
+        var msg = (parsed && parsed.errors && parsed.errors.length > 0)
+          ? parsed.errors.join('; ')
+          : ('Update provider failed: HTTP ' + response.status);
+        var err = new Error(msg);
+        err.status = response.status;
+        err.body = parsed;
+        throw err;
+      }
+      return parsed;
+    });
+  });
+}
+
+function removeProvider(id) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/' + encodeURIComponent(id), {
+    method: 'DELETE',
+  }).then(function(response) {
+    if (response.status === 204) { return { ok: true }; }
+    return response.json().then(function(parsed) {
+      var err = new Error((parsed && parsed.message) || ('Remove provider failed: HTTP ' + response.status));
+      err.status = response.status;
+      err.body = parsed;
+      throw err;
+    });
+  });
+}
+
+function testProvider(id) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/' + encodeURIComponent(id) + '/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  }, 15000).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      return parsed;
+    });
+  });
+}
+
+function parseQrText(text) {
+  return fetchWithTimeout(BASE_URL + '/api/providers/parse-qr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: String(text || '') }),
+  }).then(function(response) {
+    return response.json().then(function(parsed) {
+      parsed._status = response.status;
+      return parsed;
+    });
+  });
+}
+
 function getCatalog() {
   return fetchWithTimeout(BASE_URL + '/api/catalog').then(function(response) {
     if (!response.ok) {
@@ -104,7 +378,7 @@ function getCatalog() {
     return response.json().then(function(body) {
       // Surface the response header on the returned object so the UI can
       // render an honest "data source" badge (Live providers / Jellyfin /
-      // iptv-org / Mock seed). Tizen 6.5 / Chrome 76 safe — no spread.
+      // iptv-org / empty). Tizen 6.5 / Chrome 76 safe — no spread.
       body._source_header = sourceHeader;
       return body;
     });
@@ -211,8 +485,8 @@ function cancelDownload(jobId) {
 
 /**
  * Mint a fresh pairing code for the "Add a Provider" QR flow.
- * Returns { pairing_code, status, issued_at, expires_at, ttl_ms } from
- * POST /api/pair. The TV displays the pairing_code under the QR and then
+ * Returns { pairing_code, setup_url, status, issued_at, expires_at, ttl_ms }
+ * from POST /api/pair. The TV displays the pairing_code under the QR and then
  * polls getPairingStatus(code) every 5s until status === 'completed'.
  */
 function createPairing() {
@@ -252,4 +526,9 @@ export {
   submitCommand, validateCommand, startPlayback,
   startDownload, listDownloads, cancelDownload,
   createPairing, getPairingStatus,
+  getApiBaseUrl, buildApiUrl,
+  getAuthMe, login, logout, registerWithToken, requestPasswordReset, resetPassword,
+  getAdminUsers, createInvite, createUserAccount, adminSetPassword,
+  // Wave-20 multi-provider CRUD
+  listProviders, addProvider, updateProvider, removeProvider, testProvider, parseQrText,
 };

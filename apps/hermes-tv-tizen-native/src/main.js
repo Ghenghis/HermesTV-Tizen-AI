@@ -53,7 +53,7 @@
         splash.className = 'boot-splash';
 
         var title = document.createElement('p');
-        title.textContent = 'HermesTV';
+        title.textContent = 'DaveTV';
 
         var welcome = document.createElement('p');
         // display_name comes from the backend; textContent prevents injection.

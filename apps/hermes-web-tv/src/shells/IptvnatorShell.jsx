@@ -4,7 +4,7 @@ import * as watchHistoryStore from '../store/watchHistoryStore.js';
 import CategorySidebar from '../components/CategorySidebar.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IptvnatorShell — HermesTV's 13th layout shell, a "Classic 3-pane" surface.
+// IptvnatorShell — DaveTV's 13th layout shell, a "Classic 3-pane" surface.
 //
 // Cloned design language (NOT cloned assets):
 //   - Three-column CSS grid: 220px navigation rail | flexible channel list
@@ -32,7 +32,7 @@ import CategorySidebar from '../components/CategorySidebar.jsx';
 //     buttons console.log for now — wiring into the player surface is a
 //     follow-up task because it touches the playback layer outside the shell.
 //
-// All copy is HermesTV branding — never reference "iptvnator" in user-visible
+// All copy is DaveTV branding — never reference "iptvnator" in user-visible
 // strings.
 //
 // Tizen 6.5 / Chrome 76 safe: ES5-style declarations, no arrow funcs in body,
@@ -238,7 +238,7 @@ function IptvnatorShell(props) {
   }
 
   var focusedTitle = focusedChannel ? (focusedChannel.title || 'Untitled') : '';
-  var chosenName = (profile && (profile.chosen_name || profile.name)) || 'Hermes viewer';
+  var chosenName = (profile && (profile.chosen_name || profile.name)) || 'DaveTV viewer';
 
   return (
     <div
@@ -281,7 +281,7 @@ function IptvnatorShell(props) {
               color: COLOR_ACCENT,
             }}
           >
-            HermesTV
+            DaveTV
           </div>
           <div
             style={{
@@ -556,7 +556,7 @@ function IptvnatorShell(props) {
               </div>
               <div style={{ fontSize: 'calc(0.78rem * var(--font-scale, 1))', maxWidth: '420px', margin: '0 auto', lineHeight: 1.5 }}>
                 Import a radio M3U playlist from Playlists in the left rail to start
-                listening. HermesTV will surface stations here once a radio source is
+                listening. DaveTV will surface stations here once a radio source is
                 added.
               </div>
             </div>

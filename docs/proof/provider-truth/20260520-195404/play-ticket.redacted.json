@@ -1,0 +1,40 @@
+{
+  "ticket": "<redacted>",
+  "item": {
+    "id": "iptv-10Bold.au",
+    "title": "10 Bold",
+    "type": "live",
+    "resolution": "1080p",
+    "hdr_format": null,
+    "category": "lifestyle"
+  },
+  "provider": {
+    "provider_id": "iptv-org",
+    "display_name": "iptv-org (Free)",
+    "source_health": {
+      "status": "ok",
+      "latency_ms": null,
+      "checked_utc": null
+    }
+  },
+  "sources": [
+    {
+      "index": 0,
+      "provider_id": "iptv-org",
+      "label": "iptv-org (Free)",
+      "resolution": "1080p",
+      "source_health": {
+        "status": "ok",
+        "latency_ms": null,
+        "checked_utc": null
+      },
+      "is_seed_placeholder": false
+    }
+  ],
+  "profile_id": "dave_tv",
+  "issued_at": "2026-05-20T19:54:38.371Z",
+  "expires_at": "2026-05-20T19:59:38.371Z",
+  "stream_endpoint": "/api/play/play-mpehdi1.../stream.m3u8",
+  "sources_endpoint": "/api/play/play-mpehdi1v-zb3g2ykl/sources",
+  "_note": "Stream URL is never returned to client. Call stream_endpoint to begin playback."
+}

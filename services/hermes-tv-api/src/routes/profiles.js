@@ -22,7 +22,7 @@ const PROFILES = {
     font_scale: 1.1,
     reduced_motion: false,
     audio_feedback: false,
-    agent_name: 'Hermes',
+    agent_name: 'DaveTV',
     agent_voice: 'azure-en-us-guy-neural',
     display_size_inches: 55,
     quality_preference: {
@@ -44,7 +44,7 @@ const PROFILES = {
     font_scale: 1.35,
     reduced_motion: true,
     audio_feedback: true,
-    agent_name: 'Hermes',
+    agent_name: 'DaveTV',
     agent_voice: 'azure-en-us-aria-neural',
     display_size_inches: 85,
     quality_preference: {
@@ -162,7 +162,7 @@ function applyProfilePatch(id, updates, res) {
   }
 
   // Validate agent_name when present — string, <= 30 chars. Empty falls back
-  // to default 'Hermes' on the server so the client stays simple.
+  // to default 'DaveTV' on the server so the client stays simple.
   if (updates.agent_name !== undefined) {
     if (typeof updates.agent_name !== 'string') {
       return res.status(400).json({
@@ -177,7 +177,9 @@ function applyProfilePatch(id, updates, res) {
         message: 'agent_name must be 30 characters or fewer',
       });
     }
-    updates.agent_name = trimmedAgent.length === 0 ? 'Hermes' : trimmedAgent;
+    updates.agent_name = trimmedAgent.length === 0 || trimmedAgent.toLowerCase() === 'hermes'
+      ? 'DaveTV'
+      : trimmedAgent;
   }
 
   // Guard: never allow overwriting protected identity fields via PATCH

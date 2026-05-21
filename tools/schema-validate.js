@@ -466,15 +466,20 @@ if (fs.existsSync(channelMapPath)) {
   fail('channelMap.json missing — expected services/hermes-tv-api/src/data/channelMap.json');
 }
 
-// /api/epg must actually call the XMLTV adapter when XMLTV_URL is set.
+// /api/epg must actually call the XMLTV adapter, but production routing now
+// builds EPG candidates from providerRegistry first and maps through current
+// playable catalog/source IDs. The legacy channelMap helper remains covered
+// by xmltv.smoke.js, but release routes must not depend on live.* samples.
 var epgSrcText = fs.existsSync(epgRoutePath) ? fs.readFileSync(epgRoutePath, 'utf8') : '';
 if (epgSrcText.indexOf("require('../integrations/xmltv')") !== -1
+    && epgSrcText.indexOf("require('../lib/providerRegistry')") !== -1
+    && epgSrcText.indexOf('buildEpgUrlCandidatesFromRegistryRows') !== -1
     && epgSrcText.indexOf('XMLTV_URL') !== -1
     && epgSrcText.indexOf('fetchEpg(') !== -1
-    && epgSrcText.indexOf('applyChannelMap(') !== -1) {
-  pass('routes/epg.js wires XMLTV_URL → fetchEpg → applyChannelMap');
+    && epgSrcText.indexOf('resolvePlayableEpgChannel(') !== -1) {
+  pass('routes/epg.js wires providerRegistry/XMLTV_URL → fetchEpg → playable catalog mapping');
 } else {
-  fail('routes/epg.js missing XMLTV wiring (XMLTV_URL / fetchEpg / applyChannelMap)');
+  fail('routes/epg.js missing provider-backed XMLTV wiring (providerRegistry / XMLTV_URL / fetchEpg / playable mapping)');
 }
 if (epgSrcText.indexOf('X-Hermes-XMLTV-Channels') !== -1) {
   pass('routes/epg.js emits X-Hermes-XMLTV-Channels header');

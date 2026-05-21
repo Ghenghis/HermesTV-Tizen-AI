@@ -4,6 +4,7 @@
 var PROVIDER_NAMES = {
   apollo_group: 'Apollo Group',
   xtremehd: 'XtremeHD',
+  'iptv-org': 'iptv-org',
   all: 'all providers',
 };
 
@@ -58,7 +59,7 @@ function getResponseText(action, params) {
   }
 
   if (action === 'update_layout') {
-    var lname = LAYOUT_NAMES[p.layout] || p.layout || 'new layout';
+    var lname = LAYOUT_NAMES[p.layout] || p.layout || 'new View';
     return 'Switching to ' + lname + '.';
   }
 
@@ -79,7 +80,7 @@ function getResponseText(action, params) {
   if (action === 'open_search') return 'Opening search.';
   if (action === 'play_this') return 'Playing now.';
   if (action === 'open_epg') return 'Opening tonight’s lineup.';
-  if (action === 'open_layout_switcher') return 'Opening the layout picker.';
+  if (action === 'open_layout_switcher') return 'Opening the View picker.';
 
   return 'Done.';
 }

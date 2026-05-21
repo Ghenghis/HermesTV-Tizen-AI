@@ -110,7 +110,7 @@
     topbar.className = 'region-topbar';
 
     var title = document.createElement('span');
-    title.textContent = 'HermesTV — ' + (profile.display_name || profile.profile_id);
+    title.textContent = 'DaveTV — ' + (profile.display_name || profile.profile_id);
     title.style.fontSize = 'calc(20px * var(--font-scale, 1))';
     topbar.appendChild(title);
     root.appendChild(topbar);

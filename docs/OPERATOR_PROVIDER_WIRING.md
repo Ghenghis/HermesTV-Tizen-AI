@@ -2,6 +2,12 @@
 
 Generated 2026-05-20 after wave-17.
 
+Truth gate: this runbook describes how provider env wiring is intended to be
+operated. It is not provider-completion proof by itself. Any Claude/Codex/agent
+claim that providers are finished must satisfy
+`docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md`, including non-zero catalog data,
+play-ticket creation, stream response proof, and sanitized evidence artifacts.
+
 This doc is the operator-side runbook for turning on the paid IPTV providers
 on the production VPS (`tv.daveai.tech` / `hermestv.daveai.tech`). The code
 ships ready to consume four real upstream lanes:

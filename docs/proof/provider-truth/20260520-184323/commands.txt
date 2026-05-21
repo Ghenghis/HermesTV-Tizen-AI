@@ -1,0 +1,13 @@
+PROVIDER_E2E_MODE=empty-state
+NO_PROVIDER_EMPTY_STATE=1
+HERMES_PROVIDER_E2E_BASE=<unset>
+APOLLO_M3U_URL=<unset>
+XTREMEHD_M3U_URL=<unset>
+XTREAM_URL=<unset>
+XTREAM_USERNAME=<unset>
+XTREAM_PASSWORD=<unset>
+JELLYFIN_URL=<unset>
+JELLYFIN_API_KEY=<unset>
+IPTV_ORG_ENABLED=<unset>
+
+# Command: node tools/test-provider-e2e.js

@@ -24,7 +24,7 @@ var sanitizeLog = require('../lib/sanitizeLog').sanitizeForLog;
 var router = Router();
 
 var VALID_PROFILES = ['dave_tv', 'mom_tv'];
-var VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'iptv-org', 'jellyfin', 'all'];
+var VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'xtream', 'iptv-org', 'jellyfin', 'all'];
 
 // X-Catalog-Source header values surfaced to the client so DevTools / Settings
 // can render a "Live Jellyfin" / "iptv-org" / "operator providers" / "empty"
@@ -127,24 +127,25 @@ async function resolveCatalog() {
   // Operator-pasted M3U providers (Apollo Group, xTremeHD).
   var m3uCount = 0;
   var m3uProviders = null;
-  if (m3uClient.isEnabled()) {
-    try {
-      var m3uItems = await m3uClient.fetchCatalog({ limit: 600 });
-      if (Array.isArray(m3uItems) && m3uItems.length > 0) {
-        m3uCount = m3uItems.length;
-        baseItems = baseItems.concat(m3uItems);
-        if (baseSource === SRC_NONE) {
-          baseSource = SRC_PROVIDERS_ONLY;
-        } else {
-          baseSource = SRC_MERGED;
-        }
+  try {
+    // Always call fetchCatalog. Disk-backed providers are discovered through
+    // providerRegistry asynchronously, so a cold-start isEnabled() check can
+    // be stale before the first registry snapshot is loaded.
+    var m3uItems = await m3uClient.fetchCatalog({ limit: 600 });
+    if (Array.isArray(m3uItems) && m3uItems.length > 0) {
+      m3uCount = m3uItems.length;
+      baseItems = baseItems.concat(m3uItems);
+      if (baseSource === SRC_NONE) {
+        baseSource = SRC_PROVIDERS_ONLY;
+      } else {
+        baseSource = SRC_MERGED;
       }
-      // Status is reported even on zero items so Settings can show
-      // "configured but fetch failed" diagnostics.
-      m3uProviders = m3uClient.getProviderStatus();
-    } catch (err) {
-      console.warn('[catalog] m3u merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
     }
+    // Status is reported even on zero items so Settings can show
+    // "configured but fetch failed" diagnostics.
+    m3uProviders = m3uClient.getProviderStatus();
+  } catch (err) {
+    console.warn('[catalog] m3u merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
   }
 
   // Xtream Codes panel (the de-facto paid-IPTV REST API). Activates when the
@@ -155,37 +156,27 @@ async function resolveCatalog() {
   // across xTreme + m3u + iptv-org.
   var xtreamCount = 0;
   var xtreamStatus = null;
-  if (xtreamClient.isEnabled()) {
-    try {
-      var live = await xtreamClient.getLiveStreams();
-      var vod = await xtreamClient.getVodStreams();
-      var series = await xtreamClient.getSeriesList();
-      var xtreamItems = [];
-      var addBatch = function(arr, type) {
-        if (!Array.isArray(arr)) { return; }
-        for (var xi = 0; xi < arr.length; xi++) {
-          try {
-            var shaped = xtreamClient.toHermesItem(arr[xi], type);
-            if (shaped) { xtreamItems.push(shaped); }
-          } catch (_) { /* malformed — skip */ }
-        }
-      };
-      addBatch(live, 'live');
-      addBatch(vod, 'vod');
-      addBatch(series, 'series');
-      if (xtreamItems.length > 0) {
-        xtreamCount = xtreamItems.length;
-        baseItems = baseItems.concat(xtreamItems);
-        if (baseSource === SRC_NONE) {
-          baseSource = SRC_PROVIDERS_ONLY;
-        } else {
-          baseSource = SRC_MERGED;
-        }
+  try {
+    // Same cold-start rule as M3U: fetchAll* refreshes providerRegistry first.
+    var live = await xtreamClient.fetchAllLive();
+    var vod = await xtreamClient.fetchAllVod();
+    var series = await xtreamClient.fetchAllSeries();
+    var xtreamItems = [];
+    if (Array.isArray(live)) { for (var li = 0; li < live.length; li++) { xtreamItems.push(live[li]); } }
+    if (Array.isArray(vod)) { for (var vi = 0; vi < vod.length; vi++) { xtreamItems.push(vod[vi]); } }
+    if (Array.isArray(series)) { for (var si = 0; si < series.length; si++) { xtreamItems.push(series[si]); } }
+    if (xtreamItems.length > 0) {
+      xtreamCount = xtreamItems.length;
+      baseItems = baseItems.concat(xtreamItems);
+      if (baseSource === SRC_NONE) {
+        baseSource = SRC_PROVIDERS_ONLY;
+      } else {
+        baseSource = SRC_MERGED;
       }
-      try { xtreamStatus = xtreamClient.getProviderStatus(); } catch (_) { xtreamStatus = null; }
-    } catch (err) {
-      console.warn('[catalog] xtream merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
     }
+    try { xtreamStatus = xtreamClient.getProviderStatus(); } catch (_) { xtreamStatus = null; }
+  } catch (err) {
+    console.warn('[catalog] xtream merge failed: ' + sanitizeLog(err && err.message ? err.message : 'unknown'));
   }
 
   // Cross-provider title merge. If three providers all carry "ESPN" the user
@@ -254,16 +245,92 @@ function parseHideProviders(raw) {
   return set;
 }
 
+function normalizeProviderId(raw) {
+  if (typeof raw !== 'string') { return ''; }
+  var p = raw.trim().toLowerCase();
+  if (!p) { return ''; }
+  if (p === 'apollo') { return 'apollo_group'; }
+  if (p === 'apollo-group' || p === 'apollo_group_tv' || p === 'apollo group') { return 'apollo_group'; }
+  if (p === 'iptv_org' || p === 'iptvorg' || p === 'iptv-org-public') { return 'iptv-org'; }
+  if (p === 'extreme' || p === 'xtreme' || p === 'xtreme-hd' || p === 'xtreme_hd') { return 'xtremehd'; }
+  return p;
+}
+
+function isValidProviderId(providerId) {
+  return VALID_PROVIDERS.indexOf(providerId) !== -1 ||
+    /^(m3u|xtream|stalker)-prov-[a-f0-9]{8}$/i.test(providerId);
+}
+
+function parseProviderIds(query) {
+  var raw = [];
+  function add(value) {
+    if (Array.isArray(value)) {
+      for (var ai = 0; ai < value.length; ai++) { add(value[ai]); }
+      return;
+    }
+    if (typeof value !== 'string') { return; }
+    var parts = value.split(',');
+    for (var pi = 0; pi < parts.length; pi++) { raw.push(parts[pi]); }
+  }
+
+  add(query.provider_id);
+  add(query.provider_ids);
+
+  var ids = [];
+  var invalid = [];
+  for (var i = 0; i < raw.length; i++) {
+    var id = normalizeProviderId(raw[i]);
+    if (!id) { continue; }
+    if (id === 'all') { return { ids: [], invalid: [] }; }
+    if (!isValidProviderId(id)) {
+      invalid.push(id);
+      continue;
+    }
+    if (ids.indexOf(id) === -1) { ids.push(id); }
+  }
+  return { ids: ids, invalid: invalid };
+}
+
+function itemHasAnyProvider(item, providerIds) {
+  if (!item || !Array.isArray(providerIds) || providerIds.length === 0) { return true; }
+  var selected = {};
+  for (var si = 0; si < providerIds.length; si++) { selected[providerIds[si]] = true; }
+  var i;
+  if (Array.isArray(item.sources)) {
+    for (i = 0; i < item.sources.length; i++) {
+      var sid = normalizeProviderId(item.sources[i] && item.sources[i].provider_id);
+      if (sid && selected[sid]) { return true; }
+    }
+  }
+  if (Array.isArray(item.providers)) {
+    for (i = 0; i < item.providers.length; i++) {
+      var pid = normalizeProviderId(item.providers[i] && item.providers[i].provider_id);
+      if (pid && selected[pid]) { return true; }
+    }
+  }
+  var flat = normalizeProviderId(item.provider_id || item.provider || '');
+  if (flat && selected[flat]) { return true; }
+  if (Array.isArray(item.provider_tags)) {
+    for (i = 0; i < item.provider_tags.length; i++) {
+      var tag = normalizeProviderId(item.provider_tags[i]);
+      if (tag && selected[tag]) { return true; }
+    }
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/catalog
 // Optional query params:
 //   ?profile_id=dave_tv|mom_tv   — filters by profile_access (when present)
 //   ?provider_id=apollo_group|xtremehd|iptv-org|jellyfin|all — provider filter
+//   ?provider_ids=xtremehd,apollo_group,iptv-org — multi-provider filter
 //   ?hide_providers=A,B,C        — wave-16 visibility toggle (server-side)
 // ---------------------------------------------------------------------------
 router.get('/api/catalog', async function(req, res) {
   var profile_id = req.query.profile_id;
-  var provider_id = req.query.provider_id;
+  var providerParse = parseProviderIds(req.query);
+  var providerIds = providerParse.ids;
   var hiddenSet = parseHideProviders(req.query.hide_providers);
 
   if (profile_id !== undefined && VALID_PROFILES.indexOf(profile_id) === -1) {
@@ -273,10 +340,10 @@ router.get('/api/catalog', async function(req, res) {
     });
   }
 
-  if (provider_id !== undefined && VALID_PROVIDERS.indexOf(provider_id) === -1) {
+  if (providerParse.invalid.length > 0) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: "Invalid provider_id '" + provider_id + "'. Valid values: apollo_group, xtremehd, iptv-org, jellyfin, all",
+      message: "Invalid provider_id '" + providerParse.invalid[0] + "'. Use all, a known provider id, or a registry-backed provider id.",
     });
   }
 
@@ -301,21 +368,12 @@ router.get('/api/catalog', async function(req, res) {
     });
   }
 
-  // Provider filter. "all" is a no-op; specific provider id filters by either
-  // the legacy providers[] array OR the post-merge sources[] array.
-  if (provider_id && provider_id !== 'all' && !isJellyfin) {
+  // Provider filter. "all" is a no-op; specific provider ids filter by any
+  // legacy providers[], post-merge sources[], flat provider_id/provider, or
+  // provider_tags entry.
+  if (providerIds.length > 0 && !isJellyfin) {
     items = items.filter(function(item) {
-      if (Array.isArray(item.sources)) {
-        for (var si = 0; si < item.sources.length; si++) {
-          if (item.sources[si] && item.sources[si].provider_id === provider_id) { return true; }
-        }
-      }
-      if (Array.isArray(item.providers)) {
-        for (var pi = 0; pi < item.providers.length; pi++) {
-          if (item.providers[pi] && item.providers[pi].provider_id === provider_id) { return true; }
-        }
-      }
-      return false;
+      return itemHasAnyProvider(item, providerIds);
     });
   }
 
@@ -376,11 +434,14 @@ router.get('/api/catalog', async function(req, res) {
   var _meta = {
     sorted_for_profile: profile_id || null,
     quality_preference: quality_preference,
-    provider_filter: provider_id || null,
+    provider_filter: providerIds.length > 0 ? providerIds.join(',') : null,
+    provider_filters: providerIds,
     source: resolved.source,
     iptv_org_count: resolved.iptv_org_count,
     m3u_count: resolved.m3u_count,
     m3u_providers: resolved.m3u_providers,
+    xtream_count: resolved.xtream_count,
+    xtream_status: resolved.xtream_status,
     merged_duplicates: resolved.merged_duplicates || 0,
     // Wave-16: how many items the hide_providers query param dropped.
     // 0 when the param is missing — the catalog is unfiltered.

@@ -81,7 +81,7 @@ You can also just **talk to the Hermes chat bubble** at any time. Try saying thi
 - *"Mom Mode please"*
 - *"Show me the Apple TV style"*
 
-Hermes will understand and switch it for you right away.
+DaveTV will understand and switch it for you right away.
 
 ---
 

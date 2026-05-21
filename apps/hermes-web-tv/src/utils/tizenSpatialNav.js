@@ -160,6 +160,12 @@ function nextInDirection(current, candidates, direction) {
 // (37/38/39/40) AND the alternate codes (4/5/6/7) Tizen surfaces on some
 // older remotes — see TIZEN_KEY_CODES in tizenKeyMap.js.
 function directionForKey(keyCode) {
+  if (typeof keyCode === 'string') {
+    if (keyCode === 'ArrowLeft' || keyCode === 'Left') { return 'left'; }
+    if (keyCode === 'ArrowUp' || keyCode === 'Up') { return 'up'; }
+    if (keyCode === 'ArrowRight' || keyCode === 'Right') { return 'right'; }
+    if (keyCode === 'ArrowDown' || keyCode === 'Down') { return 'down'; }
+  }
   if (keyCode === 37 || keyCode === 4) { return 'left'; }
   if (keyCode === 38 || keyCode === 5) { return 'up'; }
   if (keyCode === 39 || keyCode === 6) { return 'right'; }
@@ -207,7 +213,7 @@ function installSpatialNav(options) {
   }
 
   function handler(e) {
-    var dir = directionForKey(e.keyCode);
+    var dir = directionForKey(e.keyCode || e.which || e.key);
     if (!dir) { return; }
     if (!keyFilter(e)) { return; }
 

@@ -10,6 +10,16 @@ name: HermesTV CI
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_provider_live:
+        description: 'Run the provider-live proof job (requires provider secrets configured)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 # Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
@@ -60,7 +70,37 @@ jobs:
           echo "Schema validation: ${PASS_COUNT} PASS, 0 FAIL — OK"
 
   # -----------------------------------------------------------------------
-  # 2) Web build — parallel with schema-validation.
+  # 2) API/provider regression suite — release truth gate.
+  # This is the exact local proof command from docs/49:
+  #   npm test --prefix services/hermes-tv-api
+  # It covers provider registry, setup QR, catalog, playback proxy, and the
+  # Xtream fixture path. PR/push CI must fail when any of those regress.
+  # -----------------------------------------------------------------------
+  api-regression-tests:
+    name: API/provider regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            services/hermes-tv-api/package-lock.json
+
+      - name: Install API deps
+        working-directory: services/hermes-tv-api
+        run: npm ci
+
+      - name: Run API/provider regression suite
+        run: npm test --prefix services/hermes-tv-api
+
+  # -----------------------------------------------------------------------
+  # 3) Web build — parallel with schema/API validation.
   # Produces apps/hermes-web-tv/dist/ as an artifact for downstream jobs.
   # -----------------------------------------------------------------------
   web-build:
@@ -104,7 +144,7 @@ jobs:
           retention-days: 7
 
   # -----------------------------------------------------------------------
-  # 3) Chatbot integration — depends on schema-validation passing.
+  # 4) Chatbot integration — depends on schema/API validation passing.
   # Boots the API in background, waits for /health, then runs every case in
   # tools/test-chatbot-commands.js. We gate on "PASS >= 46, FAIL == 0" so
   # adding new commands in future PRs doesn't break this job (same pattern
@@ -113,7 +153,7 @@ jobs:
   chatbot-integration:
     name: Chatbot integration (46+/all)
     runs-on: ubuntu-latest
-    needs: schema-validation
+    needs: [schema-validation, api-regression-tests]
     timeout-minutes: 10
     env:
       PORT: '3001'
@@ -200,21 +240,28 @@ jobs:
           retention-days: 7
 
   # -----------------------------------------------------------------------
-  # 4) E2E smoke — 12 critical-endpoint probes against a freshly-booted API.
-  # Boots the API in-process on PORT=3199 (test-e2e-smoke.js handles its own
-  # /health wait) so this job stays self-contained — no nohup, no PID file.
-  # Expected: "12 PASS, 0 FAIL" from tools/test-e2e-smoke.js. Documented
-  # stub statuses (503 on /api/play/.../stream, 202/503 on /api/tts) are
-  # treated as PASS inside the test; only contract drift breaks the gate.
+  # 5a) E2E smoke (empty-state honest) — Lane 09 part 1.
+  # Per docs/47_REMAINING_E2E_COMPLETION_CONTRACT.md §"20-Agent Work Plan"
+  # Agent 09: "Separate no-provider and provider-live jobs. Fail provider-
+  # live on skip/no-provider. Keep empty-state test honest."
+  #
+  # This job runs with NO_PROVIDER_EMPTY_STATE=1, which means:
+  #   - /api/catalog is ALLOWED to return total=0 + _meta.source=no-providers
+  #   - play/download probes are PASS-skipped with explicit annotations
+  #   - The catalog-empty contract is the test (envelope shape + no-mock)
+  #
+  # This job PROVES the honest no-provider contract. It cannot stand in for
+  # provider-live proof — see 4b below.
   # -----------------------------------------------------------------------
-  e2e-smoke:
-    name: E2E smoke (12 probes)
+  e2e-smoke-empty-state:
+    name: E2E smoke — empty-state honest (12 probes, NO_PROVIDER_EMPTY_STATE=1)
     runs-on: ubuntu-latest
     needs: chatbot-integration
     timeout-minutes: 10
     env:
       PORT: '3199'
       NODE_ENV: 'test'
+      NO_PROVIDER_EMPTY_STATE: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -231,29 +278,149 @@ jobs:
         working-directory: services/hermes-tv-api
         run: npm ci
 
-      - name: Run E2E smoke suite (boots API in-process on PORT=3199)
+      - name: Assert env strips any provider config
+        run: |
+          # The empty-state job MUST run without any provider env vars set,
+          # otherwise the "honest no-provider" assertion becomes nondeterministic.
+          # Explicitly unset any that GH Actions might have inherited.
+          for v in APOLLO_M3U_URL XTREMEHD_M3U_URL XTREAM_URL XTREAM_USERNAME XTREAM_PASSWORD JELLYFIN_URL JELLYFIN_API_KEY IPTV_ORG_ENABLED; do
+            if [ -n "${!v:-}" ]; then
+              echo "::error::Provider env var $v is set; empty-state job requires unset."
+              exit 1
+            fi
+          done
+          echo "Empty-state env: clean — no provider env vars set"
+
+      - name: Run E2E smoke suite (empty-state mode, NO_PROVIDER_EMPTY_STATE=1)
         run: node tools/test-e2e-smoke.js | tee e2e-smoke.log
 
       - name: Enforce 12 PASS / 0 FAIL
         run: |
           if ! grep -qE 'Results:[[:space:]]+12[[:space:]]+PASS,[[:space:]]+0[[:space:]]+FAIL' e2e-smoke.log; then
-            echo "::error::test-e2e-smoke.js did not report '12 PASS, 0 FAIL'"
+            echo "::error::test-e2e-smoke.js did not report '12 PASS, 0 FAIL' in empty-state mode"
             tail -n 40 e2e-smoke.log
             exit 1
           fi
-          echo "E2E smoke: 12 PASS, 0 FAIL — OK"
+          # Defense in depth: verify the skip-paths emitted the explicit
+          # NO_PROVIDER_EMPTY_STATE annotation, not a silent "skipped".
+          if ! grep -qE 'NO_PROVIDER_EMPTY_STATE=1' e2e-smoke.log; then
+            echo "::error::Empty-state job did not surface NO_PROVIDER_EMPTY_STATE=1 annotation on skip lines"
+            tail -n 40 e2e-smoke.log
+            exit 1
+          fi
+          echo "E2E smoke (empty-state): 12 PASS, 0 FAIL — OK"
 
       - name: Upload smoke log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-smoke-log
+          name: e2e-smoke-empty-state-log
           path: e2e-smoke.log
           if-no-files-found: ignore
           retention-days: 7
 
   # -----------------------------------------------------------------------
-  # 5) Secret scan — fast, parallel, no Node deps.
+  # 5b) Provider-live proof (Lane 09 part 2) — release-gate job.
+  # Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md §"Non-Negotiable Truth Rules"
+  # rule 1: "No test may report provider playback as passing because no
+  # provider items were configured." This job runs tools/test-provider-e2e.js
+  # WITHOUT NO_PROVIDER_EMPTY_STATE, so the runner FAILS when /api/catalog
+  # is empty.
+  #
+  # Triggering:
+  #   - Manual workflow_dispatch (any branch)
+  #   - Scheduled nightly (against main) to catch upstream-provider drift
+  #   - Required by the deploy-vps workflow before flipping the release flag
+  #
+  # PR / push runs do NOT execute this job — it is a release-gate job that
+  # consumes operator-configured provider secrets and is not appropriate
+  # for every PR. Use the dedicated provider-live.yml workflow (added
+  # alongside this commit) to invoke it explicitly.
+  #
+  # Proof artifacts under docs/proof/provider-truth/<ts>/ are uploaded
+  # to the workflow run regardless of pass/fail so the operator can
+  # download the sanitized evidence ledger.
+  # -----------------------------------------------------------------------
+  provider-live:
+    name: Provider-live proof (release-gate)
+    runs-on: ubuntu-latest
+    needs: [chatbot-integration, api-regression-tests]
+    timeout-minutes: 12
+    # Lane 09 contract: only run when explicitly requested OR when the
+    # operator has wired a secret marker indicating live-provider mode.
+    # PR / push events never enter this job — they have the empty-state
+    # job above. workflow_dispatch with run_provider_live=true forces it.
+    if: github.event_name == 'workflow_dispatch' && inputs.run_provider_live == 'true'
+    env:
+      PORT: '3199'
+      NODE_ENV: 'test'
+      PROVIDER_E2E_MODE: 'live'
+      PROVIDER_E2E_ALLOW_LOCAL_LIVE: '1'
+      # Provider env vars get injected from GH Action secrets the operator
+      # set per docs/OPERATOR_PROVIDER_WIRING.md. Without these set, the
+      # runner FAILS by design (empty /api/catalog).
+      APOLLO_M3U_URL: ${{ secrets.APOLLO_M3U_URL }}
+      XTREMEHD_M3U_URL: ${{ secrets.XTREMEHD_M3U_URL }}
+      XTREAM_URL: ${{ secrets.XTREAM_URL }}
+      XTREAM_USERNAME: ${{ secrets.XTREAM_USERNAME }}
+      XTREAM_PASSWORD: ${{ secrets.XTREAM_PASSWORD }}
+      JELLYFIN_URL: ${{ secrets.JELLYFIN_URL }}
+      JELLYFIN_API_KEY: ${{ secrets.JELLYFIN_API_KEY }}
+      IPTV_ORG_ENABLED: ${{ secrets.IPTV_ORG_ENABLED }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            services/hermes-tv-api/package-lock.json
+
+      - name: Install API deps
+        working-directory: services/hermes-tv-api
+        run: npm ci
+
+      - name: Run provider-live proof (NO skip allowed)
+        run: |
+          # tools/test-provider-e2e.js boots the API in-process on PORT=3199,
+          # asserts: /api/providers non-empty, /api/catalog total>0 with
+          # _meta.source != 'no-providers', play ticket creation, stream
+          # HEAD/GET, no credential leak in proof artifacts. Exits 1 on FAIL.
+          node tools/test-provider-e2e.js | tee provider-live.log
+
+      - name: Enforce live-provider non-skip contract
+        run: |
+          if ! grep -qE '^=== Results: [1-9][0-9]* PASS, 0 FAIL' provider-live.log; then
+            echo "::error::Provider-live proof did not return any PASS or contained FAIL"
+            echo "::error::Per docs/46_PROVIDER_TRUTH_PROOF_CONTRACT.md, no skip may count as PASS in live mode."
+            tail -n 60 provider-live.log
+            exit 1
+          fi
+          echo "Provider-live proof: PASS"
+
+      - name: Upload sanitized proof artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-truth-proof-${{ github.run_id }}
+          path: docs/proof/provider-truth/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload proof log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-live-log
+          path: provider-live.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # -----------------------------------------------------------------------
+  # 6) Secret scan — fast, parallel, no Node deps.
   # Inline grep patterns mirror tools/secret-scan.sh PATTERNS array so the
   # CI signal matches what an operator runs locally before opening a PR.
   # -----------------------------------------------------------------------

@@ -6,6 +6,7 @@ var OFFLINE_COMMAND_TABLE = [
   // --- Provider filters ---
   { patterns: ['show apollo', 'show apollo group'], action: 'filter_provider', params: { provider_id: 'apollo_group' } },
   { patterns: ['show xtremehd', 'show extreme'], action: 'filter_provider', params: { provider_id: 'xtremehd' } },
+  { patterns: ['show iptv-org', 'show iptv org', 'show public channels'], action: 'filter_provider', params: { provider_id: 'iptv-org' } },
   { patterns: ['show all providers', 'show all'], action: 'filter_provider', params: { provider_id: 'all' } },
   // --- Content type filters ---
   { patterns: ['show movies'], action: 'filter_content', params: { content_type: 'movies' } },

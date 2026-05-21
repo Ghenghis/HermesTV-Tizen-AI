@@ -1,11 +1,11 @@
 # ============================================================================
-# HermesTV — host nginx site config (Cloudflare-Flexible / proxied edition)
+# HermesTV — host nginx site config (Cloudflare proxied edition)
 #
-# Pattern: Cloudflare proxies tv.daveai.tech AND hermestv.daveai.tech →
-# terminates TLS at edge → connects to this VPS over HTTP on port 80. Origin
-# serves HTTP only. This matches the existing `hermes.daveai.tech`,
-# `voice.daveai.tech`, and every other daveai.tech site already on this
-# VPS — see docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md.
+# Pattern: Cloudflare proxies tv.daveai.tech AND hermestv.daveai.tech to this
+# VPS. If Cloudflare SSL/TLS is set to Full (Strict), the origin server block
+# should also listen on 443 with a valid origin certificate. This template
+# keeps the existing HTTP upstream shape for the Docker services; host nginx
+# remains the only public edge.
 #
 # Canonical / alias: `tv.daveai.tech` is the new short canonical URL.
 # `hermestv.daveai.tech` is kept as an additive alias so existing bookmarks,
@@ -16,6 +16,8 @@
 # Installation (sysadmin, after PR #8 merge + DNS A record + operator user):
 #   sudo cp upstream/nginx/hermestv.daveai.tech.conf.example \
 #           /etc/nginx/sites-available/hermestv.daveai.tech
+#   sudo cp upstream/nginx/cloudflare-real-ip.conf.example \
+#           /etc/nginx/cloudflare-real-ip.conf
 #   sudo ln -s /etc/nginx/sites-available/hermestv.daveai.tech \
 #              /etc/nginx/sites-enabled/
 #   sudo nginx -t                         # MUST print "syntax is ok"
@@ -42,9 +44,10 @@ server {
     add_header Referrer-Policy "no-referrer" always;
 
     # Cloudflare → origin requests carry the real client IP in CF-Connecting-IP.
-    # Set X-Real-IP from that header so upstream logs are useful.
-    set_real_ip_from 0.0.0.0/0;
-    real_ip_header CF-Connecting-IP;
+    # Trust only Cloudflare edge IP ranges, never 0.0.0.0/0. The include file
+    # can also be moved to the global nginx http{} block if every daveai.tech
+    # site should log real visitor IPs.
+    include /etc/nginx/cloudflare-real-ip.conf;
 
     # --- API + health ---
     # HermesTV API container will bind host port 3011 once Phase 2 brings the

@@ -34,6 +34,8 @@ const parentalRouter = require('./routes/parental');
 const searchRouter = require('./routes/search');
 const backupRouter = require('./routes/backup');
 const remoteRouter = require('./routes/remote');
+const authRouter = require('./routes/auth');
+const agentRouter = require('./routes/agent');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -50,7 +52,7 @@ const PORT = process.env.PORT || 3001;
 // send no Origin header and so were unaffected — which is why curl (no
 // Origin) and same-origin GETs always worked while the browser POSTs
 // silently 500'd. See route audit W5-CORS-1.
-// Never expose credentials via CORS.
+// Auth cookies are HttpOnly and sent only for the allowlisted DaveTV origins.
 const LAN_ORIGIN = /^http:\/\/(localhost|hermestv\.local|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
 const PROD_ORIGIN = /^https:\/\/(tv|hermestv)\.daveai\.tech$/;
 app.use(
@@ -66,7 +68,7 @@ app.use(
     },
     methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Accept'],
-    credentials: false,
+    credentials: true,
   })
 );
 
@@ -83,6 +85,13 @@ app.use(requestLogger);
 
 // --- Credential guard (wraps res.json to block any accidental leaks) ---
 app.use(credentialGuard);
+
+// --- Auth routes + optional API gate ---
+// /api/auth/* and /api/admin/* are always mounted. DAVETV_AUTH_ENFORCE_API=true
+// additionally protects non-auth API routes on the VPS after Dave's admin
+// account exists.
+app.use('/', authRouter);
+app.use(authRouter.authMiddleware);
 
 // --- Routes ---
 app.use('/', healthRouter);
@@ -119,6 +128,9 @@ app.use('/', searchRouter);
 app.use('/', backupRouter);
 // Phone-as-remote relay: POST /api/remote/event + GET /api/remote/events (SSE).
 app.use('/', remoteRouter);
+// DaveTV natural voice agent surface. Routes are honest-blocked until the
+// provider-search/orchestrator lane is implemented; config is durable.
+app.use('/', agentRouter);
 
 // --- 404 fallback ---
 app.use((req, res) => {
@@ -167,6 +179,14 @@ const server = app.listen(PORT, () => {
     }
   }
 });
+
+// Test harnesses that require this module in-process need a way to close the
+// auto-started listener cleanly before process exit, especially on Windows.
+app.closeHermesServer = function closeHermesServer(callback) {
+  server.close(function(err) {
+    if (typeof callback === 'function') { callback(err || null); }
+  });
+};
 
 // --- Graceful shutdown ---
 process.on('SIGTERM', () => {

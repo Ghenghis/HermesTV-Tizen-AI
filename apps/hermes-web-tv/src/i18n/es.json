@@ -44,7 +44,7 @@
   "settings.tabs.parental": "Parental",
 
   "settings.language.header": "Idioma",
-  "settings.language.tagline": "Elige el idioma de los menús, los diálogos y las respuestas de Hermes.",
+  "settings.language.tagline": "Elige el idioma de los menús, los diálogos y las respuestas de DaveTV.",
   "settings.language.english": "English",
   "settings.language.spanish": "Español",
   "settings.language.french": "Français",
@@ -94,9 +94,9 @@
   "settings.theme.luna": "Luna",
   "settings.theme.hula": "Hula",
 
-  "settings.layout.header": "Diseño",
-  "settings.layout.tagline": "Cambia entre los 8 diseños disponibles (TiviMate, Netflix, Plex, Apple TV, Samsung, Modo Sencillo, Avanzado y Zero).",
-  "settings.layout.open_switcher": "Cambiar diseño",
+  "settings.layout.header": "Vistas",
+  "settings.layout.tagline": "Cambia entre vistas de TV como TiviMate, Netflix, Plex, Apple TV, Samsung, Modo Sencillo, Avanzado y Zero.",
+  "settings.layout.open_switcher": "Cambiar vista",
 
   "settings.features.catchup": "Catch-up (TV en diferido)",
   "settings.features.catchup_tagline": "Muestra la pestaña de TV en diferido cuando tu operador la soporte.",
@@ -141,13 +141,13 @@
   "settings.about.credit": "Hecho para Sherri (Modo Sencillo) y Dave. Inspirado en IPTV Player Zero — sin recursos copiados.",
 
   "settings.voice.header": "Voz",
-  "settings.voice.tagline": "Elige la voz sintetizada que usará Hermes.",
+  "settings.voice.tagline": "Elige la voz sintetizada que usará DaveTV.",
   "settings.voice.pick_voice": "Elegir voz",
   "settings.voice.tts_engine": "Motor de voz",
   "settings.voice.tts_engine_value": "Azure Speech",
   "settings.voice.tts_engine_note": "No se usa Bixby AI. La salida de voz es solo Azure.",
   "settings.voice.mic_input": "Entrada de micrófono",
-  "settings.voice.mic_input_tagline": "Usa el micrófono del mando Samsung para hablar con Hermes.",
+  "settings.voice.mic_input_tagline": "Usa el micrófono del mando Samsung para hablar con DaveTV.",
   "settings.voice.mic_input_detail": "Solo captura — el reconocimiento se hace en el servidor. La salida nunca pasa por Bixby.",
 
   "settings.sleep.header": "Temporizador de apagado",
@@ -160,7 +160,7 @@
   "settings.sleep.set": "Programar apagado",
   "settings.sleep.cancel": "Cancelar apagado",
 
-  "chatbot.greeting": "¡Hola! Soy Hermes. Escribe un comando o toca una sugerencia. Prueba: muestra películas, modo sencillo, tema oscuro, muestra 4K.",
+  "chatbot.greeting": "Hola, soy DaveTV. Pulsa el botón de voz o dime qué quieres ver.",
   "chatbot.placeholder": "Escribe a {name}...",
   "chatbot.send": "Enviar",
   "chatbot.thinking_aria": "{name} está pensando",
@@ -215,7 +215,7 @@
   "download.aria_open": "Descargar {title}",
 
   "pairing.title": "Añadir un proveedor",
-  "pairing.qr_aria": "Marcador de código QR",
+  "pairing.qr_aria": "Código QR de emparejamiento",
   "pairing.code_label": "Código de emparejamiento",
   "pairing.instruction": "Escanea este código con el teléfono para añadir un proveedor en {host}",
   "pairing.completed": "Proveedor añadido — cerrando…",
