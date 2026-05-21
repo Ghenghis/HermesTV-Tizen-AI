@@ -130,6 +130,9 @@ function LoginView(props) {
   var resetInfoState = React.useState('');
   var resetInfo = resetInfoState[0];
   var setResetInfo = resetInfoState[1];
+  var resetUrlState = React.useState('');
+  var resetUrl = resetUrlState[0];
+  var setResetUrl = resetUrlState[1];
 
   function submit(e) {
     e.preventDefault();
@@ -149,10 +152,12 @@ function LoginView(props) {
     setBusy(true);
     setMessage('');
     setResetInfo('');
+    setResetUrl('');
     hermesApi.requestPasswordReset(email).then(function(body) {
       setBusy(false);
       if (body && body.reset_url) {
-        setResetInfo('SMTP is not configured yet. Dave can use this reset link: ' + body.reset_url);
+        setResetInfo('SMTP is not configured yet. Use this reset form on this device.');
+        setResetUrl(body.reset_url);
       } else {
         setResetInfo('If that email has an active DaveTV account, a reset link was created.');
       }
@@ -175,14 +180,17 @@ function LoginView(props) {
         {authErrorBox(message)}
         {resetInfo ? (
           <div style={{ background: 'rgba(31,111,235,0.12)', border: '1px solid rgba(31,111,235,0.45)', color: '#b9d4ff', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', wordBreak: 'break-word' }}>
-            {resetInfo}
+            <div>{resetInfo}</div>
+            {resetUrl ? (
+              <a href={resetUrl} style={Object.assign({}, SECONDARY, { display: 'inline-flex', marginTop: '0.75rem', textDecoration: 'none' })}>Open reset form</a>
+            ) : null}
           </div>
         ) : null}
         {field('Email', email, setEmail, 'email', 'email')}
         {!resetMode ? field('Password', password, setPassword, 'password', 'current-password') : null}
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button type="submit" disabled={busy || !auth.configured} style={BUTTON}>{busy ? 'Working...' : (resetMode ? 'Send reset link' : 'Sign in')}</button>
-          <button type="button" style={SECONDARY} onClick={function() { setResetMode(!resetMode); setMessage(''); }}>
+          <button type="button" style={SECONDARY} onClick={function() { setResetMode(!resetMode); setMessage(''); setResetInfo(''); setResetUrl(''); }}>
             {resetMode ? 'Back to login' : 'Reset password'}
           </button>
         </div>

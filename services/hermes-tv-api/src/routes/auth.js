@@ -38,22 +38,39 @@ function sessionToken(req) {
   return parseCookies(req)[authStore.SESSION_COOKIE] || '';
 }
 
-function publicBaseUrl(req) {
-  const configured = String(process.env.DAVETV_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
-  if (configured) return configured;
+function isLocalHostname(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+}
 
+function hostnameFromHeader(hostHeader) {
+  const raw = String(hostHeader || '').trim();
+  if (!raw) return '';
+  if (raw.charAt(0) === '[') {
+    const idx = raw.indexOf(']');
+    return idx === -1 ? raw : raw.slice(0, idx + 1);
+  }
+  return raw.split(':')[0];
+}
+
+function publicBaseUrl(req) {
   const origin = req.get('origin');
-  if (origin && process.env.NODE_ENV !== 'production') {
+  if (origin) {
     try {
       const parsed = new URL(origin);
-      const host = parsed.hostname.toLowerCase();
-      if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+      const apiHostHeader = req.get('x-forwarded-host') || req.get('host') || '';
+      const apiHost = hostnameFromHeader(apiHostHeader);
+      const localApiRequest = isLocalHostname(apiHost);
+      if (isLocalHostname(parsed.hostname) && (process.env.NODE_ENV !== 'production' || localApiRequest)) {
         return parsed.origin;
       }
     } catch (_) {
       // Fall back to the API host below.
     }
   }
+
+  const configured = String(process.env.DAVETV_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
+  if (configured) return configured;
 
   const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
   const host = req.get('x-forwarded-host') || req.get('host');

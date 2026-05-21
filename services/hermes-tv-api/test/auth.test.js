@@ -12,6 +12,7 @@ process.env.DAVETV_ADMIN_EMAIL = 'dave@example.test';
 process.env.DAVETV_ADMIN_PASSWORD = 'StrongPass123!';
 process.env.DAVETV_AUTH_REQUIRED = 'true';
 process.env.DAVETV_AUTH_ENFORCE_API = 'true';
+process.env.DAVETV_PUBLIC_APP_URL = 'https://tv.daveai.tech';
 process.env.NODE_ENV = 'test';
 process.env.PORT = '0';
 
@@ -113,7 +114,12 @@ function closeAppServer() {
     }, adminJar);
     ok('admin creates Sherri invite', invite.status === 201 && invite.body && invite.body.invite && invite.body.invite.display_name === 'Sherri', invite.text);
     ok('invite returns manual link when SMTP not configured', invite.body && invite.body.delivery && invite.body.delivery.sent === false && /register_token=/.test(invite.body.invite_url || ''), invite.text);
-    ok('invite link targets public web origin', /^http:\/\/localhost:5173\/\?register_token=/.test(invite.body.invite_url || ''), invite.body && invite.body.invite_url);
+    ok('local browser origin wins over configured public URL outside production', /^http:\/\/localhost:5173\/\?register_token=/.test(invite.body.invite_url || ''), invite.body && invite.body.invite_url);
+
+    var forgotLocal = await request(srv, { method: 'POST', path: '/api/auth/password/forgot', headers: { Origin: 'http://localhost:5173' } }, {
+      email: 'dave@example.test',
+    }, {});
+    ok('self-service reset link also targets local browser origin outside production', forgotLocal.status === 200 && forgotLocal.body && /^http:\/\/localhost:5173\/\?reset_token=/.test(forgotLocal.body.reset_url || ''), forgotLocal.text);
 
     var registerToken = new URL(invite.body.invite_url).searchParams.get('register_token');
     var registered = await request(srv, { method: 'POST', path: '/api/auth/register' }, {
@@ -129,6 +135,7 @@ function closeAppServer() {
     }, adminJar);
     ok('admin creates email-only Warren account', emailAccount.status === 201 && emailAccount.body && emailAccount.body.user && emailAccount.body.user.display_name === 'Warren', emailAccount.text);
     ok('email-only account returns reset link when SMTP not configured', emailAccount.body && emailAccount.body.delivery && emailAccount.body.delivery.sent === false && /reset_token=/.test(emailAccount.body.reset_url || ''), emailAccount.text);
+    ok('email-only reset link targets local browser origin outside production', /^http:\/\/localhost:5173\/\?reset_token=/.test(emailAccount.body.reset_url || ''), emailAccount.body && emailAccount.body.reset_url);
 
     var resetToken = new URL(emailAccount.body.reset_url).searchParams.get('reset_token');
     var resetUser = await request(srv, { method: 'POST', path: '/api/auth/password/reset' }, {
@@ -138,6 +145,20 @@ function closeAppServer() {
     ok('reset link sets first password for email-only account', resetUser.status === 200 && resetUser.body && resetUser.body.user && resetUser.body.user.display_name === 'Warren', resetUser.text);
     ok('reset password sets durable session cookie', /^davetv_session=/.test(resetJar.cookie || ''), resetJar.cookie);
 
+    var priorNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    var prodInvite = await request(srv, {
+      method: 'POST',
+      path: '/api/admin/invites',
+      headers: { Origin: 'http://localhost:5173', 'X-Forwarded-Host': 'tv.daveai.tech' },
+    }, {
+      email: 'suzy@example.test',
+      display_name: 'Suzy',
+      duration_days: 30,
+    }, adminJar);
+    process.env.NODE_ENV = priorNodeEnv;
+    ok('production reset/register links use configured public URL', prodInvite.status === 201 && prodInvite.body && /^https:\/\/tv\.daveai\.tech\/\?register_token=/.test(prodInvite.body.invite_url || ''), prodInvite.text);
+
     var viewerAdmin = await request(srv, { path: '/api/admin/users' }, null, userJar);
     ok('viewer cannot access admin users', viewerAdmin.status === 403, viewerAdmin.text);
 
@@ -145,7 +166,7 @@ function closeAppServer() {
     ok('email-only viewer still cannot access admin users', resetViewerAdmin.status === 403, resetViewerAdmin.text);
 
     var users = await request(srv, { path: '/api/admin/users' }, null, adminJar);
-    ok('admin can list users and invites', users.status === 200 && users.body && users.body.users && users.body.users.length === 3 && users.body.invites && users.body.invites.length === 1, users.text);
+    ok('admin can list users and invites', users.status === 200 && users.body && users.body.users && users.body.users.length === 3 && users.body.invites && users.body.invites.length === 2, users.text);
     var sherri = users.body.users.filter(function(u) { return u.email === 'sherri@example.test'; })[0];
     ok('registered account carries expiry', sherri && typeof sherri.account_expires_at === 'string' && Date.parse(sherri.account_expires_at) > Date.now(), JSON.stringify(sherri));
 
