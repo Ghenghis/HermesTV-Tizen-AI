@@ -4,23 +4,27 @@ Status: **IN_PROGRESS** (continuation of 20260521-0423 — same swarm,
 deeper Wave 2 walk per user's "PRs are checkpoints, not completion" rule).
 
 PR: https://github.com/Ghenghis/HermesTV-Tizen-AI/pull/150 (draft)
-Branch: `claude/swarm-20260521-0423` — 5 commits at last push:
+Branch: `claude/swarm-20260521-0423` — 9 commits at last push:
 
   1. `576b5dc` — initial swarm (secret-scan + e2e-smoke + boundary spec)
   2. `752916f` — Wave 2.1-2.6 audits + sidecar API spec (6/0)
   3. `94b8ea8` — HANDOFF blockers #4 #6 #7 + UI proof boundary
   4. `939b31a` — HANDOFF blocker #8 (EPG mapping persistence)
   5. `5b0a5b4` — HANDOFF blocker #10 (IptvnatorShell real EPG)
+  6. `511f03f` — Wave 2 continuation 20260521-0535 proof folder
+  7. `5eeee0d` — HANDOFF blocker #2 (DVR/Downloads/Catch-up gate)
+  8. `298c357` — HANDOFF blocker #5 (Tizen scaffold dedup guard)
+  9. `fd3aab8` — BUG-SWARM-009 fix (Origin-preserving proxy)
 
 ## HANDOFF blockers from docs/HANDOFF_FOR_CODEX.md §2 status
 
 | # | Blocker | Status | Evidence |
 | --- | --- | --- | --- |
 | 1 | Jellyfin items unplayable | **BLOCKED** — owner=Dave (JELLYFIN_URL/KEY env required) | Branch design noted in bug-ledger; integration cannot run without env |
-| 2 | DVR/Downloads/Catch-up UI lies | **open** | Not yet touched by this swarm |
+| 2 | DVR/Downloads/Catch-up UI lies | **PASS** | releaseFlags + 3 gated components + 15/0 contract test (commit `5eeee0d`) |
 | 3 | AVPlay never invoked on Tizen | **BLOCKED** — owner=Dave/Tizen TV | Needs sideload to verify |
 | 4 | setupProviderRestart.e2e.test.js missing | **PASS** | New 16/0 test in commit `94b8ea8` |
-| 5 | Two competing Tizen scaffolds | **open** | Static dedup possible |
+| 5 | Two competing Tizen scaffolds | **PASS** | refuse-guard build gate (commit `298c357`); ALLOW_LEGACY_TIZEN_NATIVE_BUILD=1 override documented |
 | 6 | sourceHealth ignores disk providers | **PASS** | Fix in `sourceHealthAggregator.js` (commit `94b8ea8`) |
 | 7 | credentialGuard missing m3u_plus | **PASS** | Patterns synced + new 32/0 test (commit `94b8ea8`) |
 | 8 | EPG mapping in-memory only | **PASS** | New `epgMappingStore.js` + 10/0 test (commit `939b31a`) |
@@ -39,11 +43,11 @@ Branch: `claude/swarm-20260521-0423` — 5 commits at last push:
 | BUG-SWARM-006 | **REJECTED** | deploy-vps live gate already correctly wired |
 | BUG-SWARM-007 | **PASS** | apiBase.js escape hatch exists (`window.__HERMES_API_BASE__`) |
 | BUG-SWARM-008 | n/a | (numbering skipped) |
-| BUG-SWARM-009 | **open** | AuthGate React state doesn't trust proxied /api/auth/me response (HTTP layer correct, React state stuck on `auth.configured=false`). Logged for Lane A investigation. |
+| BUG-SWARM-009 | **PASS** | Root-caused: proxy stripping Origin broke CORS reflection → credentialed fetch blocked → AuthGate.catch → setUser(null). Fix: Origin-preserving proxy in new spec `swarm-20260521-authed-ui.spec.ts` (2/2 PASS, commit `fd3aab8`). Test-infrastructure bug only — production unchanged. |
 
 ## API test suite (npm test --prefix services/hermes-tv-api)
 
-26 test files, EXIT=0 across the whole chain:
+27 test files, EXIT=0 across the whole chain (new: releaseFlagContract):
 
 ```
 schema-validate.js                131 PASS / 0 FAIL
@@ -73,6 +77,7 @@ xtreamFixture.e2e.test.js         9 PASS / 0 FAIL
 setupProviderRestart.e2e.test     16 PASS / 0 FAIL  ← new (this swarm)
 credentialGuardSync.test.js       32 PASS / 0 FAIL  ← new (this swarm)
 epgMappingRestart.test.js         10 PASS / 0 FAIL  ← new (this swarm)
+releaseFlagContract.test.js       15 PASS / 0 FAIL  ← new (HANDOFF #2)
 ```
 
 ## Playwright suites passing under both projects (chromium-1080p + samsung-qn85-mock)
@@ -80,6 +85,7 @@ epgMappingRestart.test.js         10 PASS / 0 FAIL  ← new (this swarm)
 - `swarm-20260521-boundary-proof.spec.ts` — 4/0 (login surface controls + focus + reload)
 - `swarm-20260521-sidecar-api.spec.ts` — 6/0 (sidecar API deep authed proof, no leaks)
 - `swarm-20260521-provider-reload-ui.spec.ts` — 1/0 (boundary reload via sidecar proxy)
+- `swarm-20260521-authed-ui.spec.ts` — 2/0 (BUG-SWARM-009 fix; deep authed UI surface mounts)
 
 ## Web build + secret scan + smoke
 

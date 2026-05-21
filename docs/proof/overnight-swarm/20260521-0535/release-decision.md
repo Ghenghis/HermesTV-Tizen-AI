@@ -34,18 +34,18 @@ missing.
 | 2 | HANDOFF #3 AVPlay on Tizen | Dave/Tizen TV | sideload signed `.wgt` and run AVPlay manual proof on QN85 |
 | 3 | BUG-SWARM-003 live-provider truth | Dave/provider | `PROVIDER_E2E_ALLOW_LOCAL_LIVE=1 node tools/test-provider-e2e.js` *or* dispatch deploy-vps with `run_provider_live=true` |
 
-## What is BLOCKED — owner=Lane A
+## What was BLOCKED — owner=Lane A — now RESOLVED
 
-| # | Block | Owner | Unblock signal |
-| --- | --- | --- | --- |
-| BUG-SWARM-009 | AuthGate React state doesn't trust proxied `/api/auth/me` | Lane A | AuthGate respects `hasUser: true` regardless of how the response was delivered |
-
-## What is open agent-fixable — Wave 3 candidates
-
-| # | Block | Why deferred |
+| # | Block | Resolution |
 | --- | --- | --- |
-| HANDOFF #2 | DVR/Downloads/Catch-up UI lies | Needs UI gate behind feature flag + smoke proof of empty-state honesty. ~1.5 h. |
-| HANDOFF #5 | Two competing Tizen scaffolds | Static dedup decision (which scaffold survives) needs Dave's input on which Tizen build is the release vehicle. Not blocked, just needs a 1-line confirmation. |
+| BUG-SWARM-009 | AuthGate React state doesn't trust proxied `/api/auth/me` | **fixed (commit `fd3aab8`)** — root cause was test-infrastructure: the page.route proxy stripped the `Origin` header, breaking CORS reflection and blocking the credentialed fetch. New spec `swarm-20260521-authed-ui.spec.ts` preserves Origin and proves the deep authed UI surface mounts cleanly (2/2 PASS). Production code unchanged. |
+
+## What was open agent-fixable — now RESOLVED
+
+| # | Block | Resolution |
+| --- | --- | --- |
+| HANDOFF #2 | DVR/Downloads/Catch-up UI lies | **fixed (commit `5eeee0d`)** — new `releaseFlags.js` module gates 3 components; each surface renders honest "not yet available" UI when its pipeline flag is off. Backend route contract pinned by new `releaseFlagContract.test.js` (15/0). |
+| HANDOFF #5 | Two competing Tizen scaffolds | **fixed (commit `298c357`)** — `refuse-guard.js` blocks `npm run build/package` in the legacy scaffold unless `ALLOW_LEGACY_TIZEN_NATIVE_BUILD=1`. Canonical path unchanged. |
 
 ## Decision
 
@@ -56,8 +56,9 @@ passes, no leaks. But:
 1. Live provider proof has never run — the contract in docs/46 cannot be
    satisfied by anything except real credentials.
 2. AVPlay on real Tizen hardware has never been confirmed — HANDOFF #3.
-3. BUG-SWARM-009 (React state) blocks the deep authed browser proof for
-   the next-level UI gate.
+
+(BUG-SWARM-009 is no longer blocking — the deep authed browser proof is
+now passing via the Origin-preserving spec.)
 
 Dave's next move (one of):
 

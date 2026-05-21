@@ -8,6 +8,54 @@ Schema: as in 0423/bug-ledger.md.
 
 ---
 
+## HANDOFF #2 — DVR/Downloads/Catch-up UI lies (status update — commit `5eeee0d`)
+
+- Earlier status: open
+- **Wave 2 outcome:** **fixed**
+  - `apps/hermes-web-tv/src/store/releaseFlags.js` (new) — exposes
+    `isDvrEnabled`, `isDownloadsEnabled`, `isCatchupEnabled`. Each is OFF
+    by default; opt-in via either `VITE_DAVETV_<PIPELINE>=1` at build
+    time or `window.__DAVETV_<PIPELINE>__ = true` at runtime.
+  - `apps/hermes-web-tv/src/components/DownloadModal.jsx` — when
+    `isDownloadsEnabled()` is false, renders an honest "Downloads aren't
+    live yet" panel instead of the size disclosure / Proceed flow.
+  - `apps/hermes-web-tv/src/components/CatchupRail.jsx` — early-returns
+    null when `isCatchupEnabled()` is false (no rail at all).
+  - `apps/hermes-web-tv/src/components/settings/RecordingsSection.jsx` —
+    when `isDvrEnabled()` is false, hides the "View all recordings"
+    button and the entire DVR settings form; renders only an honest
+    notice.
+  - `services/hermes-tv-api/test/releaseFlagContract.test.js` (new — 15/0
+    PASS) — pins down the route contract the UI gate is built on:
+    POST /api/dvr/schedule freezes status='scheduled' with a Phase 4
+    `_note`, every row in /api/dvr/recordings stays 'scheduled',
+    GET /api/download/.../file returns 503 (or 404 unknown-job),
+    POST /api/catchup/play returns 501 (or 404 honest gate). When the
+    pipelines ship, this test fails — that's the signal to flip the
+    flags ON.
+- Status: **fixed**
+
+## HANDOFF #5 — Two competing Tizen scaffolds (status update — commit `298c357`)
+
+- Earlier status: open
+- **Wave 2 outcome:** **fixed** via build guard (deletion blocked by
+  operator-mandated "do not delete this directory" note in the legacy
+  scaffold's README).
+  - `apps/hermes-tv-tizen-native/scripts/refuse-guard.js` (new) — exits 1
+    with a clear refusal message pointing operators at the canonical
+    build path (`apps/hermes-tv-tizen/`). Override:
+    `ALLOW_LEGACY_TIZEN_NATIVE_BUILD=1` for genuine reference-build use.
+  - `apps/hermes-tv-tizen-native/package.json` — `npm run build`,
+    `build:watch`, and `package` scripts prefixed with the guard.
+  - `apps/hermes-tv-tizen-native/README.md` — new "Build guard" section
+    documents the override and the rationale.
+  - Verified: guard exits 1 by default; exits 0 with override env;
+    `node tools/schema-validate.js` still 131/0 unchanged.
+- Status: **fixed** — "only canonical path can produce .wgt" acceptance
+  satisfied without deleting the reference scaffold.
+
+---
+
 ## BUG-SWARM-001 — secret-scan false positives (status update)
 
 - Earlier status: open → in_progress (fix targeted in Wave 2)
@@ -149,17 +197,27 @@ Schema: as in 0423/bug-ledger.md.
   proxying `localhost:3001/api/**` to a sidecar API on a different port,
   the HTTP layer succeeds (`/api/auth/me` returns `hasUser: true` with the
   proxied session cookie) but the React tree stays on the login surface.
-  Symptom: `state.auth.configured === false` even after a successful
-  `/api/auth/me` response.
 - Expected behavior: when `/api/auth/me` returns `hasUser: true`, the gate
   should resolve to `auth.configured = true` and the rest of the app should
   mount.
-- Proof: `tests/playwright/specs/swarm-20260521-provider-reload-ui.spec.ts`
-  — original deep-UI variant landed on the login surface and was adapted to
-  a boundary-reload proof. Honest pass logged.
-- Suspected cause: AuthGate may double-check origin or rely on a side
-  effect not satisfied by `page.route()` proxy (cookie origin mismatch,
-  CORS preflight from `withCredentials`, or a fetch-from-fetch race).
-- Fix owner: **Lane A** (auth gate owns the boot decision tree).
-- Status: **open** — honest blocker logged; HTTP-layer correctness is proven
-  by the sidecar API spec (6/0), so this is purely a React-state issue.
+- **ROOT CAUSE (post-fix update):** the original `swarm-20260521-provider-reload-ui.spec.ts`
+  proxy stripped the `Origin` header before forwarding to the sidecar. The
+  sidecar's `cors()` middleware in `services/hermes-tv-api/src/index.js`
+  reflects `Origin` into `Access-Control-Allow-Origin`. With Origin stripped,
+  no Allow-Origin is set in the response → the browser BLOCKS the
+  credentialed read (per the CORS spec for `credentials: 'include'`) →
+  `hermesApi.getAuthMe()` throws → `AuthGate`'s `.catch` runs → `setUser(null)` →
+  LoginView renders.
+- **Fix (this swarm, commit `fd3aab8`):**
+  `tests/playwright/specs/swarm-20260521-authed-ui.spec.ts` — new spec that
+  preserves `Origin` in the page.route proxy. Result: 2/2 PASS across
+  `chromium-1080p` + `samsung-qn85-mock` in 10s. AuthGate clears, the
+  authed surface mounts, screenshots in `screenshots/authed-*.png` show
+  the deep authed UI.
+- Note: production code unchanged. This was a TEST INFRASTRUCTURE bug —
+  the running localhost:5173 → localhost:3001 path hits the same cors()
+  middleware with the browser's real Origin header, so the production
+  fetch path was never broken. The bug only manifested when proxying
+  through a custom Playwright route handler that dropped Origin.
+- Status: **fixed** — proxy preserves Origin, deep authed UI surface
+  proven across both Playwright projects.
