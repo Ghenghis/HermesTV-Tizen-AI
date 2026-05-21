@@ -331,23 +331,23 @@ router.get('/api/epg', async (req, res) => {
 
 const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
-// In-memory channel→EPG mapping (resets on restart; persisted-to-disk is the
-// next step but isn't blocking the surface).
+// HANDOFF blocker #8 (2026-05-21): EPG channel-mapping overrides and import
+// settings are now persisted via lib/epgMappingStore (file-backed, atomic
+// write, same data dir as providerStore). Restart no longer wipes mappings.
+// The legacy in-memory shims below are kept as a sync fallback so the existing
+// suggest-channels handler can quote a strategy without an extra await on the
+// hot path; they are hydrated from disk on first store read.
+var epgMappingStore = require('../lib/epgMappingStore');
+var EPG_SETTINGS = Object.assign({}, epgMappingStore.DEFAULT_SETTINGS);
 var EPG_MAPPING = {};
-
-// In-memory EPG import settings. The shape matches Zero's EpgImportSettings:
-//   auto_refresh        — daily refresh on/off
-//   refresh_hour_utc    — clock hour to run the refresh
-//   keep_days           — retain N days of past programs
-//   match_strategy      — "fuzzy" | "exact" | "prefix"
-//   default_source_id   — fallback source if a playlist has none
-var EPG_SETTINGS = {
-  auto_refresh: true,
-  refresh_hour_utc: 4,
-  keep_days: 3,
-  match_strategy: 'fuzzy',
-  default_source_id: null,
-};
+// Eagerly hydrate the in-memory shims so suggest-channels sees the right
+// strategy from the get-go. Failure is non-fatal — the defaults are sound.
+(async function _hydrate() {
+  try {
+    EPG_SETTINGS = Object.assign({}, await epgMappingStore.getSettings());
+    EPG_MAPPING = await epgMappingStore.getMappings();
+  } catch (_) { /* keep defaults */ }
+})();
 
 const VALID_MATCH_STRATEGIES = ['fuzzy', 'exact', 'prefix'];
 
@@ -374,17 +374,25 @@ router.get('/api/epg/coverage', (req, res) => {
 
 // ─── GET /api/epg/settings ───────────────────────────────────────────────────
 // Maps to: get_epg_import_settings() → EpgImportSettings
-router.get('/api/epg/settings', (req, res) => {
-  res.json({
-    ...EPG_SETTINGS,
-    _meta: { source: 'in-memory' },
-  });
+// Reads from the persisted store so a freshly-booted container returns the
+// operator's last-saved settings, not the defaults.
+router.get('/api/epg/settings', async (req, res) => {
+  try {
+    const settings = await epgMappingStore.getSettings();
+    EPG_SETTINGS = Object.assign({}, settings);
+    res.json({
+      ...settings,
+      _meta: { source: 'epg-mapping-store' },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'store_read_failed', message: 'Could not read EPG settings.' });
+  }
 });
 
 // ─── PATCH /api/epg/settings ─────────────────────────────────────────────────
 // Maps to: set_epg_import_settings({ settings })
-// Validates types and applies the partial update.
-router.patch('/api/epg/settings', (req, res) => {
+// Validates types and persists the merged settings via epgMappingStore.
+router.patch('/api/epg/settings', async (req, res) => {
   const body = req.body || {};
   const errors = {};
 
@@ -420,8 +428,13 @@ router.patch('/api/epg/settings', (req, res) => {
     return res.status(400).json({ error: 'validation_failed', fields: errors });
   }
 
-  EPG_SETTINGS = { ...EPG_SETTINGS, ...body };
-  res.json({ success: true, ...EPG_SETTINGS });
+  try {
+    const merged = await epgMappingStore.updateSettings(body);
+    EPG_SETTINGS = Object.assign({}, merged);
+    res.json({ success: true, ...merged });
+  } catch (err) {
+    res.status(500).json({ error: 'store_write_failed', message: 'Could not persist EPG settings.' });
+  }
 });
 
 // ─── POST /api/epg/refresh ───────────────────────────────────────────────────
@@ -534,8 +547,8 @@ router.get('/api/epg/suggest-channels', (req, res) => {
 
 // ─── POST /api/epg/mapping ───────────────────────────────────────────────────
 // Maps to: set_channel_epg_mapping({ channel_id, epg_id })
-// Stores the mapping in-memory (persisted store lands later).
-router.post('/api/epg/mapping', (req, res) => {
+// Persists via lib/epgMappingStore — mappings survive process restart.
+router.post('/api/epg/mapping', async (req, res) => {
   const body = req.body || {};
   if (!body.profile_id || !VALID_PROFILES.includes(body.profile_id)) {
     return res.status(400).json({
@@ -550,13 +563,19 @@ router.post('/api/epg/mapping', (req, res) => {
     return res.status(400).json({ error: 'validation_failed', message: 'epg_id is required' });
   }
 
-  EPG_MAPPING[body.channel_id] = body.epg_id;
-  res.json({
-    success: true,
-    channel_id: body.channel_id,
-    epg_id: body.epg_id,
-    _meta: { source: 'in-memory', mapping_count: Object.keys(EPG_MAPPING).length },
-  });
+  try {
+    await epgMappingStore.setMapping(body.channel_id, body.epg_id);
+    const all = await epgMappingStore.getMappings();
+    EPG_MAPPING = all;
+    res.json({
+      success: true,
+      channel_id: body.channel_id,
+      epg_id: body.epg_id,
+      _meta: { source: 'epg-mapping-store', mapping_count: Object.keys(all).length },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'store_write_failed', message: 'Could not persist EPG mapping.' });
+  }
 });
 
 // ─── GET /api/epg/:channelId ─────────────────────────────────────────────────
@@ -635,7 +654,18 @@ router.get('/api/epg/:channelId', async (req, res) => {
 
 module.exports = router;
 module.exports._internal = {
-  _clear: function() { EPG_MAPPING = {}; EPG_SETTINGS = {
+  _clear: function() {
+    EPG_MAPPING = {};
+    EPG_SETTINGS = Object.assign({}, epgMappingStore.DEFAULT_SETTINGS);
+    epgMappingStore._resetCacheForTests();
+    // Best-effort disk reset — non-fatal if file doesn't exist.
+    try {
+      var p = epgMappingStore._filePath();
+      var fsSync = require('fs');
+      if (fsSync.existsSync(p)) { fsSync.unlinkSync(p); }
+    } catch (_) { /* silent */ }
+  },
+  _clearLegacy: function() { EPG_MAPPING = {}; EPG_SETTINGS = {
     auto_refresh: true,
     refresh_hour_utc: 4,
     keep_days: 3,
