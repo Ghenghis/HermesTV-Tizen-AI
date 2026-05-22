@@ -17,7 +17,7 @@ test.describe('Parental controls', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const sherri = page.locator('button[aria-label*="Sherri"]').first();
     if (await sherri.count()) await sherri.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
   });
 
   test('API: set PIN then verify (right PIN ok, wrong PIN fails)', async ({ request }) => {

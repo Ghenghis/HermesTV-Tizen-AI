@@ -393,6 +393,133 @@ function getSeriesInfo(seriesId) {
     .then(function(data) { return data && typeof data === 'object' ? data : null; });
 }
 
+function _parseHermesSeriesId(hermesItemId) {
+  if (typeof hermesItemId !== 'string') { return null; }
+  var store = /^xtream-(prov-[a-f0-9]+)-series-(.+)$/.exec(hermesItemId);
+  if (store) {
+    return { cfgId: store[1], seriesId: store[2], storeBacked: true };
+  }
+  var env = /^xtream-series-(.+)$/.exec(hermesItemId);
+  if (env) {
+    return { cfgId: 'env', seriesId: env[1], storeBacked: false };
+  }
+  return null;
+}
+
+function _cfgForSeriesItemId(hermesItemId) {
+  var parsed = _parseHermesSeriesId(hermesItemId);
+  if (!parsed) { return null; }
+  if (parsed.cfgId === 'env') {
+    var env = _cfg();
+    return env ? { cfg: env, seriesId: parsed.seriesId } : null;
+  }
+  for (var i = 0; i < _registrySnapshot.length; i++) {
+    if (_registrySnapshot[i].id === parsed.cfgId) {
+      return { cfg: _registrySnapshot[i], seriesId: parsed.seriesId };
+    }
+  }
+  return null;
+}
+
+function _episodeItemIdForSeries(seriesItemId, episodeRawId) {
+  if (episodeRawId == null) { return null; }
+  var parsed = _parseHermesSeriesId(seriesItemId);
+  if (!parsed) { return null; }
+  var ep = String(episodeRawId);
+  if (parsed.storeBacked) {
+    return 'xtream-' + parsed.cfgId + '-series-' + ep;
+  }
+  return 'xtream-series-' + ep;
+}
+
+function _num(v) {
+  if (v === null || v === undefined || v === '') { return null; }
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
+function _text(v) {
+  return (typeof v === 'string' && v.trim().length > 0) ? v.trim() : null;
+}
+
+function _durationMinutes(info) {
+  info = info || {};
+  var seconds = _num(info.duration_secs || info.duration_seconds);
+  if (seconds && seconds > 0) { return Math.round(seconds / 60); }
+  var raw = _text(info.duration || info.runtime);
+  if (!raw) { return null; }
+  var hms = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(raw);
+  if (hms) {
+    var h = hms[3] ? Number(hms[1]) : 0;
+    var m = hms[3] ? Number(hms[2]) : Number(hms[1]);
+    return (h * 60) + m;
+  }
+  var n = _num(raw);
+  return n && n > 0 ? n : null;
+}
+
+function normaliseSeriesEpisodes(seriesItemId, payload) {
+  if (!payload || typeof payload !== 'object') { return []; }
+  var rawEpisodes = payload.episodes;
+  var out = [];
+
+  function pushEpisode(raw, seasonHint, idx) {
+    if (!raw || typeof raw !== 'object') { return; }
+    var info = (raw.info && typeof raw.info === 'object') ? raw.info : {};
+    var rawId = raw.id != null ? raw.id :
+      (raw.episode_id != null ? raw.episode_id :
+        (raw.stream_id != null ? raw.stream_id : null));
+    var playId = _episodeItemIdForSeries(seriesItemId, rawId);
+    if (!playId) { return; }
+    var season = _num(raw.season || raw.season_number || seasonHint) || 1;
+    var episode = _num(raw.episode_num || raw.episode || raw.episode_number || raw.number) || (idx + 1);
+    var title = _text(raw.title || raw.name || info.name || info.title);
+    out.push({
+      episode_id: String(rawId),
+      play_item_id: playId,
+      series_id: seriesItemId,
+      season: season,
+      episode: episode,
+      title: title,
+      plot: _text(info.plot || info.description || info.overview),
+      rating: _num(info.rating || raw.rating),
+      runtime_min: _durationMinutes(info),
+      still_url: _text(info.movie_image || info.cover || raw.cover || raw.movie_image),
+      container_extension: _text(raw.container_extension || info.container_extension),
+    });
+  }
+
+  if (Array.isArray(rawEpisodes)) {
+    for (var i = 0; i < rawEpisodes.length; i++) { pushEpisode(rawEpisodes[i], null, i); }
+  } else if (rawEpisodes && typeof rawEpisodes === 'object') {
+    var seasons = Object.keys(rawEpisodes).sort(function(a, b) { return Number(a) - Number(b); });
+    for (var s = 0; s < seasons.length; s++) {
+      var list = rawEpisodes[seasons[s]];
+      if (!Array.isArray(list)) { continue; }
+      for (var j = 0; j < list.length; j++) { pushEpisode(list[j], seasons[s], j); }
+    }
+  }
+
+  out.sort(function(a, b) {
+    if (a.season !== b.season) { return a.season - b.season; }
+    return a.episode - b.episode;
+  });
+  return out;
+}
+
+async function getSeriesInfoForItemId(hermesItemId) {
+  await _refreshRegistrySnapshot();
+  var found = _cfgForSeriesItemId(hermesItemId);
+  if (!found) { return null; }
+  return _fetchAction('get_series_info', { series_id: found.seriesId }, LIST_CACHE_TTL_MS, found.cfg)
+    .then(function(data) { return data && typeof data === 'object' ? data : null; });
+}
+
+async function getSeriesEpisodesForItemId(hermesItemId) {
+  var info = await getSeriesInfoForItemId(hermesItemId);
+  return normaliseSeriesEpisodes(hermesItemId, info);
+}
+
 // ---------------------------------------------------------------------------
 // EPG — short (now/next) and simple (full day) per channel
 // ---------------------------------------------------------------------------
@@ -551,7 +678,6 @@ function toHermesItem(x, type, cfgRef) {
     category: category,
     logo_url: logo,
     poster_url: logo,
-    profile_access: ['dave_tv', 'mom_tv'],
     metadata: metadata,
     providers: [{
       provider_id: providerId,
@@ -582,18 +708,27 @@ function getProviderStatus() {
     if (e && e.fetchedAt > latestAt) { latestAt = e.fetchedAt; }
     if (e && e.error) { lastError = e.error; }
   }
-  // Count live streams across every cached panel.
+  // Count streams across every cached panel.
   var liveCount = 0;
+  var vodCount = 0;
+  var seriesCount = 0;
   for (var ck in _cache) {
     if (!Object.prototype.hasOwnProperty.call(_cache, ck)) { continue; }
     if (ck.indexOf('|get_live_streams') !== -1 && _cache[ck] && Array.isArray(_cache[ck].data)) {
       liveCount += _cache[ck].data.length;
+    } else if (ck.indexOf('|get_vod_streams') !== -1 && _cache[ck] && Array.isArray(_cache[ck].data)) {
+      vodCount += _cache[ck].data.length;
+    } else if (ck.indexOf('|get_series') !== -1 && _cache[ck] && Array.isArray(_cache[ck].data)) {
+      seriesCount += _cache[ck].data.length;
     }
   }
   return {
     configured: configured,
     label: 'Xtream Codes',
-    count: liveCount,
+    count: liveCount + vodCount + seriesCount,
+    live_count: liveCount,
+    vod_count: vodCount,
+    series_count: seriesCount,
     error: lastError,
     age_ms: latestAt > 0 ? (_now() - latestAt) : null,
     panel_count: _allConfigs().length,
@@ -682,6 +817,8 @@ module.exports = {
   getSeriesCategories: getSeriesCategories,
   getSeriesList: getSeriesList,
   getSeriesInfo: getSeriesInfo,
+  getSeriesInfoForItemId: getSeriesInfoForItemId,
+  getSeriesEpisodesForItemId: getSeriesEpisodesForItemId,
   getShortEpg: getShortEpg,
   getSimpleEpg: getSimpleEpg,
   toHermesItem: toHermesItem,
@@ -696,6 +833,8 @@ module.exports = {
   // any HTTP route. Same audit boundary as m3uClient.internal.
   internal: {
     resolveStreamUrl: _resolveStreamUrl,
+    episodeItemIdForSeries: _episodeItemIdForSeries,
+    normaliseSeriesEpisodes: normaliseSeriesEpisodes,
   },
   _clearCache: _clearCache,
 };

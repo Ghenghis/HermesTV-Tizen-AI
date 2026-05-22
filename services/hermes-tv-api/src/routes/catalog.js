@@ -20,10 +20,10 @@ var m3uClient = require('../lib/m3uClient');
 var xtreamClient = require('../lib/xtreamClient');
 var catalogMerge = require('../lib/catalogMerge');
 var sanitizeLog = require('../lib/sanitizeLog').sanitizeForLog;
+var profileIds = require('../lib/profileIds');
 
 var router = Router();
 
-var VALID_PROFILES = ['dave_tv', 'mom_tv'];
 var VALID_PROVIDERS = ['apollo_group', 'xtremehd', 'xtream', 'iptv-org', 'jellyfin', 'all'];
 
 // X-Catalog-Source header values surfaced to the client so DevTools / Settings
@@ -81,7 +81,8 @@ router.get('/api/actors', function(req, res) {
 // When all three yield zero items the response is honestly empty.
 // Never throws; per-provider failures are logged and skipped.
 // ---------------------------------------------------------------------------
-async function resolveCatalog() {
+async function resolveCatalog(opts) {
+  opts = opts || {};
   var baseItems = [];
   var baseSource = SRC_NONE;
 
@@ -131,7 +132,7 @@ async function resolveCatalog() {
     // Always call fetchCatalog. Disk-backed providers are discovered through
     // providerRegistry asynchronously, so a cold-start isEnabled() check can
     // be stale before the first registry snapshot is loaded.
-    var m3uItems = await m3uClient.fetchCatalog({ limit: 600 });
+    var m3uItems = await m3uClient.fetchCatalog({ limit: 600, waitForColdMs: opts.waitForColdMs });
     if (Array.isArray(m3uItems) && m3uItems.length > 0) {
       m3uCount = m3uItems.length;
       baseItems = baseItems.concat(m3uItems);
@@ -158,9 +159,14 @@ async function resolveCatalog() {
   var xtreamStatus = null;
   try {
     // Same cold-start rule as M3U: fetchAll* refreshes providerRegistry first.
-    var live = await xtreamClient.fetchAllLive();
-    var vod = await xtreamClient.fetchAllVod();
-    var series = await xtreamClient.fetchAllSeries();
+    var xtreamResults = await Promise.all([
+      xtreamClient.fetchAllLive(),
+      xtreamClient.fetchAllVod(),
+      xtreamClient.fetchAllSeries(),
+    ]);
+    var live = xtreamResults[0];
+    var vod = xtreamResults[1];
+    var series = xtreamResults[2];
     var xtreamItems = [];
     if (Array.isArray(live)) { for (var li = 0; li < live.length; li++) { xtreamItems.push(live[li]); } }
     if (Array.isArray(vod)) { for (var vi = 0; vi < vod.length; vi++) { xtreamItems.push(vod[vi]); } }
@@ -322,7 +328,7 @@ function itemHasAnyProvider(item, providerIds) {
 // ---------------------------------------------------------------------------
 // GET /api/catalog
 // Optional query params:
-//   ?profile_id=dave_tv|mom_tv   — filters by profile_access (when present)
+//   ?profile_id=<safe profile id> — filters by profile_access (when present)
 //   ?provider_id=apollo_group|xtremehd|iptv-org|jellyfin|all — provider filter
 //   ?provider_ids=xtremehd,apollo_group,iptv-org — multi-provider filter
 //   ?hide_providers=A,B,C        — wave-16 visibility toggle (server-side)
@@ -332,11 +338,18 @@ router.get('/api/catalog', async function(req, res) {
   var providerParse = parseProviderIds(req.query);
   var providerIds = providerParse.ids;
   var hiddenSet = parseHideProviders(req.query.hide_providers);
+  var waitForColdMs = 6000;
+  if (req.query && req.query.wait_for_cold_ms !== undefined) {
+    var parsedWait = Number(req.query.wait_for_cold_ms);
+    if (isFinite(parsedWait) && parsedWait > 0) {
+      waitForColdMs = Math.min(15000, Math.floor(parsedWait));
+    }
+  }
 
-  if (profile_id !== undefined && VALID_PROFILES.indexOf(profile_id) === -1) {
+  if (profile_id !== undefined && !profileIds.isValidProfileId(profile_id)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: "Invalid profile_id '" + profile_id + "'. Valid values: dave_tv, mom_tv",
+      message: profileIds.profileValidationMessage(),
     });
   }
 
@@ -347,31 +360,29 @@ router.get('/api/catalog', async function(req, res) {
     });
   }
 
-  var resolved = await resolveCatalog();
+  var resolved = await resolveCatalog({ waitForColdMs: waitForColdMs });
   var items = resolved.items;
   res.setHeader(CATALOG_SOURCE_HEADER, resolved.source);
 
-  // Edge-cache the catalog at Cloudflare. Catalog changes only when the
-  // operator pastes new provider credentials — safe for 2 min at edge with
-  // a 10 min SWR window so a stale entry serves instantly while we refresh.
-  res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=120, stale-while-revalidate=600');
+  // Provider lists are private to DaveTV's account and must reflect newly
+  // added provider rows immediately. Never let Cloudflare/browser edge-cache
+  // a stale catalog after credentials are saved.
+  res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Vary', 'Accept-Encoding');
 
   // Filtering by profile_access only meaningfully applies to items that
   // carry the field (legacy seed used to set it; iptv-org / m3uClient may
   // or may not). When the field is absent we keep the item.
-  var isJellyfin = resolved.source === SRC_JELLYFIN;
-  if (profile_id && !isJellyfin) {
+  if (profile_id) {
     items = items.filter(function(item) {
-      if (!Array.isArray(item.profile_access)) { return true; }
-      return item.profile_access.indexOf(profile_id) !== -1;
+      return profileIds.itemVisibleToProfile(item, profile_id);
     });
   }
 
   // Provider filter. "all" is a no-op; specific provider ids filter by any
   // legacy providers[], post-merge sources[], flat provider_id/provider, or
   // provider_tags entry.
-  if (providerIds.length > 0 && !isJellyfin) {
+  if (providerIds.length > 0) {
     items = items.filter(function(item) {
       return itemHasAnyProvider(item, providerIds);
     });
@@ -416,7 +427,7 @@ router.get('/api/catalog', async function(req, res) {
   }
 
   // Mom-mode quality sort: 4K first, HDR-flagged higher.
-  if (profile_id === 'mom_tv' && !isJellyfin) {
+  if (profile_id === 'mom_tv') {
     items.sort(function(a, b) {
       var resA = (a && a.metadata && RESOLUTION_ORDER[a.metadata.resolution]) || 0;
       var resB = (b && b.metadata && RESOLUTION_ORDER[b.metadata.resolution]) || 0;

@@ -308,6 +308,7 @@ router.post(['/setup/provider/submit', '/api/setup/provider/submit'], express.ur
   }
   providerStore.add({
     type: body.type,
+    provider_id: body.provider_id,
     label: body.label,
     url: body.url,
     username: body.username,

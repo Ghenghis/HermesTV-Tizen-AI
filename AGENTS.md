@@ -82,6 +82,7 @@ mock proof for live-provider proof.
 - `docs/48_REFERENCE_APPS_E2E_ADOPTION_CONTRACT.md`
 - `docs/49_TRUTH_AUDIT_RELEASE_READINESS_CONTRACT.md`
 - `docs/50_NATURAL_VOICE_AGENT_CONTRACT.md`
+- `docs/54_OVERNIGHT_24_AGENT_RELEASE_SWARM_CONTRACT.md`
 - `docs/07_PROVIDER_CATALOG_AND_QR_ONBOARDING_CONTRACT.md`
 - `docs/10_ACCEPTANCE_GATES_VISUAL_RUNTIME_SECURITY.md`
 - `.agents/constitution.md`
@@ -132,8 +133,13 @@ store. For VPS provider proof, use `DAVETV_PROOF_EMAIL` and
 - Each agent must produce evidence: files changed, commands run, pass/fail, and
   blockers.
 - A truth/proof agent may reject a feature as incomplete even if code exists.
-- Reference apps may be used for behavior patterns, not copy-pasted licensed
-  code. Extract contracts, not source blobs.
+- Dave accepts upstream license obligations for private DaveTV work, but agents
+  must still respect each license exactly. Source adoption is allowed only
+  through the documented upstream View-pack process with attribution, license
+  files, provenance notes, tests, and proof. If a license forbids modification
+  or redistribution, or no license is present, agents may study the app,
+  launch it unmodified as local tooling, or rebuild the idea in DaveTV style,
+  but must not paste or modify its source inside DaveTV.
 
 ## Deployment Rules
 

@@ -1,0 +1,9 @@
+{
+  "label": "138 Azure English voices",
+  "filtered": true,
+  "speak_status": 200,
+  "speak_content_type": "audio/mpeg",
+  "speak_voice": "en-US-GuyNeural",
+  "speak_bytes": 37728,
+  "screenshot": "G:\\Github\\HermesTV-Tizen-AI\\docs\\proof\\azure-voices\\20260522-023434\\voice-picker-azure-live.png"
+}

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "build:watch": "webpack --watch --config webpack.config.js",
-    "package": "npm run build && node scripts/package-wgt.js",
+    "build": "node scripts/refuse-guard.js && webpack --config webpack.config.js",
+    "build:watch": "node scripts/refuse-guard.js && webpack --watch --config webpack.config.js",
+    "package": "node scripts/refuse-guard.js && webpack --config webpack.config.js && node scripts/package-wgt.js",
     "lint": "eslint src/ --rule '{\"no-var\": 0}' --ext .js",
     "test:tier": "node ../../tools/tier-detect-test.js"
   },

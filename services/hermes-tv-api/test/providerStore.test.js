@@ -102,6 +102,7 @@ function expectThrows(label, fn) {
   // ---------------------------------------------------------------------------
   var x1 = await providerStore.add({
     type: 'xtream',
+    provider_id: 'xtremehd',
     label: 'Test Xtream',
     url: 'http://panel.example:8080',
     username: 'placeholderUser',
@@ -124,6 +125,10 @@ function expectThrows(label, fn) {
 
   var testedFail = await providerStore.recordTest(x1.id, false, 'HTTP 401');
   ok('recordTest(false) sets last_error', testedFail && testedFail.last_error === 'HTTP 401');
+  var taggedFull = await providerStore.listFull();
+  ok('listFull() preserves canonical provider_id',
+    taggedFull.length === 1 && taggedFull[0].provider_id === 'xtremehd',
+    JSON.stringify(taggedFull.map(function(r) { return { id: r.id, provider_id: r.provider_id }; })));
 
   // ---------------------------------------------------------------------------
   // 10. Validation

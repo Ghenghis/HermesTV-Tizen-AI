@@ -19,7 +19,7 @@ test.describe('Mom-mode hardening (J14)', () => {
     const sherri = page.locator('button[aria-label*="Sherri"]').first();
     await expect(sherri).toBeVisible({ timeout: 8000 });
     await sherri.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
 
     // 1. --font-scale on <html> ≥ 1.25 (Mom-mode enforces this in App.jsx).
     const fontScale = await page.evaluate(() =>

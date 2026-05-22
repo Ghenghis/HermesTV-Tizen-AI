@@ -189,6 +189,7 @@ function NetflixShell(props) {
   var profile = props.profile;
   var tier = props.tier;
   var onItemSelect = props.onItemSelect;
+  var onOpenDetail = props.onOpenDetail;
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
@@ -343,11 +344,11 @@ function NetflixShell(props) {
                 <button
                   className="hermes-focusable hermes-press"
                   tabIndex={0}
-                  onClick={function() { if (onItemSelect) onItemSelect(featured); }}
+                  onClick={function() { if (onOpenDetail) onOpenDetail(featured); }}
                   onKeyDown={function(e) {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      if (onItemSelect) onItemSelect(featured);
+                      if (onOpenDetail) onOpenDetail(featured);
                     }
                   }}
                   style={{
@@ -408,8 +409,8 @@ function NetflixShell(props) {
             catalog={filtered}
           />
           <CardRow title="Top Picks For You" items={filtered} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
-          <CardRow title="Live Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, capForProfile(profile, 8))} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
-          <CardRow title="Movies" items={movies.length > 0 ? movies : filtered.slice(4)} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="Live Now" items={liveItems} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
+          <CardRow title="Movies" items={movies} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
           <CardRow title="New Arrivals" items={filtered.slice().reverse()} onItemSelect={onItemSelect} tier={tier} fontScale={fontScale} profile={profile} />
         </div>
       </div>

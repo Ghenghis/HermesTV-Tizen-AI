@@ -41,14 +41,14 @@ test.describe('All layouts smoke — every shell mounts', () => {
       // Get past the profile picker — first tile is fine.
       const tile = page.locator('button[aria-label*="profile"]').first();
       if (await tile.count()) await tile.click();
-      await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+      await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
 
-      // Open LayoutSwitcher via the header "Look" button.
-      const lookBtn = page.locator('button', { hasText: /Look/i }).first();
-      await expect(lookBtn).toBeVisible();
-      await lookBtn.click();
+      // Open LayoutSwitcher via the header "View" button.
+      const viewBtn = page.locator('button', { hasText: /View/i }).first();
+      await expect(viewBtn).toBeVisible();
+      await viewBtn.click();
 
-      // LayoutSwitcher mounts as role="dialog" with aria-labelledby="look-modal-title".
+      // LayoutSwitcher mounts as role="dialog" with aria-labelledby="view-modal-title".
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible({ timeout: 4000 });
 
@@ -72,9 +72,9 @@ test.describe('All layouts smoke — every shell mounts', () => {
 
       // Press Escape — return to a stable state. Either the LayoutSwitcher is
       // already closed (most paths) or we cascade out of any incidental modal.
-      // App should still show the HermesTV brand after.
+      // App should still show the DaveTV brand after.
       await page.keyboard.press('Escape');
-      await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 4000 });
+      await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 4000 });
     });
   }
 });

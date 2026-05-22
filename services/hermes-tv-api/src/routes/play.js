@@ -14,7 +14,8 @@
  *     pointer to GET /api/play/:ticket/stream. The actual streaming
  *     proxy is operator-side (Threadfin / Jellyfin / iptv-org) and
  *     lands in Phase 4.
- *   - The ticket expires in 5 minutes — bounded blast radius.
+ *   - The ticket expires after 5 minutes of inactivity. Active playback
+ *     slides that window forward, capped by an absolute max lifetime.
  */
 
 const { Router } = require('express');
@@ -25,17 +26,44 @@ const iptvOrg = require('../lib/iptvOrg');
 const hlsProxy = require('../lib/hlsProxy');
 const catalogMerge = require('../lib/catalogMerge');
 const streamProbe = require('../lib/streamProbe');
+const xtreamClient = require('../lib/xtreamClient');
+const profileIds = require('../lib/profileIds');
 
-const VALID_PROFILES = ['dave_tv', 'mom_tv'];
-const TICKET_TTL_MS = 5 * 60 * 1000;
+const TICKET_IDLE_TTL_MS = 5 * 60 * 1000;
+const TICKET_MAX_TTL_MS = 12 * 60 * 60 * 1000;
 
 // In-memory ticket store. A real implementation would use Redis or a signed
 // JWT; for the surface-area-first version this is fine. Tickets self-clean
 // on read after expiry.
 var tickets = {};
 
+function _nowMs() {
+  return Date.now();
+}
+
+function _isTicketExpired(entry) {
+  if (!entry) { return true; }
+  var now = _nowMs();
+  if (entry.max_expires_at && now > entry.max_expires_at) { return true; }
+  return now > entry.expires_at;
+}
+
+function _touchTicket(entry) {
+  if (!entry) { return; }
+  var now = _nowMs();
+  var max = entry.max_expires_at || (now + TICKET_IDLE_TTL_MS);
+  var next = now + TICKET_IDLE_TTL_MS;
+  if (next > max) { next = max; }
+  if (!entry.expires_at || next > entry.expires_at) {
+    entry.expires_at = next;
+    if (entry.ticket) {
+      entry.ticket.expires_at = new Date(next).toISOString();
+    }
+  }
+}
+
 function _makeTicketId() {
-  return 'play-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  return 'play-' + _nowMs().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
 // Resolve a HermesTV item by ID across all enabled catalog sources.
@@ -81,9 +109,9 @@ function _providerDisplayName(pid) {
 // Decide which extension to append to the stream_endpoint pointer so the
 // client-side hls.js path detection (which probes for `.m3u8` / `.mpd` in
 // the URL string) wires up the right engine. Returning an extension here
-// is *purely cosmetic* on the server — the actual bytes come from the
-// 302 target — but it makes the front end pick hls.js so the 302 to the
-// upstream CDN is followed transparently inside the player engine.
+// is *purely cosmetic* on the server — the actual bytes come from this same
+// endpoint — but it makes the front end pick hls.js instead of trying to hand
+// a manifest to the browser's progressive video path.
 //
 // Best-effort: peeks at the same resolver play-time path uses. If it
 // can't resolve (cold cache, missing item), returns '' — the bare
@@ -93,9 +121,6 @@ function _streamExtFor(itemId) {
   try {
     var resolved = streamResolver.resolveStreamUrl(itemId);
     if (!resolved || !resolved.url) { return ''; }
-    // Don't expose hint for credential-bearing streams — those land at
-    // 503 anyway, never become a real stream URL the client can use.
-    if (resolved.credential_bearing) { return ''; }
     var lower = String(resolved.url).toLowerCase();
     if (lower.indexOf('.m3u8') !== -1) { return '.m3u8'; }
     if (lower.indexOf('.mpd') !== -1)  { return '.mpd'; }
@@ -163,24 +188,54 @@ function _buildSourcesForItem(item, requestedProviderId) {
   return sources;
 }
 
+function _episodeItemIdForPlay(item, episodeItemId) {
+  if (!item || item.type !== 'series') { return null; }
+  if (typeof episodeItemId !== 'string' || episodeItemId.length === 0) { return null; }
+  if (episodeItemId.indexOf('xtream-') === 0) {
+    var storeSeries = /^xtream-(prov-[a-f0-9]+)-series-/.exec(item.id);
+    if (storeSeries) {
+      return episodeItemId.indexOf('xtream-' + storeSeries[1] + '-series-') === 0 ? episodeItemId : null;
+    }
+    if (item.id.indexOf('xtream-series-') === 0) {
+      return episodeItemId.indexOf('xtream-series-') === 0 ? episodeItemId : null;
+    }
+    return null;
+  }
+  return xtreamClient.internal.episodeItemIdForSeries(item.id, episodeItemId);
+}
+
+async function _defaultEpisodeItemIdForPlay(item) {
+  if (!item || item.type !== 'series' || typeof item.id !== 'string') { return null; }
+  if (item.id.indexOf('xtream-') !== 0) { return null; }
+  var episodes = await xtreamClient.getSeriesEpisodesForItemId(item.id);
+  if (!Array.isArray(episodes) || episodes.length === 0) { return null; }
+  for (var i = 0; i < episodes.length; i++) {
+    if (episodes[i] && typeof episodes[i].play_item_id === 'string' && episodes[i].play_item_id.length > 0) {
+      return episodes[i].play_item_id;
+    }
+  }
+  return null;
+}
+
 /**
  * POST /api/play
  * Body: { item_id, profile_id, provider_id? }
  * Response: ticket envelope (no stream URL).
  */
-router.post('/api/play', (req, res) => {
+router.post('/api/play', async (req, res) => {
   const body = req.body || {};
   const itemId = body.item_id;
   const profileId = body.profile_id;
   const requestedProviderId = body.provider_id;
+  const requestedEpisodeItemId = body.episode_item_id || body.episode_id || null;
 
   if (!itemId || typeof itemId !== 'string') {
     return res.status(400).json({ error: 'validation_failed', message: 'item_id is required.' });
   }
-  if (VALID_PROFILES.indexOf(profileId) === -1) {
+  if (!profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
 
@@ -192,6 +247,38 @@ router.post('/api/play', (req, res) => {
   // Wave-13: build the full sources[] array up-front so the stream
   // endpoint can walk providers in order and auto-fall-through.
   var sources = _buildSourcesForItem(item, requestedProviderId);
+  var episodeItemId = _episodeItemIdForPlay(item, requestedEpisodeItemId);
+
+  if (requestedEpisodeItemId && !episodeItemId) {
+    return res.status(400).json({
+      error: 'invalid_episode_item',
+      message: 'episode_item_id is only valid for playable provider-backed series episodes.',
+    });
+  }
+
+  if (!requestedEpisodeItemId && item.type === 'series') {
+    try {
+      episodeItemId = await _defaultEpisodeItemIdForPlay(item);
+    } catch (errEpisode) {
+      console.warn('[play] series episode metadata fetch failed: ' + (errEpisode && errEpisode.message ? errEpisode.message : 'unknown'));
+      episodeItemId = null;
+    }
+    if (!episodeItemId) {
+      return res.status(503).json({
+        error: 'episode_metadata_unavailable',
+        message: 'This provider did not return playable episode metadata for the selected series.',
+        item_id: item.id,
+      });
+    }
+  }
+
+  if (episodeItemId) {
+    sources = sources.map(function(s) {
+      var next = Object.assign({}, s);
+      next.item_id = episodeItemId;
+      return next;
+    });
+  }
 
   if (sources.length === 0) {
     return res.status(503).json({
@@ -220,13 +307,14 @@ router.post('/api/play', (req, res) => {
   // Build ticket. Strip any internal source_id detail that doesn't belong
   // on a client response — keep provider_id + display name + health only.
   const ticketId = _makeTicketId();
-  const now = Date.now();
+  const now = _nowMs();
   const ticket = {
     ticket: ticketId,
     item: {
       id: item.id,
       title: item.title,
       type: item.type,
+      episode_item_id: episodeItemId || null,
       resolution: (item.metadata && item.metadata.resolution) || item.quality || null,
       hdr_format: (item.metadata && item.metadata.hdr_format) || null,
       category: item.category || null,
@@ -251,7 +339,7 @@ router.post('/api/play', (req, res) => {
     }),
     profile_id: profileId,
     issued_at: new Date(now).toISOString(),
-    expires_at: new Date(now + TICKET_TTL_MS).toISOString(),
+    expires_at: new Date(now + TICKET_IDLE_TTL_MS).toISOString(),
     stream_endpoint: '/api/play/' + ticketId + '/stream',
     sources_endpoint: '/api/play/' + ticketId + '/sources',
     _note: 'Stream URL is never returned to client. Call stream_endpoint to begin playback.',
@@ -278,7 +366,8 @@ router.post('/api/play', (req, res) => {
   // returned to the client.
   tickets[ticketId] = {
     ticket: ticket,
-    expires_at: now + TICKET_TTL_MS,
+    expires_at: now + TICKET_IDLE_TTL_MS,
+    max_expires_at: now + TICKET_MAX_TTL_MS,
     internal: {
       sources: sources,           // full list with item_id for resolver
       current_source_index: 0,    // updated as fallback walks the list
@@ -296,11 +385,10 @@ router.post('/api/play', (req, res) => {
  *      `?source_index=N` if the caller pinned a specific index).
  *   3. For each source:
  *      a. Ask lib/streamResolver for the upstream URL. Unresolved = advance.
- *      b. Credential-bearing? Try the in-API HLS proxy fetch (wave-11). On
+ *      b. HLS manifest? Try the in-API HLS proxy fetch (wave-11). On
  *         fetch failure (timeout, 502, 504) → record provider failure, log
  *         "[play] source N failed: ... advancing to N+1", advance to next.
- *      c. Clean public URL? 302 the client — assumed playable (the iptv-org
- *         CDN reliability has been > 99% in production).
+ *      c. Clean public non-HLS URL? 302 the client — assumed playable.
  *   4. If a proxy fetch SUCCEEDS we record the provider as healthy + serve
  *      the rewritten body. First success wins. Update
  *      ticket.internal.current_source_index.
@@ -326,10 +414,11 @@ function _streamHandler(req, res) {
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found', message: 'Ticket expired or invalid.' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired', message: 'Re-request /api/play to get a fresh ticket.' });
   }
+  _touchTicket(t);
 
   // Build the candidate walk order. Default: every source in priority
   // order. If `?source_index=N` is set, hoist that index to front;
@@ -437,13 +526,14 @@ function _streamHandler(req, res) {
       catch (_) { /* setHeader after writeHead — ignore */ }
     }
 
-    if (resolved.credential_bearing && _looksLikeHlsManifest(resolved.url)) {
+    if (_looksLikeHlsManifest(resolved.url)) {
       // In-API HLS proxy path (wave-11). Fetch the upstream playlist
       // server-side, rewrite every segment URL to /api/proxy/<ticket>/seg/<b64>,
-      // and serve the rewritten body. The credential never reaches the client.
-      // We do NOT 302 here — that would put the credentialed URL into the
-      // Location header. Native HLS players (Safari, Tizen) and hls.js both
-      // accept this manifest body verbatim.
+      // and serve the rewritten body. Credential-bearing streams need this to
+      // avoid leaks; public iptv-org streams need it because desktop Chrome,
+      // Cloudflare, and Tizen can all fail on cross-origin HLS manifest/segment
+      // redirects. Native HLS players and hls.js both accept this manifest body
+      // verbatim.
       return hlsProxy.proxyPlaylist({
         upstreamUrl: resolved.url,
         ticket: req.params.ticket,
@@ -537,10 +627,11 @@ router.get('/api/play/:ticket/sources', (req, res) => {
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired' });
   }
+  _touchTicket(t);
 
   var internal = t.internal || { sources: [], current_source_index: 0 };
   var sources = Array.isArray(internal.sources) ? internal.sources : [];
@@ -575,18 +666,19 @@ router.get('/api/play/:ticket/sources', (req, res) => {
  *
  * Ticket validation is intentionally the same as /stream — we will not
  * proxy bytes for an expired or unknown ticket. This keeps the proxy
- * gated by the 5-minute play-ticket TTL, so even if a logged manifest
- * leaks the segment URLs are useless 5 minutes later.
+ * gated by the active playback inactivity window, so copied segment URLs
+ * die shortly after playback stops.
  */
 router.get('/api/proxy/:ticket/seg/:b64', (req, res) => {
   const t = tickets[req.params.ticket];
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired' });
   }
+  _touchTicket(t);
   return hlsProxy.streamSegment({
     res: res,
     req: req,
@@ -603,7 +695,7 @@ router.get('/api/play/:ticket', (req, res) => {
   if (!t) {
     return res.status(404).json({ error: 'ticket_not_found' });
   }
-  if (Date.now() > t.expires_at) {
+  if (_isTicketExpired(t)) {
     delete tickets[req.params.ticket];
     return res.status(410).json({ error: 'ticket_expired' });
   }

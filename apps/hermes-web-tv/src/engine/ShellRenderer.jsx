@@ -22,11 +22,18 @@ function ShellRenderer(props) {
   // Optional: shells that surface a Settings tab/button dispatch through here.
   // Currently only StremioShell wires this up; other shells ignore it.
   var onOpenSettings = props.onOpenSettings;
+  // Optional: shells with their own guide/search rail entries can dispatch
+  // through the same App-owned overlays instead of painting dead nav rows.
+  var onOpenEPG = props.onOpenEPG;
+  var onOpenSearch = props.onOpenSearch;
   // Hero-focus channel — shells with a hero/preview panel (Netflix, Plex,
   // AppleTV, Nuvio, ExtremeInfiniTV, Ynotv) read focusedItem to drive the
   // hero background + title + CTAs, and call onItemFocus on card hover /
   // remote-focus / single-click. Shells without a hero ignore both.
   var onItemFocus = props.onItemFocus;
+  // Explicit details path. Normal card/OK activation stays wired to
+  // onItemSelect so it plays instantly; shells route Info / More Info here.
+  var onOpenDetail = props.onOpenDetail;
   var focusedItem = props.focusedItem;
 
   var ShellComponent = getShell(layout);
@@ -99,11 +106,14 @@ function ShellRenderer(props) {
           providers={providers}
           onItemSelect={onItemSelect}
           onItemFocus={onItemFocus}
+          onOpenDetail={onOpenDetail}
           focusedItem={focusedItem}
           contentFilter={contentFilter}
           providerFilter={providerFilter}
           qualityFilter={qualityFilter}
           onOpenSettings={onOpenSettings}
+          onOpenEPG={onOpenEPG}
+          onOpenSearch={onOpenSearch}
         />
       </React.Suspense>
     </div>

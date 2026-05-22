@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const llmFallback = require('../lib/llmFallback');
+const profileIds = require('../lib/profileIds');
 const router = Router();
 
 // ---------------------------------------------------------------------------
@@ -165,8 +166,6 @@ const COMMAND_TABLE = [
   },
 ];
 
-const VALID_PROFILES = ['dave_tv', 'mom_tv'];
-
 const NO_MATCH_ERROR =
   'Command not recognized. Try: show movies, mom mode, dark theme, show 4K, search, play this, record this, reset filters';
 
@@ -210,10 +209,10 @@ router.post('/api/ui-command/validate', async (req, res) => {
     });
   }
 
-  if (profile_id !== undefined && !VALID_PROFILES.includes(profile_id)) {
+  if (profile_id !== undefined && !profileIds.isValidProfileId(profile_id)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: `Invalid profile_id '${profile_id}'. Valid values: dave_tv, mom_tv`,
+      message: profileIds.profileValidationMessage(),
     });
   }
 

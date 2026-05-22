@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
+    "proof": "playwright test specs/00-auth-proof.spec.ts specs/20-proof-gallery.spec.ts",
+    "proof:layouts": "playwright test specs/layout-screenshots.spec.js",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report"
   },

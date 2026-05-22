@@ -1,10 +1,10 @@
 'use strict';
 
 const { Router } = require('express');
+const profileIds = require('../lib/profileIds');
 const router = Router();
 
 const VALID_SCHEMA = 'hermestv.ui.v1';
-const VALID_PROFILES = ['dave_tv', 'mom_tv'];
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const MOM_FONT_SCALE_FLOOR = 1.25;
 
@@ -48,9 +48,9 @@ router.post('/api/commands', (req, res) => {
   // Target validation
   if (!body.target || !body.target.profile_id) {
     errors.push('target.profile_id is required');
-  } else if (!VALID_PROFILES.includes(body.target.profile_id)) {
+  } else if (!profileIds.isValidProfileId(body.target.profile_id)) {
     errors.push(
-      `target.profile_id must be 'dave_tv' or 'mom_tv', got: '${body.target.profile_id}'`
+      'target.' + profileIds.profileValidationMessage()
     );
   }
 

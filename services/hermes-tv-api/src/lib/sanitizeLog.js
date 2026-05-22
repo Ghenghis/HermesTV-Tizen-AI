@@ -36,10 +36,12 @@ var FORBIDDEN_PATTERNS = [
                                              // we want to drop the whole assignment)
   /DEEPSEEK_API_KEY[^\s'"]*/gi,              // DeepSeek env var
   /api[_\-]?key\s*[:=]\s*[^\s'"]*/gi,        // Generic api_key assignment
+  /[?&]api[_\-]?key=[^\s'"]*/gi,              // Generic api_key query string
   /password\s*[:=]\s*[^\s'"]*/gi,            // Generic password assignment
   /bearer\s+[A-Za-z0-9\-._~+/]+=*/gi,        // Bearer token value
   /sk-[A-Za-z0-9_\-]{20,}/gi,                // OpenAI-style key prefix
   /Ocp-Apim-Subscription-Key:\s*[^\s'"]*/gi, // Azure Speech header
+  /X-Emby-Token:\s*[^\s'"]*/gi,               // Jellyfin header
   /m3u_plus[^\s'"]*/gi,                      // Xtream Codes flag-laden URLs
 ];
 

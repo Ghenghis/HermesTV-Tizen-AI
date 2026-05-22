@@ -24,11 +24,11 @@ import { capForProfile } from '../utils/isSystemLimited.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 var SIDEBAR_SECTIONS = [
-  { icon: '🏠', label: 'Home' },
-  { icon: '📡', label: 'Live TV' },
-  { icon: '🎬', label: 'Movies' },
-  { icon: '📺', label: 'Series' },
-  { icon: '🗂️', label: 'My Library' },
+  { id: 'home', icon: '🏠', label: 'Home' },
+  { id: 'live', icon: '📡', label: 'Live TV' },
+  { id: 'movies', icon: '🎬', label: 'Movies' },
+  { id: 'series', icon: '📺', label: 'Series' },
+  { id: 'library', icon: '🗂️', label: 'My Library' },
 ];
 
 // Plex shell's signature amber accent — used inline as a fallback when the
@@ -209,17 +209,74 @@ function PlexShell(props) {
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
 
+  var allContent = applyShellFilters(catalog, 'all', providerFilter, qualityFilter);
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
-  var featured = filtered[0] || null;
-  var liveItems = filtered.filter(function(i) { return isLive(i); });
-  var movies = filtered.filter(function(i) { return isMovie(i); });
-  var series = filtered.filter(function(i) { return isSeries(i); });
+  var liveItems = allContent.filter(function(i) { return isLive(i); });
+  var movies = allContent.filter(function(i) { return isMovie(i); });
+  var series = allContent.filter(function(i) { return isSeries(i); });
   var fontScale = (profile && profile.font_scale) || 1;
   var allowMotion = !(profile && profile.reduced_motion);
 
-  var activeSectionResult = React.useState(0);
+  var mainRef = React.useRef(null);
+  var activeSectionResult = React.useState('home');
   var activeSection = activeSectionResult[0];
   var setActiveSection = activeSectionResult[1];
+  var activeItems = activeSection === 'live' ? liveItems
+    : activeSection === 'movies' ? movies
+    : activeSection === 'series' ? series
+    : filtered;
+  var featured = activeItems[0] || filtered[0] || null;
+  var pageTitle = activeSection === 'live' ? 'Live TV'
+    : activeSection === 'movies' ? 'Movies'
+    : activeSection === 'series' ? 'Series'
+    : activeSection === 'library' ? 'My Library'
+    : 'Home';
+
+  function activateSection(sectionId) {
+    setActiveSection(sectionId);
+    if (mainRef.current) {
+      try { mainRef.current.scrollTop = 0; } catch (_) {}
+    }
+  }
+
+  function focusSidebarButton(index) {
+    var el = document.querySelector('[data-plex-nav-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function handleSidebarKeyDown(e, sectionId, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      activateSection(sectionId);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      focusSidebarButton((index + 1) % SIDEBAR_SECTIONS.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      focusSidebarButton((index + SIDEBAR_SECTIONS.length - 1) % SIDEBAR_SECTIONS.length);
+      return;
+    }
+    if (e.key === 'Home') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      focusSidebarButton(0);
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      focusSidebarButton(SIDEBAR_SECTIONS.length - 1);
+    }
+  }
 
   React.useEffect(function() {
     var el = document.querySelector('[data-focusable="true"], [tabindex="0"]');
@@ -251,19 +308,16 @@ function PlexShell(props) {
         <div style={{ overflowY: 'auto', flex: 1 }}>
           <div style={{ padding: '14px 22px 6px', fontSize: 'calc(10px * ' + fontScale + ')', color: '#8b8f95', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Library</div>
           {SIDEBAR_SECTIONS.map(function(s, i) {
-            var isActive = activeSection === i;
+            var isActive = activeSection === s.id;
             return (
               <button
                 key={s.label}
                 data-focusable="true"
+                data-plex-nav-index={i}
                 tabIndex={0}
-                onClick={function() { setActiveSection(i); }}
-                onKeyDown={function(e) {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setActiveSection(i);
-                  }
-                }}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={function() { activateSection(s.id); }}
+                onKeyDown={function(e) { handleSidebarKeyDown(e, s.id, i); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -333,11 +387,19 @@ function PlexShell(props) {
       </div>
 
       {/* Main content */}
-      <div style={{ overflowY: 'auto', padding: '22px 28px' }}>
+      <div ref={mainRef} style={{ overflowY: 'auto', padding: '22px 28px' }}>
+
+        <h2 style={{
+          margin: '0 0 18px',
+          fontSize: 'calc(22px * ' + fontScale + ')',
+          color: '#f3f4f6',
+          fontWeight: 800,
+          letterSpacing: '0.01em',
+        }}>{pageTitle}</h2>
 
         {/* Hero card — bigger radius (lg) than the tile grid so it reads as
             the visual anchor of the page. Shared --shadow-lg sits under it. */}
-        {featured && (
+        {featured && activeSection !== 'library' && (
           <div
             onClick={function() { if (onItemSelect) onItemSelect(featured); }}
             style={{
@@ -408,28 +470,40 @@ function PlexShell(props) {
         {/* Layout order: Favorites → Continue Watching → Recently Watched →
             On Now / Movies / Series grids. Each rail is purely additive and
             returns null when empty. */}
-        <FavoritesRail
-          profileId={profile && (profile.profile_id || profile.id)}
-          onItemSelect={onItemSelect}
-          profile={profile}
-          fontScale={fontScale}
-          catalog={filtered}
-        />
-        <WatchlistRail profile={profile} items={filtered} onItemSelect={onItemSelect} fontScale={fontScale} />
-        <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
-        <RecentlyWatchedRail
-          profileId={profile && (profile.profile_id || profile.id)}
-          onItemSelect={onItemSelect}
-          profile={profile}
-          fontScale={fontScale}
-          catalog={filtered}
-        />
-        <GridSection title="On Now" items={liveItems.length > 0 ? liveItems : filtered.slice(0, capForProfile(profile, 4))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
-        <GridSection title="Movies" items={movies.length > 0 ? movies : filtered.slice(2, capForProfile(profile, 10))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
-        <GridSection title="Series" items={series.length > 0 ? series : filtered.slice(4)} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
-        <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, capForProfile(profile, 8))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        {(activeSection === 'home' || activeSection === 'library') && (
+          <React.Fragment>
+            <FavoritesRail
+              profileId={profile && (profile.profile_id || profile.id)}
+              onItemSelect={onItemSelect}
+              profile={profile}
+              fontScale={fontScale}
+              catalog={filtered}
+            />
+            <WatchlistRail profile={profile} items={filtered} onItemSelect={onItemSelect} fontScale={fontScale} />
+            <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
+            <RecentlyWatchedRail
+              profileId={profile && (profile.profile_id || profile.id)}
+              onItemSelect={onItemSelect}
+              profile={profile}
+              fontScale={fontScale}
+              catalog={filtered}
+            />
+          </React.Fragment>
+        )}
+        {(activeSection === 'home' || activeSection === 'live') && (
+          <GridSection title="On Now" items={liveItems} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        )}
+        {(activeSection === 'home' || activeSection === 'movies') && (
+          <GridSection title="Movies" items={movies} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        )}
+        {(activeSection === 'home' || activeSection === 'series') && (
+          <GridSection title="Series" items={series} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        )}
+        {activeSection === 'home' && (
+          <GridSection title="Recently Added" items={filtered.slice().reverse().slice(0, capForProfile(profile, 8))} onItemSelect={onItemSelect} fontScale={fontScale} profile={profile} />
+        )}
 
-        {filtered.length === 0 && (
+        {activeItems.length === 0 && activeSection !== 'library' && (
           <div style={{ textAlign: 'center', padding: '60px', color: '#8b8f95', fontSize: 'calc(14px * ' + fontScale + ')' }}>
             No content matches your current filters.
           </div>

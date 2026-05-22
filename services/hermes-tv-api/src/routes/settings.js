@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const settingsStore = require('../lib/settingsStore');
+const profileIds = require('../lib/profileIds');
 const router = Router();
 
 // App-level settings — no credentials, no stream URLs, no tokens.
@@ -13,8 +14,6 @@ const DEFAULT_SETTINGS = {
   version: '0.1.0',
   phase: 'B1-scaffold',
   features: {
-    // settings are now persisted to disk — no longer mock_mode
-    mock_mode: false,
     azure_tts: false,
     real_providers: false,
     vps_connected: false,
@@ -28,7 +27,6 @@ const DEFAULT_SETTINGS = {
   },
   providers: {
     configured: [],
-    mock_only: ['apollo_group', 'xtremehd'],
   },
 };
 
@@ -50,8 +48,6 @@ const VALID_THEMES = [
   'mom-mode', 'dave-power', 'mom-calm',
 ];
 
-const VALID_PROFILES = ['dave_tv', 'mom_tv'];
-
 /**
  * Build the merged response shape. Adds a per-profile `profile` block when
  * a profile_id is supplied so callers can read persisted settings in one
@@ -71,7 +67,7 @@ function buildResponse(profileId) {
     providers: { ...DEFAULT_SETTINGS.providers },
   });
 
-  if (profileId && VALID_PROFILES.includes(profileId)) {
+  if (profileId && profileIds.isValidProfileId(profileId)) {
     merged.profile_id = profileId;
     merged.profile = settingsStore.getSettings(profileId);
   }
@@ -82,10 +78,10 @@ function buildResponse(profileId) {
 // GET /api/settings?profile_id=mom_tv
 router.get('/api/settings', (req, res) => {
   const profileId = req.query.profile_id;
-  if (profileId && !VALID_PROFILES.includes(profileId)) {
+  if (profileId && !profileIds.isValidProfileId(profileId)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: `Invalid profile_id '${profileId}'. Allowed: ${VALID_PROFILES.join(', ')}`,
+      message: profileIds.profileValidationMessage(),
     });
   }
   res.json(buildResponse(profileId));
@@ -107,8 +103,8 @@ router.patch('/api/settings', async (req, res) => {
   if (active_theme !== undefined && !VALID_THEMES.includes(active_theme)) {
     errors.active_theme = `Invalid theme. Allowed: ${VALID_THEMES.join(', ')}`;
   }
-  if (profile_id !== undefined && !VALID_PROFILES.includes(profile_id)) {
-    errors.profile_id = `Invalid profile_id. Allowed: ${VALID_PROFILES.join(', ')}`;
+  if (profile_id !== undefined && !profileIds.isValidProfileId(profile_id)) {
+    errors.profile_id = profileIds.profileValidationMessage();
   }
 
   // Light type validation for the common per-profile fields. Unknown fields

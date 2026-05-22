@@ -89,12 +89,18 @@ function _hashToPaletteIdx(item, idx) {
 // didn't have a real Wikipedia/TMDb image — that produced random nature
 // photos labelled "ESPN", "Bloomberg", etc which read as broken art to
 // the user (audit-wave-9). The seed catalog no longer ships those URLs,
-// but we double-check here so any straggling third-party provider URL
-// that still embeds "picsum.photos" falls through to a clean gradient.
+// but we double-check here so any straggling third-party provider URL falls
+// through to a clean gradient. We also reject the old transparent-pixel
+// fallback so a tile with no art never paints as a black empty card.
+function _isTransparentPixel(url) {
+  return typeof url === 'string'
+    && url.indexOf('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB') === 0;
+}
 function _isRealArt(url) {
   return typeof url === 'string'
     && url.length > 0
-    && url.indexOf('picsum.photos') === -1;
+    && url.indexOf('picsum.photos') === -1
+    && !_isTransparentPixel(url);
 }
 
 // Resolve a catalog item to a CSS `background` value. Checks every known

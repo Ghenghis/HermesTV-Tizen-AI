@@ -491,12 +491,9 @@ function StremioShell(props) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Board content selection ──────────────────────────────────────────────
-  // Continue Watching is currently a stub (the playback-progress store is on a
-  // different track) — show the most-recent slice of the catalog as a
-  // plausible placeholder. Real data slots in once the progress endpoint
-  // lands. Mom-never-limited rule: Mom gets the unsliced filtered set, Dave
-  // gets the existing 8-item placeholder window.
-  var continueWatching = filtered.slice(0, capForProfile(profile, 8));
+  // Continue Watching is rendered by the real ContinueWatchingRail below.
+  // Do not synthesize a second row from the catalog; that made untouched
+  // content look like viewing progress.
   var featuredMovies = filtered.filter(isMovie);
   var featuredSeries = filtered.filter(isSeries);
 
@@ -592,8 +589,8 @@ function StremioShell(props) {
               fontWeight: 900,
               fontSize: '14px',
             }}
-          >H</span>
-          <span>HERMES</span>
+          >D</span>
+          <span>DaveTV</span>
         </div>
 
         {/* Tabs */}
@@ -675,19 +672,10 @@ function StremioShell(props) {
       >
         {activeTab === 'board' && (
           <div>
-            {/* Real Continue Watching rail backed by watchHistoryStore — sits
-                as the first board, above the legacy placeholder row. Returns
+            {/* Real Continue Watching rail backed by watchHistoryStore. Returns
                 null when the profile has no playback history yet. */}
             <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
             <WatchlistRail profile={profile} items={filtered} onItemSelect={onItemSelect} fontScale={fontScale} />
-            <StremioBoardRow
-              title="Continue Watching"
-              items={continueWatching}
-              onItemSelect={onItemSelect}
-              allowMotion={allowMotion}
-              emptyHint="Play something to see your progress here."
-              profile={profile}
-            />
             <StremioBoardRow
               title="Featured Movies"
               items={featuredMovies}

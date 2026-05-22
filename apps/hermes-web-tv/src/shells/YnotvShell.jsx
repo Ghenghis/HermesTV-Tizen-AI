@@ -21,12 +21,10 @@ import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 //     `useGridVirtualizer` — same contract as every other shell.
 //   - RIGHT channel overlay: a floating card that slides in from the right
 //     for 4 seconds whenever the user focuses a NEW poster. Shows the item
-//     title, "Now Playing" placeholder, and "Up Next" placeholder. Slides
-//     out automatically, can also be dismissed by Escape.
+//     title and real now/next data when available. Slides out automatically,
+//     can also be dismissed by Escape.
 //   - WATCHLIST tab: filters catalog to movies/series only, header chip says
-//     "Watchlist (N)". The first finished series episode triggers a placeholder
-//     "Auto-play in 5s" countdown chip (visual only — actual queueing happens
-//     in PlayerModal).
+//     "Watchlist (N)".
 //   - CALENDAR tab: a one-month vanilla calendar grid. Days that have a
 //     "release" (we surface anything with a year match this year, else a
 //     deterministic week-of-month bucket so the dots aren't empty in the
@@ -51,10 +49,6 @@ var CHANNEL_OVERLAY_MS = 4000;
 
 // Channel overlay slide duration. Keep under 220ms per task brief.
 var CHANNEL_OVERLAY_TRANSITION_MS = 200;
-
-// Auto-play-next countdown when a series item is hovered in the watchlist.
-// Visual only — the actual queue happens server-side in PlayerModal.
-var AUTOPLAY_COUNTDOWN_S = 5;
 
 // Days of week for the calendar header. Mon-first feels Windows-y; Sun-first
 // is the US default. We go Sun-first to match DaveTV's English-US base locale.
@@ -89,21 +83,16 @@ function _buildCalendarGrid(anchor) {
   return grid;
 }
 
-// Map catalog items → set of date strings ("YYYY-MM-DD") they "release" on.
-// Items rarely carry a real release_date in the mock catalog, so we surface
-// anything with a year and bucket it deterministically into a day-of-month
-// derived from the id hash. That way the calendar shows dots in plausible
-// positions and clicking jumps to a stable set of items each render.
+// Map catalog items → set of real release dates ("YYYY-MM-DD"). Items without
+// an explicit release_date are omitted; no deterministic buckets or fake dots.
 function _buildReleaseMap(items, anchor) {
   var map = {}; // 'YYYY-MM-DD' -> [item]
   var anchorYear = anchor.getFullYear();
   var anchorMonth = anchor.getMonth();
-  var lastDay = new Date(anchorYear, anchorMonth + 1, 0).getDate();
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
     if (!it) { continue; }
     if (isLive(it)) { continue; } // live channels don't have releases
-    // Prefer a real release_date if present (ISO-ish "YYYY-MM-DD" or full ISO).
     var dateStr = null;
     if (typeof it.release_date === 'string' && it.release_date.length >= 10) {
       dateStr = it.release_date.substring(0, 10);
@@ -111,21 +100,7 @@ function _buildReleaseMap(items, anchor) {
         && it.metadata.release_date.length >= 10) {
       dateStr = it.metadata.release_date.substring(0, 10);
     }
-    if (!dateStr) {
-      // Deterministic bucket: id hash → day-of-current-month.
-      var idStr = (it.id != null) ? String(it.id) : ('idx' + i);
-      var h = 0;
-      for (var j = 0; j < idStr.length; j++) {
-        h = (h + idStr.charCodeAt(j)) | 0;
-      }
-      if (h < 0) { h = -h; }
-      var day = (h % lastDay) + 1; // 1-based
-      var mm = String(anchorMonth + 1);
-      if (mm.length < 2) { mm = '0' + mm; }
-      var dd = String(day);
-      if (dd.length < 2) { dd = '0' + dd; }
-      dateStr = anchorYear + '-' + mm + '-' + dd;
-    }
+    if (!dateStr) { continue; }
     if (!map[dateStr]) { map[dateStr] = []; }
     map[dateStr].push(it);
   }
@@ -148,19 +123,10 @@ function _sameDate(a, b) {
     && a.getDate() === b.getDate();
 }
 
-// ─── Up-Next placeholder ────────────────────────────────────────────────────
-// EPG isn't wired through every shell yet; surface a deterministic placeholder
-// so the channel overlay never shows an empty "Up Next" line.
+// ─── Up-Next label ──────────────────────────────────────────────────────────
+// Honest empty until a real EPG/queue source is wired into this shell.
 function _upNextLabel(item) {
-  if (!item) { return 'Up next'; }
-  var titles = ['Late Edition', 'Behind the Scenes', 'Encore', 'Programme', 'Next Up'];
-  var idStr = (item.id != null) ? String(item.id) : '';
-  var h = 0;
-  for (var i = 0; i < idStr.length; i++) {
-    h = (h + idStr.charCodeAt(i)) | 0;
-  }
-  if (h < 0) { h = -h; }
-  return titles[h % titles.length];
+  return '';
 }
 
 function _nowPlayingLabel(item) {
@@ -345,11 +311,32 @@ function YnotvShell(props) {
   var pillNow = focusedItem ? _nowPlayingLabel(focusedItem) : 'Browse the catalog';
   var pillNext = focusedItem ? _upNextLabel(focusedItem) : '';
 
-  // Whether autoplay-next chip should show — only relevant on the watchlist
-  // tab when the focused item is a series. Visual hint that the player will
-  // queue the next episode when the current one ends.
-  var showAutoplayChip = activeTab === 'watchlist'
-    && focusedItem && isSeries(focusedItem);
+  function _focusRailItem(index) {
+    var el = document.querySelector('[data-ynotv-rail-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleRailKey(e, itemId, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      setActiveTab(itemId);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRailItem((index + 1) % RAIL_ITEMS.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRailItem((index + RAIL_ITEMS.length - 1) % RAIL_ITEMS.length);
+    }
+  }
 
   // ── Calendar derived ──────────────────────────────────────────────────────
   // Pre-compute the release map + grid so the render path stays straight.
@@ -579,7 +566,7 @@ function YnotvShell(props) {
           overflow: 'hidden',
         }}
       >
-        {RAIL_ITEMS.map(function(it) {
+        {RAIL_ITEMS.map(function(it, index) {
           var isActive = activeTab === it.id;
           return (
             <button
@@ -587,17 +574,13 @@ function YnotvShell(props) {
               tabIndex={0}
               data-focusable="true"
               data-focus-group="ynotv-rail"
+              data-ynotv-rail-index={index}
               data-card-id={'rail-' + it.id}
               aria-pressed={isActive}
               aria-label={it.label}
               title={it.label}
               onClick={function() { setActiveTab(it.id); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setActiveTab(it.id);
-                }
-              }}
+              onKeyDown={function(e) { _handleRailKey(e, it.id, index); }}
               style={{
                 width: '44px',
                 height: '44px',
@@ -1210,65 +1193,49 @@ function YnotvShell(props) {
                   margin: '0.5rem 0',
                 }}
               />
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.3rem',
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: 'inline-block',
-                    width: '6px', height: '6px', borderRadius: '50%',
-                    background: 'var(--muted, #94a3b8)',
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: 'calc(0.6rem * var(--font-scale, 1))',
-                    color: 'var(--muted, #94a3b8)',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Up next
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: 'calc(0.78rem * var(--font-scale, 1))',
-                  fontWeight: 600,
-                  color: 'var(--text, #e6edf3)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {_upNextLabel(focusedItem)}
-              </div>
-              {showAutoplayChip && (
-                <div
-                  style={{
-                    marginTop: '0.7rem',
-                    padding: '0.35rem 0.5rem',
-                    background: 'rgba(77,139,255,0.14)',
-                    border: '1px solid rgba(77,139,255,0.42)',
-                    borderRadius: '8px',
-                    fontSize: 'calc(0.65rem * var(--font-scale, 1))',
-                    fontWeight: 700,
-                    color: 'var(--accent, #4d8bff)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                >
-                  <span aria-hidden="true">⟳</span>
-                  <span>Auto-play in {AUTOPLAY_COUNTDOWN_S}s</span>
-                </div>
+              {pillNext && (
+                <React.Fragment>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      marginBottom: '0.3rem',
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'inline-block',
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: 'var(--muted, #94a3b8)',
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 'calc(0.6rem * var(--font-scale, 1))',
+                        color: 'var(--muted, #94a3b8)',
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Up next
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'calc(0.78rem * var(--font-scale, 1))',
+                      fontWeight: 600,
+                      color: 'var(--text, #e6edf3)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {pillNext}
+                  </div>
+                </React.Fragment>
               )}
             </React.Fragment>
           )}

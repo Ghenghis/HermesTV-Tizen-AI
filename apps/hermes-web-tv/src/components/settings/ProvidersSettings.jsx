@@ -1,6 +1,7 @@
 import React from 'react';
 import Toggle from './Toggle.jsx';
 import * as visibilityStore from '../../store/providerVisibilityStore.js';
+import { resolveApiBase } from '../../api/apiBase.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ProvidersSettings — Settings ▸ Providers sub-tab (W16-PROVIDERS).
@@ -132,17 +133,7 @@ function ProvidersSettings(props) {
   React.useEffect(function() {
     var cancelled = false;
     function load() {
-      // Inline fetch (no shared client yet) — same BASE_URL discipline as
-      // hermesApi.js. We do it inline rather than adding a new API client
-      // file so this PR stays scoped to the visibility feature.
-      var base = '';
-      try {
-        if (typeof window !== 'undefined') {
-          var h = window.location.hostname;
-          if (h === 'localhost' || h === '127.0.0.1') { base = 'http://localhost:3001'; }
-          else if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) { base = 'http://' + h + ':3001'; }
-        }
-      } catch (_e) { /* default base = '' */ }
+      var base = resolveApiBase();
       fetch(base + '/api/source-health').then(function(r) {
         if (!r.ok) { throw new Error('source-health failed'); }
         return r.json();

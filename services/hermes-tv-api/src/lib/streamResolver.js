@@ -17,6 +17,7 @@
  *   lib/iptvOrg.js     → internal.resolveStreamUrl(channelId)
  *   lib/m3uClient.js   → internal.resolveStreamUrl(channelId)
  *   lib/xtreamClient.js → internal.resolveStreamUrl(channelId)
+ *   lib/jellyfin.js    → internal.resolveStreamUrl(channelId)
  *
  * It is NOT mounted as a route and never appears in module.exports of
  * any router. The single test that this module never leaks a URL into
@@ -31,12 +32,14 @@
  *   "m3u-<provider>-<localId>"         → m3uClient
  *   "iptv-<iptvOrgChannelId>"          → iptvOrg
  *   "xtream-<type>-<stream_id>"        → xtreamClient (Xtream Codes panels)
+ *   "jellyfin-<itemId>"                → Jellyfin direct stream proxy
  *   anything else                      → null (handled upstream as 503)
  */
 
 var iptvOrg = require('./iptvOrg');
 var m3uClient = require('./m3uClient');
 var xtreamClient = require('./xtreamClient');
+var jellyfin = require('./jellyfin');
 
 // Credential-bearing URL patterns — mirror lib/sanitizeLog.js FORBIDDEN_PATTERNS.
 // If a resolved URL matches any of these we MUST NOT 302 the client at it,
@@ -47,6 +50,8 @@ var CRED_BEARING = [
   /\/get\.php\?username=/i,
   /\/player_api\.php/i,
   /m3u_plus/i,
+  /[?&]api[_-]?key=/i,
+  /X-Emby-Token/i,
 ];
 
 function isCredentialBearing(url) {
@@ -93,6 +98,12 @@ function resolveStreamUrl(channelId) {
     // user/pass in the path (`/live/<u>/<p>/<id>.m3u8`), so treated as
     // credential-bearing and routed through the HLS proxy.
     try { url = xtreamClient.internal.resolveStreamUrl(channelId); }
+    catch (_) { url = null; }
+    alwaysCredBearing = true;
+  } else if (channelId.indexOf('jellyfin-') === 0) {
+    // Jellyfin streams require the server-held API key. The URL is always
+    // proxied server-side so the browser never sees api_key or X-Emby-Token.
+    try { url = jellyfin.internal.resolveStreamUrl(channelId); }
     catch (_) { url = null; }
     alwaysCredBearing = true;
   } else if (channelId.indexOf('iptv-') === 0) {

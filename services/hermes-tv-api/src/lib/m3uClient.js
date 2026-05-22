@@ -279,6 +279,64 @@ function _parseM3U(text, opts) {
   return { entries: entries, epgUrl: _epgUrlFromHeader(headerAttrs) };
 }
 
+// Provider exports can be very large. Waiting for the entire M3U before
+// parsing makes cold boots feel broken, especially on TV hardware. Read the
+// response as a stream when Node's fetch gives us one, keep complete lines,
+// and cancel after enough entries for the local catalog cap. Test mocks that
+// only expose res.text() still use the old path.
+function _readM3UText(res, maxEntries) {
+  if (!res || !res.body || typeof res.body.getReader !== 'function') {
+    return res.text();
+  }
+
+  var reader = res.body.getReader();
+  var decoder = new TextDecoder();
+  var chunks = [];
+  var carry = '';
+  var pendingExtinf = false;
+  var entries = 0;
+  var limit = (typeof maxEntries === 'number' && maxEntries > 0) ? maxEntries : MAX_ITEMS_PER_PROVIDER;
+
+  function scanLines(text) {
+    var scan = carry + text;
+    var lines = scan.split(/\r?\n/);
+    carry = lines.pop() || '';
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line && line.charCodeAt(0) === 0xFEFF) { line = line.slice(1); }
+      line = line.trim();
+      if (line.length === 0) { continue; }
+      if (line.indexOf('#EXTINF:') === 0) {
+        pendingExtinf = true;
+        continue;
+      }
+      if (line.charAt(0) === '#') { continue; }
+      if (pendingExtinf) {
+        entries += 1;
+        pendingExtinf = false;
+        if (entries >= limit) { return true; }
+      }
+    }
+    return false;
+  }
+
+  return (async function readLoop() {
+    while (true) {
+      var r = await reader.read();
+      if (r.done) { break; }
+      var chunk = decoder.decode(r.value, { stream: true });
+      chunks.push(chunk);
+      if (scanLines(chunk)) {
+        try { await reader.cancel(); } catch (_) { /* ignore cancel races */ }
+        break;
+      }
+    }
+    var tail = decoder.decode();
+    if (tail) { chunks.push(tail); }
+    return chunks.join('');
+  })();
+}
+
 function _detectResolution(name, group) {
   var s = ((name || '') + ' ' + (group || '')).toUpperCase();
   if (/\b(4K|UHD|2160P)\b/.test(s)) { return '4K'; }
@@ -313,20 +371,17 @@ function _normaliseCategory(group) {
 
 // Defensive: some upstream providers embed creds in logo URLs too
 // (e.g. `tvg-logo="http://host/get.php?username=X..."`). If any logo
-// matches the credential-bearing shape, swap to a 1x1 transparent data
-// URI so the catalog response cannot trigger credentialGuard and kill
-// the entire payload, and so the browser never makes a DNS lookup for
-// a hermestv.local fallback host that doesn't exist in production.
-// We never just trust upstream metadata.
-var DEFAULT_LOGO_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+// matches the credential-bearing shape, drop the artwork entirely so the UI
+// falls through to its gradient/initials tile. Never substitute transparent
+// pixels: they create black cards while pretending real art exists.
 var CRED_BEARING_LOGO = [/\/get\.php\?username=/i, /\/player_api\.php/i, /m3u_plus/i];
 function _safeLogo(url) {
   if (typeof url !== 'string' || url.length === 0) {
-    return DEFAULT_LOGO_DATA_URI;
+    return null;
   }
   for (var i = 0; i < CRED_BEARING_LOGO.length; i++) {
     if (CRED_BEARING_LOGO[i].test(url)) {
-      return DEFAULT_LOGO_DATA_URI;
+      return null;
     }
   }
   return url;
@@ -352,7 +407,6 @@ function _mapToHermes(cacheKey, providerId, parsed) {
       provider: providerId,
       category: _normaliseCategory(group),
       logo_url: logo,
-      profile_access: ['dave_tv', 'mom_tv'],
       providers: [{
         provider_id: providerId,
         source_id: tvgId || localId,
@@ -374,7 +428,7 @@ function _mapToHermes(cacheKey, providerId, parsed) {
 // overrideUrl). The cache and in-flight tables are keyed by providerId so
 // store rows with their unique `prov-<hex>` IDs never collide with the
 // well-known `apollo_group` / `xtremehd` keys.
-function _fetchProvider(providerId, overrideUrl, catalogProviderId) {
+function _fetchProvider(providerId, overrideUrl, catalogProviderId, maxEntries) {
   var url = (typeof overrideUrl === 'string' && overrideUrl.length > 0) ? overrideUrl : _providerUrl(providerId);
   if (!url) {
     return Promise.resolve({ items: [], streamsByLocalId: {}, fetchedAt: _now(), error: 'not_configured' });
@@ -392,7 +446,7 @@ function _fetchProvider(providerId, overrideUrl, catalogProviderId) {
         err.status = res.status;
         throw err;
       }
-      return res.text();
+      return _readM3UText(res, maxEntries || MAX_ITEMS_PER_PROVIDER);
     })
     .then(function(text) {
       var parsed = _parseM3U(text, { shape: 'legacy' });
@@ -450,6 +504,9 @@ function _getAnyCached(providerId) {
 async function fetchCatalog(opts) {
   opts = opts || {};
   var limit = (typeof opts.limit === 'number' && opts.limit > 0) ? opts.limit : 600;
+  var waitForColdMs = (typeof opts.waitForColdMs === 'number' && opts.waitForColdMs > 0)
+    ? Math.min(15000, Math.floor(opts.waitForColdMs))
+    : 6000;
   await _refreshRegistrySnapshot();
   if (_registrySnapshot.length === 0) { return []; }
 
@@ -464,7 +521,7 @@ async function fetchCatalog(opts) {
   //     so the next call sees fresh data — but never await it on the request
   //     path.
   //   - If a provider has no cache at all (cold boot, first request), we
-  //     still need real data, so we await up to 2 s and then bail to whatever
+  //     still need real data, so we await up to waitForColdMs and then bail to whatever
   //     other providers responded. The pre-warm at server start (index.js)
   //     populates the cold cache before user traffic typically arrives.
   var results = [];
@@ -477,9 +534,9 @@ async function fetchCatalog(opts) {
     if (any) { results.push(any); }
     if (!fresh) {
       // Kick off refresh, but never await on the request path.
-      var p = _fetchProvider(pid, row.url, row.provider_id);
+      var p = _fetchProvider(pid, row.url, row.provider_id, limit);
       if (!any) {
-        // Cold cache — race the fetch against a 2 s hedge so the first
+        // Cold cache — race the fetch against a waitForColdMs hedge so the first
         // request after boot can still return SOMETHING if pre-warm hasn't
         // landed yet.
         coldFetches.push(p);
@@ -493,7 +550,7 @@ async function fetchCatalog(opts) {
     try {
       var raced = await Promise.race([
         Promise.all(coldFetches),
-        new Promise(function(resolve) { setTimeout(function() { resolve(null); }, 2000); }),
+        new Promise(function(resolve) { setTimeout(function() { resolve(null); }, waitForColdMs); }),
       ]);
       if (Array.isArray(raced)) {
         for (var rr = 0; rr < raced.length; rr++) {

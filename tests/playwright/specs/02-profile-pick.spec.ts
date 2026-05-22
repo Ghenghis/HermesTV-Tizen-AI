@@ -15,8 +15,8 @@ test.describe('Profile pick — Mom (Sherri)', () => {
     await expect(sherri).toBeVisible({ timeout: 8000 });
     await sherri.click();
 
-    // Wait for shell paint — HermesTV brand reappears in the active shell.
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    // Wait for shell paint — DaveTV brand reappears in the active shell.
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
 
     // Read the font-scale CSS custom property off documentElement.
     const fontScale = await page.evaluate(() => {
@@ -35,7 +35,7 @@ test.describe('Profile pick — Mom (Sherri)', () => {
     const dave = page.locator('button[aria-label*="Dave"]').first();
     await expect(dave).toBeVisible({ timeout: 8000 });
     await dave.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
 
     const fontScale = await page.evaluate(() => {
       return getComputedStyle(document.documentElement)

@@ -559,9 +559,8 @@ var INITIAL_STATE = {
   showPlayer: false,
   playerTicket: null,
   playerError: '',
-  // Download modal state — populated by /api/download response. Mirrors the
-  // IPTV Player Zero exact-size disclosure dialog. downloadConfirmed flips
-  // after the user clicks Proceed so the modal switches from review → queued.
+  // Download modal state — gated until /api/download has a real worker.
+  // Disabled-mode responses are error envelopes, never fake queued jobs.
   showDownload: false,
   downloadItem: null,
   downloadEnvelope: null,
@@ -593,6 +592,57 @@ function App() {
   function patchState(patch) {
     setState(function(prev) {
       return Object.assign({}, prev, patch);
+    });
+  }
+
+  function catalogPatchFromRaw(rawCatalog, isOnline) {
+    rawCatalog = rawCatalog || {};
+    var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
+    var actors = rawCatalog.actors || [];
+    var sourceHeader = rawCatalog._source_header || null;
+    var meta = rawCatalog._meta || {};
+    var metaSource = meta.source || null;
+    var catalogSource = isOnline ? (sourceHeader || metaSource || 'no-providers') : 'api-offline';
+    var m3uProviders = meta.m3u_providers || null;
+    var iptvOrgCount = (typeof meta.iptv_org_count === 'number') ? meta.iptv_org_count : 0;
+    return {
+      catalog: catalog,
+      actors: actors,
+      catalogSource: catalogSource,
+      m3uProviders: m3uProviders,
+      iptvOrgCount: iptvOrgCount,
+    };
+  }
+
+  function refreshProvidersAndCatalog(options) {
+    options = options || {};
+    var expectedProviderId = options.expectedProviderId || '';
+    var providerFilter = options.providerFilter || null;
+    var keepSettingsOpen = options.keepSettingsOpen === true;
+    return Promise.all([
+      hermesApi.getProviders({ refresh: true }),
+      hermesApi.getCatalog({ refresh: true, waitForColdMs: 15000 }),
+    ]).then(function(results) {
+      var payload = results[0];
+      var list = payload && payload.providers
+        ? payload.providers
+        : (Array.isArray(payload) ? payload : []);
+      if (expectedProviderId) {
+        var found = list.some(function(row) {
+          return row && (row.id === expectedProviderId || row.persisted_provider_id === expectedProviderId);
+        });
+        if (!found) {
+          var missing = new Error('Provider save reached the API, but /api/providers did not return the durable provider row. Nothing was confirmed.');
+          missing.code = 'provider_refresh_missing';
+          throw missing;
+        }
+      }
+      var patch = catalogPatchFromRaw(results[1], true);
+      patch.providers = list;
+      if (providerFilter) { patch.providerFilter = providerFilter; }
+      if (keepSettingsOpen) { patch.showSettings = true; }
+      patchState(patch);
+      return { providers: list, catalog: patch.catalog };
     });
   }
 
@@ -1006,7 +1056,7 @@ function App() {
       if (aborted) { return; }
       patchState({ remotePairCode: code });
       try {
-        es = new EventSource('/api/remote/events?pair_code=' + encodeURIComponent(code));
+        es = new EventSource(hermesApi.buildApiUrl('/api/remote/events?pair_code=' + encodeURIComponent(code)));
         es.onmessage = function(evt) {
           try {
             var payload = JSON.parse(evt.data);
@@ -1036,8 +1086,7 @@ function App() {
       }
     }
 
-    fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-      .then(function(r) { return r.json(); })
+    hermesApi.createPairing()
       .then(function(body) { if (body && body.pairing_code) { attach(body.pairing_code); } })
       .catch(function() { /* offline — silent */ });
 
@@ -1074,10 +1123,22 @@ function App() {
       // mockApi (which previously made the UI look identical regardless of
       // whether the backend was working). Instead, surface a clear error
       // screen unless the dev explicitly opted in by setting
-      // localStorage.hermestv_dev_mock='1'. The Settings data-source badge
-      // also flips to a red 'no-api' state on every mock fallback path so
-      // the operator can see the degradation at a glance.
-      var devMockAllowed = (typeof window !== 'undefined' && window.localStorage &&
+      // localStorage.hermestv_dev_mock='1'.
+      //
+      // HANDOFF blocker #9 (2026-05-21): the dev-mock escape hatch is now
+      // restricted to development builds (import.meta.env.DEV). In a Vite
+      // production build (`npm run build:web`) the flag is inert — the
+      // operator never gets a "looks ok in prod by accident" mode that
+      // hides a real outage. The Settings data-source badge still flips
+      // to a red 'no-api' state during dev mock fallback so the degradation
+      // is visible at a glance.
+      var IS_DEV_BUILD = false;
+      try {
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV === true) {
+          IS_DEV_BUILD = true;
+        }
+      } catch (_) { /* no import.meta — treat as production */ }
+      var devMockAllowed = IS_DEV_BUILD && (typeof window !== 'undefined' && window.localStorage &&
         window.localStorage.getItem('hermestv_dev_mock') === '1');
 
       if (!reachable && !devMockAllowed) {
@@ -1112,24 +1173,12 @@ function App() {
           api.getProviders(),
           api.getCatalog(),
         ]).then(function(results) {
-          var providers = results[0] || [];
+          var providerPayload = results[0] || [];
+          var providers = providerPayload && providerPayload.providers
+            ? providerPayload.providers
+            : (Array.isArray(providerPayload) ? providerPayload : []);
           var rawCatalog = results[1] || [];
-
-          // Support both array-of-items and catalog-wrapper formats
-          var catalog = Array.isArray(rawCatalog) ? rawCatalog : (rawCatalog.catalog || []);
-          var actors = rawCatalog.actors || [];
-          // X-Catalog-Source header (or _meta.source fallback) — honest data
-          // source signal for the Settings badge. Wave-17 removed every mock
-          // fallback path; when the API is offline we surface 'api-offline'
-          // (not a fake catalog) so DevTools shows reality.
-          var sourceHeader = rawCatalog._source_header || null;
-          var meta = rawCatalog._meta || {};
-          var metaSource = meta.source || null;
-          var catalogSource = isOnline ? (sourceHeader || metaSource || 'no-providers') : 'api-offline';
-          // m3u_providers + iptv_org_count + paid-panel status land on _meta
-          // when the API has those providers configured. Absent → null/0.
-          var m3uProviders = meta.m3u_providers || null;
-          var iptvOrgCount = (typeof meta.iptv_org_count === 'number') ? meta.iptv_org_count : 0;
+          var catalogPatch = catalogPatchFromRaw(rawCatalog, isOnline);
 
           // Restore per-profile Azure voice preference from localStorage
           // (set when the user last picked a voice in VoicePickerModal).
@@ -1140,16 +1189,16 @@ function App() {
             loading: false,
             profile: profile,
             providers: providers,
-            catalog: catalog,
-            actors: actors,
+            catalog: catalogPatch.catalog,
+            actors: catalogPatch.actors,
             tier: tier,
             tvModel: tvModel,
             online: isOnline,
             showProfilePicker: false,
-            catalogSource: catalogSource,
+            catalogSource: catalogPatch.catalogSource,
             activeVoiceId: persistedVoiceId || '',
-            m3uProviders: m3uProviders,
-            iptvOrgCount: iptvOrgCount,
+            m3uProviders: catalogPatch.m3uProviders,
+            iptvOrgCount: catalogPatch.iptvOrgCount,
           });
 
           // ── Boot greeting via Azure TTS (Azure-only path) ──────────────────
@@ -1299,7 +1348,7 @@ function App() {
     patchState({ selectedProviderId: providerId });
   }
 
-  function handlePlay(item, providerId) {
+  function handlePlay(item, providerId, opts) {
     // Gate first — anyone calling handlePlay outside MediaDetailPanel
     // (Multiview tile, future shell quick-play, etc.) is also protected.
     // When the user comes from MediaDetailPanel the item is already in
@@ -1307,17 +1356,19 @@ function App() {
     // false and we go straight through.
     if (parentalGate.isContentLocked(item)) {
       parentalGate.requestUnlock(item).then(function(res) {
-        if (res && res.ok) { _startPlayback(item, providerId); }
+        if (res && res.ok) { _startPlayback(item, providerId, opts); }
       });
       return;
     }
-    _startPlayback(item, providerId);
+    _startPlayback(item, providerId, opts);
   }
 
-  function _startPlayback(item, providerId) {
+  function _startPlayback(item, providerId, opts) {
     var profileId = (state.profile && state.profile.profile_id) || 'mom_tv';
     var args = { item_id: item.id, profile_id: profileId };
     if (providerId) { args.provider_id = providerId; }
+    if (opts && opts.episode_item_id) { args.episode_item_id = opts.episode_item_id; }
+    if (opts && opts.episode_id) { args.episode_id = opts.episode_id; }
     patchState({ showPlayer: true, playerTicket: null, playerError: '' });
     hermesApi.startPlayback(args).then(function(ticket) {
       patchState({ playerTicket: ticket, playerError: '' });
@@ -1331,14 +1382,11 @@ function App() {
     patchState({ showPlayer: false, playerTicket: null, playerError: '' });
   }
 
-  // ─── Download flow (Zero-shell 1-click ⤓) ─────────────────────────────────
-  // 1. User clicks ⤓ on a card or in the detail panel
-  // 2. POST /api/download → returns exact size envelope + job_id
-  // 3. Modal opens with "EXACT DOWNLOAD SIZE NNN MB" + Cancel/Proceed
-  // 4. Proceed flips downloadConfirmed → modal switches to "queued" view
-  // 5. Cancel DELETEs the queued job + closes the modal
-  // opts: optional { season, episode } for series downloads. season alone =
-  // "download whole season N"; season + episode = "download S{nn}E{nn}".
+  // ─── Download flow (future offline viewing) ───────────────────────────────
+  // The UI is gated by releaseFlags until a real server-side download worker
+  // exists. If a future call path reaches /api/download early, the API returns
+  // an honest 503 download_pipeline_not_available body with no fake job_id or
+  // exact-size fields.
   function handleStartDownload(item, opts) {
     if (!item || !item.id) { return; }
     // Same gate as handlePlay — protects future call sites that bypass
@@ -1384,17 +1432,14 @@ function App() {
   }
 
   function handleProceedDownload() {
-    // Backend already queued the job on POST /api/download; clicking Proceed is
-    // an explicit consent step. Flip the modal into its "queued" view.
+    // Only meaningful after the real download pipeline lands and returns a
+    // durable job envelope. Disabled-mode responses render as errors instead.
     patchState({ downloadConfirmed: true });
   }
 
   function handleCloseDownload() {
-    // If the user cancelled (downloadConfirmed=false but envelope present)
-    // we'd ideally call hermesApi.cancelDownload — but the in-memory job
-    // table self-trims old jobs, so leaving it is harmless and avoids a
-    // gratuitous round-trip when the user just dismisses. Cancel-as-explicit
-    // can come in a follow-up if the operator asks for it.
+    // In disabled mode there is no server job to cancel. After a real worker
+    // lands, explicit cancellation should call hermesApi.cancelDownload.
     patchState({
       showDownload: false,
       downloadItem: null,
@@ -2241,11 +2286,14 @@ function App() {
                   providers={state.providers}
                   onItemSelect={handleItemClick}
                   onItemFocus={handleItemFocus}
+                  onOpenDetail={handleOpenDetail}
                   focusedItem={state.focusedItem}
                   contentFilter={state.contentFilter}
                   providerFilter={state.providerFilter}
                   qualityFilter={state.qualityFilter}
                   onOpenSettings={function() { patchState({ showSettings: true }); }}
+                  onOpenEPG={function() { patchState({ showEPG: true }); }}
+                  onOpenSearch={function() { patchState({ showSearch: true }); }}
                 />
               </div>
             );
@@ -2314,15 +2362,11 @@ function App() {
               online={state.online}
               profile={profile}
               onCompleted={function() {
-                // Pairing handshake finished — refresh provider list so the
-                // newly-added entry shows up in ProviderFilter and chips.
-                var api = hermesApi;
-                api.getProviders().then(function(payload) {
-                  var list = payload && payload.providers
-                    ? payload.providers
-                    : (Array.isArray(payload) ? payload : []);
-                  patchState({ providers: list });
-                }).catch(function() { /* non-fatal; tick again on next user action */ });
+                // Pairing handshake finished — refresh providers AND catalog
+                // with cache bypass so the newly-added provider is selectable
+                // and its channels/movies appear immediately.
+                refreshProvidersAndCatalog({ keepSettingsOpen: false })
+                  .catch(function() { /* non-fatal; tick again on next user action */ });
               }}
             />
           )}
@@ -2361,7 +2405,7 @@ function App() {
             />
           )}
 
-          {/* Download modal — Zero-shell exact-size disclosure */}
+          {/* Download modal — future offline viewing, currently release-gated */}
           {state.showDownload && (
             <DownloadModal
               isOpen={state.showDownload}
@@ -2444,6 +2488,9 @@ function App() {
               onResetDefaults={handleResetDefaults}
               onReplayOnboarding={handleReplayOnboarding}
               onManageProfiles={handleManageProfiles}
+              onOpenAdminPanel={function() {
+                if (typeof window !== 'undefined') { window.location.href = '/?admin=1'; }
+              }}
               onThemeChange={function(themeName) {
                 applyThemeByName(themeName);
                 patchState({ profile: Object.assign({}, state.profile, { active_theme: themeName }) });
@@ -2470,18 +2517,21 @@ function App() {
             <PlaylistImportModal
               isOpen={state.showPlaylistImport}
               onClose={function() { patchState({ showPlaylistImport: false }); }}
-              onSaved={function() {
-                // Refresh provider list so the new playlist tag appears in
-                // ProviderFilter / FilterBar selects. We re-open Settings so
-                // the user sees the new entry in the Playlists tab list.
-                var api = hermesApi;
-                api.getProviders().then(function(payload) {
-                  var list = payload && payload.providers
-                    ? payload.providers
-                    : (Array.isArray(payload) ? payload : []);
-                  patchState({ providers: list, showPlaylistImport: false, showSettings: true });
-                }).catch(function() {
+              onSaved={function(saved) {
+                // Refresh provider list and catalog with cache-bypass proof.
+                // Closing only after this resolves prevents the previous
+                // "saved, but grid still old until reload" failure mode.
+                var persistedProviderId = saved && saved.persisted_provider_id;
+                var providerFilter = saved && saved.provider_id ? saved.provider_id : null;
+                return refreshProvidersAndCatalog({
+                  expectedProviderId: persistedProviderId,
+                  providerFilter: providerFilter,
+                  keepSettingsOpen: true,
+                }).then(function() {
                   patchState({ showPlaylistImport: false, showSettings: true });
+                }).catch(function() {
+                  patchState({ showPlaylistImport: true, showSettings: false });
+                  throw new Error('Provider save reached the API, but DaveTV could not refresh /api/providers and /api/catalog to prove it. Please do not re-enter credentials until this is fixed.');
                 });
               }}
             />

@@ -25,12 +25,8 @@ import CategorySidebar from '../components/CategorySidebar.jsx';
 //     current "Now" programme, and a play button. Falls back to a calm
 //     gradient and the chosen-name greeting copy when nothing is focused.
 //   - Bottom strip (50 px, `position: relative` — Tizen webview is unreliable
-//     with `position: fixed`): current-channel chip, transport controls
-//     (prev / pause / next / volume) and the external-player chooser:
-//     "🎬 mpv", "🔵 VLC", "📺 In-app". Only In-app is active; mpv/VLC show a
-//     tooltip explaining external player support is a v2 follow-up. Transport
-//     buttons console.log for now — wiring into the player surface is a
-//     follow-up task because it touches the playback layer outside the shell.
+//     with `position: fixed`): current-channel chip, working prev / play /
+//     next controls, and the active in-app player indicator.
 //
 // All copy is DaveTV branding — never reference "iptvnator" in user-visible
 // strings.
@@ -51,19 +47,13 @@ var COLOR_MUTED = '#8b949e';
 var COLOR_ACCENT = '#26a69a';
 var COLOR_ACCENT_DIM = 'rgba(38, 166, 154, 0.18)';
 
-// External player chooser modes. We keep all three visible because IPTV
-// power-users (Dave) recognise the affordance from desktop players. Only
-// in-app is functional today; mpv/VLC are a v2 follow-up. The labels carry
-// no third-party copy that would imply a partnership.
 var PLAYER_MODES = [
-  { id: 'mpv', icon: '🎬', label: 'mpv', external: true },
-  { id: 'vlc', icon: '🔵', label: 'VLC', external: true },
-  { id: 'inapp', icon: '📺', label: 'In-app', external: false },
+  { id: 'inapp', icon: '📺', label: 'In-app' },
 ];
 
 // ─── Sidebar inventory ───────────────────────────────────────────────────────
 // Top-level rail items. EPG and Settings link to the same surfaces the rest of
-// the app uses (today they're stubs the wider shell engine swaps in).
+// the app uses.
 function _buildRailSections(counts) {
   return [
     { id: 'playlists', icon: '☰', label: 'Playlists', count: counts.playlists },
@@ -85,24 +75,21 @@ function _isRadio(item) {
   return false;
 }
 
-// ─── Current programme — placeholder ─────────────────────────────────────────
-// /api/epg/grid integration lives in LiveTVShell. For this shell we keep the
-// "now" line deterministic so two renders show the same value (no flicker on
-// focus restore). When EPG is plumbed in we'll switch this to the real feed.
-function _placeholderNow(channel) {
-  if (!channel) { return ''; }
-  var seed = 0;
-  var key = channel.id || channel.title || 'x';
-  for (var i = 0; i < key.length; i++) { seed = (seed + key.charCodeAt(i)) | 0; }
-  if (seed < 0) { seed = -seed; }
-  var titles = [
-    'Now: Top of the Hour',
-    'Now: Headlines',
-    'Now: Feature Programme',
-    'Now: Local Update',
-    'Now: Late Edition',
-  ];
-  return titles[seed % titles.length];
+// ─── Current programme — honest empty when no EPG data ─────────────────────
+// HANDOFF blocker #10 (2026-05-21): removed `_placeholderNow` synthetic-title
+// generator (seeded 5-string array that looked real on every render). Now
+// programmes only show when /api/epg/grid returns real data for the channel;
+// otherwise the line is empty rather than a fabricated "Now: Headlines".
+//
+// Channels with no guide data render an empty programme line; the user can
+// still see the channel itself + the channel number. Replacing the seeded
+// fallback with REAL provider EPG aligns this shell with LiveTVShell's
+// honest empty-state contract.
+function _currentProgrammeText(channel, nowByChannelId) {
+  if (!channel || !nowByChannelId) { return ''; }
+  var key = channel.id;
+  if (!key) { return ''; }
+  return nowByChannelId[key] || nowByChannelId['live.' + key] || '';
 }
 
 function IptvnatorShell(props) {
@@ -111,6 +98,8 @@ function IptvnatorShell(props) {
   var tier = props.tier;
   var providers = props.providers;
   var onItemSelect = props.onItemSelect;
+  var onOpenEPG = props.onOpenEPG;
+  var onOpenSettings = props.onOpenSettings;
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
@@ -138,13 +127,56 @@ function IptvnatorShell(props) {
   var recentItems = recentState[0];
   var setRecentItems = recentState[1];
 
+  // EPG: { channel_id: "Now title" } map populated by /api/epg/grid. Empty
+  // string for any channel lookup that isn't in the map.
+  var epgState = React.useState({});
+  var nowByChannelId = epgState[0];
+  var setNowByChannelId = epgState[1];
+
+  // Fetch EPG once per profile + channel set change. Single request for the
+  // full window (3h ahead); filter to "now" per row in JS. Honest failure:
+  // on error or empty response, leave the map empty so the UI shows empty
+  // programme lines rather than synthetic titles.
+  React.useEffect(function() {
+    if (typeof fetch !== 'function') { return; }
+    var aborted = false;
+    var profileId = (profile && profile.id) || 'dave_tv';
+    var start = new Date();
+    start.setSeconds(0, 0);
+    var end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+    var url = '/api/epg/grid?profile_id=' + encodeURIComponent(profileId)
+      + '&start=' + encodeURIComponent(start.toISOString())
+      + '&end=' + encodeURIComponent(end.toISOString());
+    fetch(url)
+      .then(function(r) { if (!r || !r.ok) { throw new Error('epg-unavailable'); } return r.json(); })
+      .then(function(body) {
+        if (aborted) { return; }
+        var progs = (body && body.programs) || [];
+        var now = Date.now();
+        var map = {};
+        for (var i = 0; i < progs.length; i++) {
+          var p = progs[i];
+          if (!p || !p.channel_id) { continue; }
+          var s = Date.parse(p.start_utc);
+          var e = Date.parse(p.end_utc);
+          if (isNaN(s) || isNaN(e)) { continue; }
+          if (s <= now && now < e) {
+            // First match wins — programs are sorted by start_utc per
+            // /api/epg/grid contract, so "current" is the earliest matching.
+            if (!map[p.channel_id]) { map[p.channel_id] = p.title || ''; }
+          }
+        }
+        setNowByChannelId(map);
+      })
+      .catch(function() {
+        if (!aborted) { setNowByChannelId({}); }
+      });
+    return function() { aborted = true; };
+  }, [profile && profile.id, catalog && catalog.length]);
+
   var playerModeState = React.useState('inapp');
   var playerMode = playerModeState[0];
   var setPlayerMode = playerModeState[1];
-
-  var tooltipState = React.useState(null);
-  var tooltipPlayer = tooltipState[0];
-  var setTooltipPlayer = tooltipState[1];
 
   // Category quick-filter — chips render as a horizontal strip above the
   // channel list (existing left rail keeps its Playlists/Favorites/Recent
@@ -212,29 +244,77 @@ function IptvnatorShell(props) {
   };
   var rail = _buildRailSections(railCounts);
 
-  // ─── Player-mode click handler ─────────────────────────────────────────────
-  // Only "inapp" actually flips the mode. The other two surface a tooltip we
-  // auto-dismiss after 2.5s so the explanation doesn't linger.
   function _onPlayerMode(mode) {
     if (mode.id === 'inapp') {
       setPlayerMode('inapp');
-      setTooltipPlayer(null);
-      return;
     }
-    setTooltipPlayer(mode.id);
-    // Auto-dismiss
-    setTimeout(function() {
-      setTooltipPlayer(function(curr) { return curr === mode.id ? null : curr; });
-    }, 2500);
   }
 
-  // ─── Transport — stubs ─────────────────────────────────────────────────────
-  // Real wiring touches the playback surface (outside this shell). We log so
-  // future agents can grep for the integration point.
-  function _logTransport(action) {
-    try {
-      console.log('[IptvnatorShell] transport: ' + action + ' (stub — wire into player surface in follow-up)');
-    } catch (e) { /* ignore */ }
+  function _selectVisibleChannel(offset) {
+    if (!visibleChannels || visibleChannels.length === 0) { return; }
+    var currentIndex = 0;
+    if (focusedChannel) {
+      for (var i = 0; i < visibleChannels.length; i++) {
+        if (visibleChannels[i] && visibleChannels[i].id === focusedChannel.id) {
+          currentIndex = i;
+          break;
+        }
+      }
+    }
+    var nextIndex = currentIndex + offset;
+    if (nextIndex < 0) { nextIndex = visibleChannels.length - 1; }
+    if (nextIndex >= visibleChannels.length) { nextIndex = 0; }
+    var next = visibleChannels[nextIndex];
+    if (!next) { return; }
+    setFocusedChannel(next);
+    if (typeof onItemSelect === 'function') { onItemSelect(next); }
+  }
+
+  function _handleTransport(action) {
+    if (action === 'prev') { _selectVisibleChannel(-1); return; }
+    if (action === 'next') { _selectVisibleChannel(1); return; }
+    if (action === 'play' && focusedChannel && typeof onItemSelect === 'function') {
+      onItemSelect(focusedChannel);
+    }
+  }
+
+  function _activateRail(sectionId) {
+    if (sectionId === 'epg') {
+      if (typeof onOpenEPG === 'function') { onOpenEPG(); }
+      return;
+    }
+    if (sectionId === 'settings') {
+      if (typeof onOpenSettings === 'function') { onOpenSettings(); }
+      return;
+    }
+    setActiveRail(sectionId);
+  }
+
+  function _focusRail(index) {
+    var el = document.querySelector('[data-iptvnator-rail-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleRailKey(e, sectionId, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _activateRail(sectionId);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRail((index + 1) % rail.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRail((index + rail.length - 1) % rail.length);
+    }
   }
 
   var focusedTitle = focusedChannel ? (focusedChannel.title || 'Untitled') : '';
@@ -296,17 +376,17 @@ function IptvnatorShell(props) {
           </div>
         </div>
 
-        {rail.map(function(sec) {
+        {rail.map(function(sec, index) {
           var isActive = activeRail === sec.id;
           return (
             <button
               key={sec.id}
               tabIndex={0}
               data-focusable="true"
-              onClick={function() { setActiveRail(sec.id); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveRail(sec.id); }
-              }}
+              data-iptvnator-rail-index={index}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={function() { _activateRail(sec.id); }}
+              onKeyDown={function(e) { _handleRailKey(e, sec.id, index); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -439,6 +519,21 @@ function IptvnatorShell(props) {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {activeRail === 'favorites' && (
+          <div
+            style={{
+              padding: '0.4rem 0.85rem 0.85rem',
+              borderTop: '1px solid ' + COLOR_BORDER,
+              marginTop: '0.3rem',
+              fontSize: 'calc(0.7rem * var(--font-scale, 1))',
+              color: COLOR_MUTED,
+              lineHeight: 1.4,
+            }}
+          >
+            Favorites will appear here after this profile saves channels.
           </div>
         )}
       </aside>
@@ -618,8 +713,6 @@ function IptvnatorShell(props) {
                       height: '32px',
                       borderRadius: '4px',
                       background: posterBg(ch, idx),
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
                       flexShrink: 0,
                     }}
                   />
@@ -643,7 +736,7 @@ function IptvnatorShell(props) {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {_placeholderNow(ch)}
+                      {_currentProgrammeText(ch, nowByChannelId)}
                     </span>
                   </span>
                   <span
@@ -692,8 +785,6 @@ function IptvnatorShell(props) {
               style={{
                 aspectRatio: '16 / 9',
                 background: posterBg(focusedChannel, 0),
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
                 borderRadius: '8px',
                 border: '1px solid ' + COLOR_BORDER,
               }}
@@ -702,7 +793,7 @@ function IptvnatorShell(props) {
               {focusedTitle}
             </div>
             <div style={{ fontSize: 'calc(0.72rem * var(--font-scale, 1))', color: COLOR_MUTED }}>
-              {_placeholderNow(focusedChannel)}
+              {_currentProgrammeText(focusedChannel, nowByChannelId)}
             </div>
             <button
               tabIndex={0}
@@ -784,8 +875,6 @@ function IptvnatorShell(props) {
               height: '26px',
               borderRadius: '4px',
               background: focusedChannel ? posterBg(focusedChannel, 0) : COLOR_BG,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
               border: '1px solid ' + COLOR_BORDER,
               flexShrink: 0,
             }}
@@ -818,16 +907,15 @@ function IptvnatorShell(props) {
             { id: 'prev', label: 'Previous channel', glyph: '⏮' },
             { id: 'play', label: 'Play / pause', glyph: '⏯' },
             { id: 'next', label: 'Next channel', glyph: '⏭' },
-            { id: 'vol', label: 'Volume', glyph: '🔊' },
           ].map(function(btn) {
             return (
               <button
                 key={btn.id}
                 tabIndex={0}
                 aria-label={btn.label}
-                onClick={function() { _logTransport(btn.id); }}
+                onClick={function() { _handleTransport(btn.id); }}
                 onKeyDown={function(e) {
-                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _logTransport(btn.id); }
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _handleTransport(btn.id); }
                 }}
                 style={{
                   width: '34px',
@@ -866,7 +954,6 @@ function IptvnatorShell(props) {
         >
           {PLAYER_MODES.map(function(mode) {
             var isActive = playerMode === mode.id;
-            var isTooltipped = tooltipPlayer === mode.id;
             return (
               <div key={mode.id} style={{ position: 'relative' }}>
                 <button
@@ -885,7 +972,7 @@ function IptvnatorShell(props) {
                     background: isActive ? COLOR_ACCENT_DIM : 'transparent',
                     border: '1px solid ' + (isActive ? COLOR_ACCENT : COLOR_BORDER),
                     borderRadius: '6px',
-                    color: mode.external ? COLOR_MUTED : COLOR_TEXT,
+                    color: COLOR_TEXT,
                     cursor: 'pointer',
                     fontSize: 'calc(0.68rem * var(--font-scale, 1))',
                     fontWeight: 600,
@@ -897,28 +984,6 @@ function IptvnatorShell(props) {
                   <span aria-hidden="true">{mode.icon}</span>
                   <span>{mode.label}</span>
                 </button>
-                {isTooltipped && (
-                  <div
-                    role="tooltip"
-                    style={{
-                      position: 'absolute',
-                      bottom: 'calc(100% + 6px)',
-                      right: 0,
-                      width: '220px',
-                      padding: '0.5rem 0.6rem',
-                      background: COLOR_BG,
-                      border: '1px solid ' + COLOR_ACCENT,
-                      borderRadius: '6px',
-                      color: COLOR_TEXT,
-                      fontSize: 'calc(0.65rem * var(--font-scale, 1))',
-                      lineHeight: 1.4,
-                      boxShadow: '0 6px 18px rgba(0,0,0,0.4)',
-                      zIndex: 10,
-                    }}
-                  >
-                    External player support coming in v2.
-                  </div>
-                )}
               </div>
             );
           })}

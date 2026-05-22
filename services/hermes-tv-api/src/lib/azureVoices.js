@@ -50,8 +50,15 @@ let cache = null;          // { voices, cachedAt, source }
 let inFlight = null;       // dedup concurrent refreshes
 let refreshCount = 0;      // observability counter
 
+function azureSpeechConfig() {
+  const key = process.env.AZURE_TTS_KEY || process.env.AZURE_SPEECH_KEY || '';
+  const region = process.env.AZURE_TTS_REGION || process.env.AZURE_SPEECH_REGION || '';
+  return { key: key, region: region };
+}
+
 function azureConfigured() {
-  return !!(process.env.AZURE_TTS_KEY && process.env.AZURE_TTS_REGION);
+  const config = azureSpeechConfig();
+  return !!(config.key && config.region);
 }
 
 function nowMs() { return Date.now(); }
@@ -112,8 +119,9 @@ function fetchAzureCatalog() {
       cachedAt: nowMs(),
     });
   }
-  const region = process.env.AZURE_TTS_REGION;
-  const key = process.env.AZURE_TTS_KEY;
+  const config = azureSpeechConfig();
+  const region = config.region;
+  const key = config.key;
   const url = 'https://' + region + '.tts.speech.microsoft.com/cognitiveservices/voices/list';
 
   // 10s timeout via AbortController (Node 20+ has both fetch + AbortController globally)
@@ -281,5 +289,6 @@ module.exports = {
   refreshCache: refreshCache,
   isCurated: isCurated,
   getCacheStats: getCacheStats,
+  azureSpeechConfig: azureSpeechConfig,
   CURATED_VOICES: CURATED_VOICES,
 };

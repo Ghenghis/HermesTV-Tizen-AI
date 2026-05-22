@@ -14,7 +14,7 @@ test.describe('Multiview', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const dave = page.locator(profileSelector('Dave')).first();
     if (await dave.count()) await dave.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(/DaveTV/i).first()).toBeVisible({ timeout: 8000 });
   }
 
   test('Multi button opens Multiview and Escape closes it', async ({ page }) => {

@@ -72,6 +72,13 @@ function _safeRemove(key) {
   try { localStorage.removeItem(key); } catch (e) { /* silent */ }
 }
 
+function _profileIdFromProfile(profile) {
+  if (!profile || typeof profile !== 'object') { return null; }
+  if (typeof profile.id === 'string' && profile.id.length > 0) { return profile.id; }
+  if (typeof profile.profile_id === 'string' && profile.profile_id.length > 0) { return profile.profile_id; }
+  return null;
+}
+
 // ── Legacy voice-id slot (unchanged public API) ─────────────────────────────
 function getVoiceId(profileId) {
   var k = _legacyKey(profileId);
@@ -144,10 +151,11 @@ function _writeBlob(profileId, blob) {
 //   getVoicePrefs({ id: 'mom_tv', audio_feedback: true, preferred_voice_id: 'en-US-AriaNeural' })
 //   → { master_enabled: true, welcome_greeting_enabled: true, ..., voice_id: 'en-US-AriaNeural' }
 function getVoicePrefs(profile) {
-  if (!profile || typeof profile !== 'object' || typeof profile.id !== 'string') {
+  var profileId = _profileIdFromProfile(profile);
+  if (!profileId) {
     return Object.assign({}, PREFS_DEFAULTS, { master_enabled: false });
   }
-  var blob = _readBlob(profile.id);
+  var blob = _readBlob(profileId);
   // master_enabled: null in blob means "inherit from profile". `!!` collapses
   // missing / undefined audio_feedback to false (Dave's quiet default).
   var master = blob.master_enabled;
@@ -158,7 +166,7 @@ function getVoicePrefs(profile) {
   // profile's preferred_voice_id (server-side default), then to ''.
   var voiceId = blob.voice_id;
   if (typeof voiceId !== 'string' || voiceId.length === 0) {
-    voiceId = getVoiceId(profile.id) ||
+    voiceId = getVoiceId(profileId) ||
               (typeof profile.preferred_voice_id === 'string' ? profile.preferred_voice_id : '');
   }
   return {

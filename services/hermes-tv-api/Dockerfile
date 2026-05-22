@@ -30,8 +30,12 @@ ENV HERMES_UPSTREAM_CATALOG=/app-resources/apps-catalog.json
 # stack mounts hermestv-vps-settings-store here. Creating the dir at build
 # time makes local dev (no volume) also work — settingsStore.js creates it
 # again with mkdirSync(recursive) as a belt-and-suspenders measure.
-RUN mkdir -p /var/lib/hermestv && chown -R node:node /var/lib/hermestv
+RUN mkdir -p /var/lib/hermestv/providers /var/cache/iptv-org && chown -R node:node /var/lib/hermestv /var/cache/iptv-org
 ENV HERMES_SETTINGS_STORE=/var/lib/hermestv/settings.json
+ENV HERMES_PROVIDER_DATA_DIR=/var/lib/hermestv/providers
+ENV DAVETV_AUTH_STORE=/var/lib/hermestv/auth.json
+ENV IPTV_ORG_ENABLED=true
+ENV IPTV_ORG_CACHE_DIR=/var/cache/iptv-org
 ENV NODE_ENV=production
 # Phase 1.5: container defaults to 3011 (VPS port 3001 already bound by
 # Dave's next-server — see docs/20_VPS_PHASE_1_AUDIT_FINDINGS.md). Local dev

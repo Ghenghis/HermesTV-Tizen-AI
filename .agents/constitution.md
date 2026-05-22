@@ -56,8 +56,11 @@ not deploy without rollback and env preflight.
 
 ## 10. License-Safe Reference Use
 
-Reference IPTV apps may inform behavior, UX, and test contracts. Do not paste
-large source sections or import incompatible licensed code.
+Reference IPTV apps may inform behavior, UX, and test contracts. Dave accepts
+upstream license obligations for private DaveTV work, but agents must follow the
+actual license in each source tree. Source adoption requires a manifest entry,
+license attribution, and proof. If a license forbids modification or no license
+is present, use Pattern Only or Sandbox App mode instead of pasting source.
 
 ## 11. Release Definition
 

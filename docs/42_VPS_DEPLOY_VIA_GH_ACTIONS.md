@@ -44,22 +44,27 @@ ssh -o ConnectTimeout=10 operator@<vps-host> 'echo ok'
 If that prints `ok`, the same host/user/password values should work from the
 runner.
 
-### Required private VPS `.env`
+### Optional private VPS `.env`
 
-Before deploying the auth-gated DaveTV build, the private file
-`/home/operator/hermestv/.env` on the VPS must contain real values:
+The deploy can run when `/home/operator/hermestv/.env` is missing. In that
+case the compose/image defaults boot, the persistent `/var/lib/hermestv`
+auth/provider stores are reused, and the job prints a warning instead of
+blocking the deploy.
+
+For fully working family login, reset links, SMTP, and provider credentials,
+create `/home/operator/hermestv/.env` with real private values:
 
 ```env
 DAVETV_AUTH_REQUIRED=true
 DAVETV_AUTH_ENFORCE_API=true
 DAVETV_PUBLIC_APP_URL=https://tv.daveai.tech
 DAVETV_ADMIN_EMAIL=<Dave real email>
-DAVETV_ADMIN_PASSWORD=<Dave real initial password>
 ```
 
-The deploy workflow checks these keys before rebuilding. It prints only key
-names, never the values. If any are missing, deploy stops before the running
-site is changed.
+The deploy workflow prints only key names, never values. Missing optional keys
+produce warnings. A present `DAVETV_PUBLIC_APP_URL` must be exactly
+`https://tv.daveai.tech`; a different value still blocks deploy because reset
+links would point at the wrong place.
 
 ---
 
@@ -117,9 +122,10 @@ runner IPs; when the edge is reachable, the five probes above should report
 | Job stops in **Pre-seed known_hosts** with `Secret VPS_HOST is empty`. | `VPS_HOST` secret is unset. | Add the hostname/IP and re-run. |
 | Job stops in **SSH to VPS and redeploy** with `Permission denied`. | `VPS_USER`, `VPS_PASS`, host, or port is wrong. | Correct the repo secrets and confirm `ssh operator@<vps-host> 'echo ok'` from a workstation. |
 | SSH step hangs to timeout. | VPS firewall is dropping inbound from the GitHub runner IP. | Confirm port 22 (or the configured port) accepts global inbound. Hostinger panel → Firewall. |
-| SSH step reports `.env missing required DAVETV_*`. | Auth-gated build would lock the site because the private VPS env is incomplete. | SSH to the VPS and set the required keys in `/home/operator/hermestv/.env`, mode `0600`. |
+| SSH step warns that `.env` is missing. | The deploy is using compose/image defaults plus any existing persisted auth/provider data. | Continue if this is intentional. Add `/home/operator/hermestv/.env`, mode `0600`, when SMTP/OAuth/provider secrets are ready. |
+| SSH step reports `DAVETV_PUBLIC_APP_URL must be https://tv.daveai.tech`. | `.env` exists but reset/register links would point at the wrong host. | Fix only that private env value, then rerun deploy. |
 | `containers did not reach healthy within 60s`. | Bad build, missing env var, or the API/web image crashed on boot. | SSH manually and run `docker compose -p hermestv-vps logs --tail=200 hermes-tv-api hermes-web-tv`. |
-| Smoke probe reports `/api/auth/me` not configured. | Dave admin bootstrap env was missing or the auth store has no admin. | Set `DAVETV_ADMIN_EMAIL` and `DAVETV_ADMIN_PASSWORD`, then redeploy/restart before inviting users. |
+| Smoke probe reports `/api/auth/me` not configured. | The auth store has no admin and `DAVETV_ADMIN_EMAIL` is missing. | Set `DAVETV_ADMIN_EMAIL`, redeploy/restart, then use the reset-password flow to set Dave's password. |
 | Smoke probe reports `/api/providers` did not return 401. | Public API auth gate is not enabled. | Set `DAVETV_AUTH_ENFORCE_API=true` on the VPS. |
 
 The full container logs are not echoed into the job log (they would leak

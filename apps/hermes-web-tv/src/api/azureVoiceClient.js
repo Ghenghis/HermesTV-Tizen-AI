@@ -1,18 +1,9 @@
 'use strict';
 
 import * as voicePrefStore from '../store/voicePrefStore.js';
+import { resolveApiBase } from './apiBase.js';
 
-// Production (https://tv.daveai.tech, with hermestv.daveai.tech as an
-// additive alias) → same-origin (BASE_URL = '').
-// Local dev / LAN mirror → cross-origin to the workstation API on :3001.
-var BASE_URL = (function() {
-  if (typeof window === 'undefined') return '';
-  var h = window.location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:3001';
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return 'http://' + h + ':3001';
-  if (h === 'hermestv.local') return 'http://hermestv.local';
-  return '';
-})();
+var BASE_URL = resolveApiBase();
 
 var currentAudio = null;
 
@@ -37,7 +28,7 @@ function _skippedReason(intent) {
 }
 
 function listVoices() {
-  return fetch(BASE_URL + '/api/tts/voices', { method: 'GET', headers: { 'Accept': 'application/json' } })
+  return fetch(BASE_URL + '/api/tts/voices', { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } })
     .then(function(r) {
       if (!r.ok) throw new Error('Failed to load voices: HTTP ' + r.status);
       return r.json();
@@ -45,7 +36,7 @@ function listVoices() {
 }
 
 function getProfileVoice(profileId) {
-  return fetch(BASE_URL + '/api/tts/voice/' + encodeURIComponent(profileId), { method: 'GET' })
+  return fetch(BASE_URL + '/api/tts/voice/' + encodeURIComponent(profileId), { method: 'GET', credentials: 'include' })
     .then(function(r) {
       if (!r.ok) throw new Error('Failed to load profile voice: HTTP ' + r.status);
       return r.json();
@@ -55,6 +46,7 @@ function getProfileVoice(profileId) {
 function setProfileVoice(profileId, voiceId) {
   return fetch(BASE_URL + '/api/tts/voice/' + encodeURIComponent(profileId), {
     method: 'PATCH',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ voice_id: voiceId }),
   }).then(function(r) {
@@ -103,7 +95,7 @@ function speak(text, profileIdOrOpts, voiceIdLegacy) {
     // Options form.
     var opts = profileIdOrOpts;
     var profile = opts.profile || {};
-    profileId = profile.id;
+    profileId = profile.id || profile.profile_id;
     intent = opts.intent;
     if (!profileId) {
       return Promise.reject(new Error('text and profile_id are required'));
@@ -134,6 +126,7 @@ function speak(text, profileIdOrOpts, voiceIdLegacy) {
 
   return fetch(BASE_URL + '/api/tts/speak', {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
     body: JSON.stringify(payload),
   }).then(function(r) {

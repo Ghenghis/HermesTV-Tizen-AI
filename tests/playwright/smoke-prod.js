@@ -28,17 +28,17 @@ const BASE = 'https://tv.daveai.tech';
   await page.locator('button').filter({ hasText: /Sherri/i }).first().click();
   await page.waitForTimeout(2000);
 
-  console.log('=== 3. Header shows HermesTV brand + 🎨 Look button ===');
-  const brand = await page.locator('text=HermesTV').first().isVisible();
-  const lookBtn = await page.locator('button').filter({ hasText: /Look/i }).first().isVisible();
-  console.log('  brand visible:', brand, '— Look button:', lookBtn);
+  console.log('=== 3. Header shows DaveTV brand + View button ===');
+  const brand = await page.locator('text=DaveTV').first().isVisible();
+  const viewBtn = await page.locator('button').filter({ hasText: /View/i }).first().isVisible();
+  console.log('  brand visible:', brand, '- View button:', viewBtn);
 
   console.log('');
   console.log('=== 4. Open layout switcher modal ===');
-  await page.locator('button').filter({ hasText: /Look/i }).first().click();
+  await page.locator('button').filter({ hasText: /View/i }).first().click();
   await page.waitForTimeout(800);
-  const modalTitle = await page.locator('text=Choose Your Look').first().isVisible();
-  console.log('  "Choose Your Look" modal visible:', modalTitle);
+  const modalTitle = await page.locator('text=Choose Your View').first().isVisible();
+  console.log('  "Choose Your View" modal visible:', modalTitle);
 
   const layoutCount = await page.locator('button').filter({ hasText: /TiviMate|Netflix|Plex|Apple TV|Samsung|Mom Mode|Dave Power/i }).count();
   console.log('  layout buttons in modal:', layoutCount);
@@ -52,7 +52,7 @@ const BASE = 'https://tv.daveai.tech';
 
   console.log('');
   console.log('=== 6. Switch to Mom Mode ===');
-  await page.locator('button').filter({ hasText: /Look/i }).first().click();
+  await page.locator('button').filter({ hasText: /View/i }).first().click();
   await page.waitForTimeout(400);
   await page.locator('button', { hasText: 'Mom Mode' }).filter({ hasText: /Senior-friendly/i }).first().click();
   await page.waitForTimeout(1500);

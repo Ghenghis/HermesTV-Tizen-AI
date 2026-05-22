@@ -81,19 +81,15 @@ function _buildGroups(items) {
   return list;
 }
 
-// Cheap "now / next" derivation. Real EPG is stitched in by epg.js routes
-// downstream; this is just the fallback for shells that need to render
-// program text immediately. Items may carry `metadata.epg_now / epg_next`
-// from a hydrated provider; if not, we synthesise a placeholder so the
-// row still aligns visually.
+// Cheap "now / next" derivation. Items may carry provider EPG metadata;
+// otherwise the shell renders an honest no-guide state.
 function _nowProgram(item) {
   if (item && item.metadata) {
     if (item.metadata.epg_now) { return item.metadata.epg_now; }
     if (item.metadata.program) { return item.metadata.program; }
   }
-  if (isLive(item)) { return 'Live programming'; }
   if (item && item.title) { return item.title; }
-  return '—';
+  return 'No guide data';
 }
 function _nextProgram(item) {
   if (item && item.metadata && item.metadata.epg_next) { return item.metadata.epg_next; }
@@ -249,6 +245,71 @@ function ExtremeInfiniTVShell(props) {
   // glance how big the current scope is.
   var totalLabel = displayItems.length + (displayItems.length === 1 ? ' channel' : ' channels');
 
+  function _activateGroup(nextGroup) {
+    setGroup(nextGroup);
+    setFocused(null);
+    if (listScrollRef.current) {
+      try { listScrollRef.current.scrollTop = 0; } catch (_) {}
+    }
+  }
+
+  function _focusExtremeTab(index) {
+    var el = document.querySelector('[data-extreme-tab-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _focusExtremeGroup(index) {
+    var el = document.querySelector('[data-extreme-group-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleExtremeTabKey(e, tabId, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      setTab(tabId);
+      setGroup(null);
+      setFocused(null);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'Right') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusExtremeTab((index + 1) % TABS.length);
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'Left') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusExtremeTab((index + TABS.length - 1) % TABS.length);
+    }
+  }
+
+  function _handleExtremeGroupKey(e, nextGroup, index) {
+    var total = groups.length + 1;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _activateGroup(nextGroup);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusExtremeGroup((index + 1) % total);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusExtremeGroup((index + total - 1) % total);
+    }
+  }
+
   return (
     <div
       className="extreme-infinitv-shell"
@@ -314,21 +375,16 @@ function ExtremeInfiniTVShell(props) {
             height: '100%',
           }}
         >
-          {TABS.map(function(t) {
+          {TABS.map(function(t, index) {
             var isActive = tab === t.id;
             return (
               <button
                 key={t.id}
                 tabIndex={0}
                 aria-pressed={isActive}
-                onClick={function() { setTab(t.id); setFocused(null); }}
-                onKeyDown={function(e) {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setTab(t.id);
-                    setFocused(null);
-                  }
-                }}
+                data-extreme-tab-index={index}
+                onClick={function() { setTab(t.id); setGroup(null); setFocused(null); }}
+                onKeyDown={function(e) { _handleExtremeTabKey(e, t.id, index); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.35rem',
                   padding: '0.35rem 0.75rem',
@@ -419,12 +475,9 @@ function ExtremeInfiniTVShell(props) {
         <button
           tabIndex={0}
           aria-pressed={group === null}
-          onClick={function() { setGroup(null); setFocused(null); }}
-          onKeyDown={function(e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault(); setGroup(null); setFocused(null);
-            }
-          }}
+          data-extreme-group-index={0}
+          onClick={function() { _activateGroup(null); }}
+          onKeyDown={function(e) { _handleExtremeGroupKey(e, null, 0); }}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             width: '100%',
@@ -447,7 +500,7 @@ function ExtremeInfiniTVShell(props) {
           </span>
         </button>
 
-        {groups.map(function(g) {
+        {groups.map(function(g, index) {
           var isActive = group === g.id;
           var hasOnline = g.online > 0;
           return (
@@ -456,12 +509,9 @@ function ExtremeInfiniTVShell(props) {
               tabIndex={0}
               aria-pressed={isActive}
               data-focusable="true"
-              onClick={function() { setGroup(g.id); setFocused(null); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault(); setGroup(g.id); setFocused(null);
-                }
-              }}
+              data-extreme-group-index={index + 1}
+              onClick={function() { _activateGroup(g.id); }}
+              onKeyDown={function(e) { _handleExtremeGroupKey(e, g.id, index + 1); }}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%',

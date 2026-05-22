@@ -82,21 +82,10 @@ function _buildSidebarSections(catalog, momMode) {
       { id: 'all_live', icon: '📡', label: 'Live TV', count: counts.live, group: 'browse' },
       { id: 'all_movies', icon: '🎬', label: 'Movies', count: counts.movies, group: 'browse' },
       { id: 'all_series', icon: '📺', label: 'Series', count: counts.series, group: 'browse' },
-      { id: 'continue_watching', icon: '⟲', label: 'Continue Watching', count: 0, group: 'sync' },
     ];
   }
   return [
-    { id: 'favorite_movies', icon: '★', label: 'Favorite Movies', count: 0, group: 'pinned' },
-    { id: 'trakt', icon: '◉', label: 'Trakt', count: 0, group: 'sync', children: [
-      { id: 'trakt_watchlist', label: 'Watchlist', count: 0 },
-      { id: 'trakt_library', label: 'Library', count: 0 },
-      { id: 'trakt_history', label: 'History', count: 0 },
-      { id: 'trakt_continue', label: 'Continue', count: 0 },
-    ] },
-    { id: 'continue_watching', icon: '⟲', label: 'Continue Watching', count: 0, group: 'sync' },
-    { id: 'downloads', icon: '⤓', label: 'Downloads', count: 0, group: 'sync' },
     { id: 'all_movies', icon: '🎬', label: 'All movies', count: counts.movies, group: 'browse' },
-    { id: 'movies_new', icon: '✦', label: 'Movies-New Releases', count: counts.movies, group: 'browse' },
     { id: 'all_series', icon: '📺', label: 'All series', count: counts.series, group: 'browse' },
     { id: 'all_live', icon: '📡', label: 'Live TV', count: counts.live, group: 'browse' },
   ];
@@ -108,6 +97,7 @@ function ZeroShell(props) {
   var tier = props.tier;
   var providers = props.providers;
   var onItemSelect = props.onItemSelect;
+  var onOpenDetail = props.onOpenDetail;
   // onItemFocus + focusedItem drive the hero panel. We also keep an internal
   // fallback so the shell works correctly when used standalone (e.g. via
   // /layout/zero with no App.jsx orchestrator above it).
@@ -310,6 +300,51 @@ function ZeroShell(props) {
   var clockLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   var dateLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
+  function _tabForSidebar(sectionId) {
+    if (sectionId === 'all_live') { return 'live'; }
+    if (sectionId === 'all_movies' || sectionId === 'movies_new' || sectionId === 'favorite_movies') { return 'movies'; }
+    if (sectionId === 'all_series') { return 'series'; }
+    return '';
+  }
+
+  function _activateSidebarSection(sectionId) {
+    var nextTab = _tabForSidebar(sectionId);
+    if (!nextTab) { return; }
+    setActiveTab(nextTab);
+    setSearchInput('');
+    setSearch('');
+    if (gridScrollRef.current) {
+      try { gridScrollRef.current.scrollTop = 0; } catch (_) {}
+    }
+  }
+
+  function _focusZeroSidebar(index) {
+    var el = document.querySelector('[data-zero-sidebar-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleZeroSidebarKey(e, sectionId, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _activateSidebarSection(sectionId);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusZeroSidebar((index + 1) % sidebarSections.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusZeroSidebar((index + sidebarSections.length - 1) % sidebarSections.length);
+    }
+  }
+
   // Live channels list — fed to the ZeroChannelStrip when on the Live tab.
   var liveChannels = filtered.filter(function(i) { return isLive(i); });
   // Now/next placeholder — when the API surfaces EPG-window per channel
@@ -482,24 +517,36 @@ function ZeroShell(props) {
           >◧</button>
         </div>
 
-        {sidebarSections.map(function(sec) {
+        {sidebarSections.map(function(sec, index) {
+          var targetTab = _tabForSidebar(sec.id);
+          var isActive = !!targetTab && activeTab === targetTab;
           return (
             <button
               key={sec.id}
               tabIndex={0}
               data-focusable="true"
+              data-zero-sidebar-index={index}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={function() { _activateSidebarSection(sec.id); }}
+              onKeyDown={function(e) { _handleZeroSidebarKey(e, sec.id, index); }}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '0.55rem 0.85rem',
-                background: 'transparent', border: 'none', borderLeft: '3px solid transparent',
-                color: 'var(--text, #e6edf3)', cursor: 'pointer', textAlign: 'left',
+                background: isActive ? 'var(--surface-raised, #1c2128)' : 'transparent',
+                border: 'none',
+                borderLeft: '3px solid ' + (isActive ? 'var(--accent, #00d4ff)' : 'transparent'),
+                color: isActive ? 'var(--accent, #00d4ff)' : 'var(--text, #e6edf3)',
+                cursor: 'pointer', textAlign: 'left',
                 fontSize: 'calc(0.78rem * var(--font-scale, 1))',
                 outline: 'none',
               }}
               onFocus={function(e) { e.currentTarget.style.background = 'var(--surface-raised, #1c2128)'; e.currentTarget.style.borderLeftColor = 'var(--accent, #00d4ff)'; }}
-              onBlur={function(e) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderLeftColor = 'transparent'; }}
+              onBlur={function(e) {
+                e.currentTarget.style.background = isActive ? 'var(--surface-raised, #1c2128)' : 'transparent';
+                e.currentTarget.style.borderLeftColor = isActive ? 'var(--accent, #00d4ff)' : 'transparent';
+              }}
               onMouseEnter={function(e) { e.currentTarget.style.background = 'var(--surface-raised, #1c2128)'; }}
-              onMouseLeave={function(e) { e.currentTarget.style.background = 'transparent'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = isActive ? 'var(--surface-raised, #1c2128)' : 'transparent'; }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                 <span aria-hidden="true" style={{ color: 'var(--accent, #00d4ff)', fontSize: '14px', width: '16px', textAlign: 'center' }}>{sec.icon}</span>
@@ -611,7 +658,7 @@ function ZeroShell(props) {
           profile={profile}
           tier={tier}
           onPlay={function(item) { if (typeof onItemSelect === 'function') { onItemSelect(item); } }}
-          onMoreInfo={function(item) { if (typeof onItemSelect === 'function') { onItemSelect(item); } }}
+          onMoreInfo={function(item) { if (typeof onOpenDetail === 'function') { onOpenDetail(item); } }}
         />
 
         {/* Now/Next strip — only meaningful when the focused item is a live

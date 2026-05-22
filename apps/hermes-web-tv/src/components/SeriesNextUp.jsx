@@ -1,67 +1,35 @@
 import React from 'react';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SeriesNextUp — pinned "Next up" hero card rendered above the season list
-// inside SeriesEpisodesBlock.
-//
-// Picks the first unwatched episode for the series. Resolution rules:
-//   1. Walk seasons from newest → oldest. The first season that has *any*
-//      progress (a percent_complete > 0 anywhere) is considered "in flight".
-//   2. Inside that season, the next-up episode is the lowest-numbered
-//      episode whose percent_complete is either undefined or < 0.9 (90%).
-//   3. If no progress at all → pick S01E01 — that's the first-watch path.
-//
-// Watch history isn't wired yet (parallel agent owns watchHistoryStore.js);
-// when it lands, the `progressFor(seasonIdx, episodeIdx)` function is the
-// only place that needs to swap from "always returns null" to reading the
-// store. Until then the component renders the S01E01 first-watch CTA with
-// no progress bar.
-//
-// Tizen / Chrome 76 safe — no spread, no optional chaining, no nullish.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Heuristic: when watch history is unavailable, always recommend S01E01.
-// TODO: wire when watchHistoryStore lands — replace this with a function
-// that takes (seriesId, totalSeasons, episodeCountFn) and returns the
-// next-up { season, episode, percent_complete } record.
-function _computeNextUp(item, episodeCountFn) {
-  var meta = item.metadata || {};
-  var seasons = (typeof meta.seasons === 'number' && meta.seasons > 0) ? meta.seasons : 1;
-  // Default — series is fresh, kick the user off at S01E01.
-  return {
-    season: 1,
-    episode: 1,
-    is_first_watch: true,
-    percent_complete: 0,
-    totalSeasons: seasons,
-    totalEpisodesInSeason: episodeCountFn(1),
-  };
+function _episodeLabel(ep) {
+  var season = ep && ep.season ? ep.season : 1;
+  var episode = ep && ep.episode ? ep.episode : 1;
+  return 'S' + (season < 10 ? '0' + season : season) +
+    'E' + (episode < 10 ? '0' + episode : episode);
 }
 
 function SeriesNextUp(props) {
   var item = props.item || {};
-  var episodeCountFn = props.episodeCountFn || function() { return 10; };
+  var episodes = Array.isArray(props.episodes) ? props.episodes : [];
   var onPlay = props.onPlay;
-  // Static title list shared with SeriesEpisodesBlock — kept inline so the
-  // component is self-contained and the next-up label matches whatever
-  // synthetic title the episode list shows for the same (season, episode).
-  var SYNTH_TITLES = [
-    'Pilot', 'Metamorphosis', 'Hothead', 'X-Ray', 'Cool',
-    'Hourglass', 'Crossfire', 'Heartbeat', 'Threshold', 'Echoes',
-    'Pinpoint', 'Drift', 'Origins', 'Inversion', 'Daybreak',
-    'Frostline', 'Marathon', 'Crosswind', 'Sundown', 'Recalibrate',
-    'Quicksilver', 'Untethered', 'Compass', 'Wildfire', 'Anchor',
-  ];
+  if (episodes.length === 0) { return null; }
 
-  var nextUp = _computeNextUp(item, episodeCountFn);
-  var seq = (nextUp.season - 1) * 25 + (nextUp.episode - 1);
-  var epTitle = SYNTH_TITLES[seq % SYNTH_TITLES.length];
-  var label = 'S' + (nextUp.season < 10 ? '0' + nextUp.season : nextUp.season) +
-              'E' + (nextUp.episode < 10 ? '0' + nextUp.episode : nextUp.episode);
+  var nextUp = null;
+  for (var i = 0; i < episodes.length; i++) {
+    if (!episodes[i].viewed) { nextUp = episodes[i]; break; }
+  }
+  if (!nextUp) { nextUp = episodes[0]; }
+
+  var label = _episodeLabel(nextUp);
+  var title = nextUp.title || label;
 
   function handleClick() {
-    if (typeof onPlay !== 'function') { return; }
-    onPlay(item, null, { season: nextUp.season, episode: nextUp.episode });
+    if (typeof onPlay !== 'function' || !nextUp.play_item_id) { return; }
+    onPlay(item, null, {
+      episode_item_id: nextUp.play_item_id,
+      episode_id: nextUp.episode_id,
+      season: nextUp.season,
+      episode: nextUp.episode,
+    });
   }
 
   function handleKey(e) {
@@ -86,7 +54,6 @@ function SeriesNextUp(props) {
         overflow: 'hidden',
       }}
     >
-      {/* Soft darken overlay so the white text stays legible across all themes */}
       <div
         aria-hidden="true"
         style={{
@@ -108,7 +75,7 @@ function SeriesNextUp(props) {
             marginBottom: '0.2rem',
           }}
         >
-          {nextUp.is_first_watch ? 'Start with' : 'Next up'}
+          {nextUp.viewed ? 'Replay episode' : 'Next up'}
         </div>
         <div
           style={{
@@ -120,36 +87,15 @@ function SeriesNextUp(props) {
             whiteSpace: 'nowrap',
           }}
         >
-          {label} <span style={{ opacity: 0.85, fontWeight: 600 }}>· {epTitle}</span>
+          {label} <span style={{ opacity: 0.85, fontWeight: 600 }}>{title !== label ? '· ' + title : ''}</span>
         </div>
-        {nextUp.percent_complete > 0 && (
-          <div
-            aria-label={'Resume at ' + Math.round(nextUp.percent_complete * 100) + ' percent'}
-            style={{
-              marginTop: '0.45rem',
-              height: '4px',
-              width: '100%',
-              background: 'rgba(255,255,255,0.22)',
-              borderRadius: '2px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: Math.round(nextUp.percent_complete * 100) + '%',
-                height: '100%',
-                background: '#ffffff',
-                transition: 'width 240ms var(--ease-out, ease)',
-              }}
-            />
-          </div>
-        )}
       </div>
       <button
         tabIndex={0}
-        aria-label={(nextUp.percent_complete > 0 ? 'Resume ' : 'Play ') + label}
+        aria-label={'Play ' + label}
         onClick={handleClick}
         onKeyDown={handleKey}
+        disabled={!nextUp.play_item_id}
         style={{
           position: 'relative',
           padding: '0.5rem 1.1rem',
@@ -159,25 +105,26 @@ function SeriesNextUp(props) {
           borderRadius: 'var(--radius-pill, 9999px)',
           fontWeight: 800,
           fontSize: 'calc(0.78rem * var(--font-scale, 1))',
-          cursor: 'pointer',
+          cursor: nextUp.play_item_id ? 'pointer' : 'not-allowed',
           outline: 'none',
           flexShrink: 0,
           letterSpacing: '0.04em',
+          opacity: nextUp.play_item_id ? 1 : 0.55,
           transition: 'transform 160ms var(--ease-out, ease)',
         }}
         onFocus={function(e) {
           e.currentTarget.style.outline = '2px solid #ffffff';
           e.currentTarget.style.outlineOffset = '3px';
-          e.currentTarget.style.transform = 'scale(1.04)';
+          if (nextUp.play_item_id) { e.currentTarget.style.transform = 'scale(1.04)'; }
         }}
         onBlur={function(e) {
           e.currentTarget.style.outline = 'none';
           e.currentTarget.style.transform = 'scale(1)';
         }}
-        onMouseEnter={function(e) { e.currentTarget.style.transform = 'scale(1.04)'; }}
+        onMouseEnter={function(e) { if (nextUp.play_item_id) { e.currentTarget.style.transform = 'scale(1.04)'; } }}
         onMouseLeave={function(e) { e.currentTarget.style.transform = 'scale(1)'; }}
       >
-        <span aria-hidden="true">▶</span> {nextUp.percent_complete > 0 ? 'Resume' : 'Play'}
+        <span aria-hidden="true">▶</span> Play
       </button>
     </div>
   );

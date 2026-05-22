@@ -1,0 +1,41 @@
+{
+  "ticket": "<redacted>",
+  "item": {
+    "id": "m3u-xtremehd-usa-amc-0",
+    "title": "USA AMC",
+    "type": "live",
+    "episode_item_id": null,
+    "resolution": "720p",
+    "hdr_format": null,
+    "category": "general"
+  },
+  "provider": {
+    "provider_id": "xtremehd",
+    "display_name": "xTremeHD",
+    "source_health": {
+      "status": "ok",
+      "latency_ms": null,
+      "checked_utc": null
+    }
+  },
+  "sources": [
+    {
+      "index": 0,
+      "provider_id": "xtremehd",
+      "label": "xTremeHD",
+      "resolution": "720p",
+      "source_health": {
+        "status": "ok",
+        "latency_ms": null,
+        "checked_utc": null
+      },
+      "is_seed_placeholder": false
+    }
+  ],
+  "profile_id": "dave_tv",
+  "issued_at": "2026-05-22T09:10:44.798Z",
+  "expires_at": "2026-05-22T09:15:44.798Z",
+  "stream_endpoint": "/api/play/play-mpgp95j.../stream",
+  "sources_endpoint": "/api/play/play-mpgp95j2-e9xf95t8/sources",
+  "_note": "Stream URL is never returned to client. Call stream_endpoint to begin playback."
+}

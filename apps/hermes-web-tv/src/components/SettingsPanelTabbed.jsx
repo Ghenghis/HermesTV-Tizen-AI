@@ -260,6 +260,7 @@ function SettingsPanelTabbed(props) {
   // and opens the full ProfileManagementModal (add / edit / delete + picker
   // settings).
   var onManageProfiles = props.onManageProfiles;
+  var onOpenAdminPanel = props.onOpenAdminPanel;
   var onThemeChange = props.onThemeChange;
   // onOpenPlaylistImport — fires when the user clicks the new "Import
   // playlist" button on the Playlists tab. App.jsx hosts the modal so the
@@ -416,6 +417,15 @@ function SettingsPanelTabbed(props) {
                 onFocus={zeroButtonFocus}
                 onBlur={zeroButtonBlur}
               >👥 Manage profiles</button>
+            ) : null}
+            {onOpenAdminPanel ? (
+              <button
+                tabIndex={0}
+                onClick={onOpenAdminPanel}
+                style={zeroButtonStyle('outline')}
+                onFocus={zeroButtonFocus}
+                onBlur={zeroButtonBlur}
+              >🔐 Manage family access</button>
             ) : null}
           </div>
         </_Card>

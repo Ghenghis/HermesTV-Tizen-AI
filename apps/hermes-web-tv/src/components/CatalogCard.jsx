@@ -136,9 +136,17 @@ function CatalogCard(props) {
   //
   // Reject picsum.photos URLs — pre-wave-9 the seed catalog shipped random
   // nature photos under those URLs labelled with channel names, which read
-  // as broken art. Null-out picsum so the channelArt placeholder fires.
+  // as broken art. Also reject the old transparent-pixel fallback that made
+  // live cards render as black empty boxes. Null them so channelArt fires.
+  function _transparentPixel(u) {
+    return typeof u === 'string'
+      && u.indexOf('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB') === 0;
+  }
   function _realArt(u) {
-    return typeof u === 'string' && u.length > 0 && u.indexOf('picsum.photos') === -1;
+    return typeof u === 'string'
+      && u.length > 0
+      && u.indexOf('picsum.photos') === -1
+      && !_transparentPixel(u);
   }
   function _pick() {
     for (var i = 0; i < arguments.length; i++) {
@@ -156,6 +164,11 @@ function CatalogCard(props) {
       ? _pick(item.poster_url, item.thumbnail_url, item.logo_url)
       : _pick(item.thumbnail_url, item.poster_url, item.logo_url);
   }
+
+  var failedPosterState = React.useState('');
+  var failedPosterSrc = failedPosterState[0];
+  var setFailedPosterSrc = failedPosterState[1];
+  var activePosterUrl = posterUrl && failedPosterSrc !== posterUrl ? posterUrl : null;
 
   // Resolve the channelArt placeholder once so the empty-poster branch and
   // the focus ring share a stable gradient. Two-letter initials over a
@@ -235,20 +248,21 @@ function CatalogCard(props) {
           // tile reads as branded (matching initials overlay below) rather
           // than a dark void. The neutral grey gradient is only used when
           // an <img> covers the slot.
-          background: posterUrl
+          background: activePosterUrl
             ? 'linear-gradient(135deg, #1f2430, #11151c)'
             : 'linear-gradient(135deg,' + art.gradient[0] + ',' + art.gradient[1] + ')',
           overflow: 'hidden',
           flexShrink: 0,
         }}
       >
-        {posterUrl ? (
+        {activePosterUrl ? (
           <img
-            src={posterUrl}
+            src={activePosterUrl}
             alt=""
             aria-hidden="true"
             loading="lazy"
             decoding="async"
+            onError={function() { setFailedPosterSrc(activePosterUrl); }}
             style={{
               position: 'absolute',
               inset: 0,

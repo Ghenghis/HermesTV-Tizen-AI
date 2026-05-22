@@ -33,6 +33,8 @@
  * uniformity and to keep grep audits clean.)
  */
 
+var profileIds = require('./profileIds');
+
 // ---------------------------------------------------------------------------
 // Credential scrubbing — outbound side.
 // We replicate (rather than import) the patterns from middleware/credentialGuard
@@ -230,7 +232,7 @@ async function tryParse(command_text, profile_id) {
   }
   var endpoint = baseUrl + '/chat/completions';
 
-  var safeProfile = (profile_id === 'dave_tv' || profile_id === 'mom_tv') ? profile_id : 'dave_tv';
+  var safeProfile = profileIds.isValidProfileId(profile_id) ? profileIds.normaliseProfileId(profile_id) : 'dave_tv';
   var safeText = scrubOutbound(command_text);
 
   if (safeText.length === 0) return null;

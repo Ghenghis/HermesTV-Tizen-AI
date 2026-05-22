@@ -24,10 +24,9 @@ var iptvOrg = require('../lib/iptvOrg');
 var m3uClient = require('../lib/m3uClient');
 var xtreamClient = require('../lib/xtreamClient');
 var catalogMerge = require('../lib/catalogMerge');
+var profileIds = require('../lib/profileIds');
 
 var router = express.Router();
-
-var VALID_PROFILES = ['dave_tv', 'mom_tv'];
 
 // Pull live channels from the same real provider/catalog adapters that
 // /api/catalog uses. Never throws. Returns an array in /api/channels shape
@@ -128,11 +127,11 @@ function _toChannelShape(item) {
     epg_status: (item.metadata && item.metadata.has_catchup) ? 'matched' : 'unknown',
     category: item.category || 'unknown',
     resolution: (item.metadata && item.metadata.resolution) || item.quality || null,
-    profile_access: Array.isArray(item.profile_access) ? item.profile_access : ['dave_tv', 'mom_tv'],
+    profile_access: Array.isArray(item.profile_access) ? item.profile_access : null,
   };
 }
 
-// ── GET /api/channels?profile_id=dave_tv|mom_tv ───────────────────────────────
+// ── GET /api/channels?profile_id=<safe profile id> ───────────────────────────
 router.get('/', async function(req, res) {
   var profile_id = req.query.profile_id;
 
@@ -142,16 +141,16 @@ router.get('/', async function(req, res) {
       message: 'profile_id query parameter is required',
     });
   }
-  if (VALID_PROFILES.indexOf(profile_id) === -1) {
+  if (!profileIds.isValidProfileId(profile_id)) {
     return res.status(400).json({
       error: 'validation_failed',
-      message: 'profile_id must be one of: ' + VALID_PROFILES.join(', '),
+      message: profileIds.profileValidationMessage(),
     });
   }
 
   var channels = await _collectLiveChannels();
   var visible = channels.filter(function(ch) {
-    return !ch.profile_access || ch.profile_access.indexOf(profile_id) !== -1;
+    return profileIds.itemVisibleToProfile(ch, profile_id);
   });
 
   return res.status(200).json({

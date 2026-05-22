@@ -14,7 +14,7 @@
  *   - Name sanitiser strips <, >, and the literal `script` token
  *   - M3U parser handles real-world EXTINF + URL pairs
  *   - Empty / oversize inputs are rejected with explicit errors
- *   - Xtream / Stalker stubs return 501 not_implemented
+ *   - Parser/validation helpers stay deterministic without live providers
  *
  * Exits non-zero on any failure so `npm test` and CI gates can wire in.
  */

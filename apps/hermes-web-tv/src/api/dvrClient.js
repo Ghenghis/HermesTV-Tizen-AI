@@ -1,4 +1,5 @@
 // api/dvrClient.js — Frontend client for the /api/dvr/* routes.
+import { resolveApiBase } from './apiBase.js';
 //
 // Mirrors the BASE_URL auto-detect logic in api/hermesApi.js so the same
 // three deployment shapes (local Vite dev, LAN mirror via 192.168.x.x,
@@ -19,14 +20,7 @@
 // `.status`, `.code`, and `.body` set when the server replied with a
 // JSON envelope so the modal can render an actionable message.
 
-var BASE_URL = (function() {
-  if (typeof window === 'undefined') { return ''; }
-  var h = window.location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1') { return 'http://localhost:3001'; }
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) { return 'http://' + h + ':3001'; }
-  if (h === 'hermestv.local') { return 'http://hermestv.local'; }
-  return '';
-})();
+var BASE_URL = resolveApiBase();
 
 var DEFAULT_TIMEOUT_MS = 10000;
 

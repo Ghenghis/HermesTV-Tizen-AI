@@ -293,6 +293,7 @@ router.post('/api/pair/:code/complete', function(req, res) {
   var cfg = body.provider_config;
   return providerStore.add({
     type: cfg.type,
+    provider_id: cfg.provider_id,
     label: cfg.label || cfg.type,
     url: cfg.url,
     username: cfg.username,

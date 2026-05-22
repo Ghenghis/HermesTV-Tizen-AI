@@ -1,20 +1,18 @@
 import { test, expect } from '@playwright/test';
 import { collectConsoleErrors } from '../helpers/console';
+import { openDaveProofApp } from '../helpers/proof';
 
-// J8: SettingsPanelTabbed — gear opens the panel, each of the 11 tabs from
+// J8: SettingsPanelTabbed — gear opens the panel, each tab from
 // TABS[] in SettingsPanelTabbed.jsx renders content, Esc closes the modal.
 
 const TABS = [
-  'Playlists', 'General', 'Appearance', 'Features', 'Network',
-  'Playback', 'Parental', 'Backup', 'Hotkeys', 'Diagnostics', 'About',
+  'Playlists', 'General', 'Providers', 'Appearance', 'Features', 'Network',
+  'Playback', 'Parental', 'Backup', 'Hotkeys', 'Diagnostics', 'About', 'Voice',
 ];
 
 test.describe('Settings tabbed panel', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    const tile = page.locator('button[aria-label*="profile"]').first();
-    if (await tile.count()) await tile.click();
-    await expect(page.getByText(/HermesTV/i).first()).toBeVisible({ timeout: 8000 });
+    await openDaveProofApp(page);
   });
 
   test('gear opens panel, every tab renders, Esc closes', async ({ page }) => {
@@ -30,7 +28,7 @@ test.describe('Settings tabbed panel', () => {
     const tabpanel = dialog.locator('div[role="tabpanel"]');
 
     for (const label of TABS) {
-      const tab = dialog.locator(`button[role="tab"]`, { hasText: new RegExp(`^${label}$`) }).first();
+      const tab = dialog.getByRole('tab', { name: label, exact: true });
       await expect(tab, `tab "${label}" should exist`).toBeVisible();
       await tab.click();
       await expect(tab).toHaveAttribute('aria-selected', 'true');

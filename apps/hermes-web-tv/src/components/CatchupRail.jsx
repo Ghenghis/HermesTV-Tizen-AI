@@ -22,8 +22,16 @@
 
 import React from 'react';
 import { capForProfile } from '../utils/isSystemLimited.js';
+import { isCatchupEnabled } from '../store/releaseFlags.js';
 
 function CatchupRail(props) {
+  // HANDOFF #2 gate. Catch-up playback returns 501 from /api/catchup/play
+  // until the timeshift pipeline ships, and /api/catchup/:channelId is an
+  // empty `programs: []` array. Rendering the rail header + skeleton in
+  // that state is dishonest — the user thinks something is loading when
+  // there is nothing to load. Early-return null so the shell composes
+  // honestly (no rail at all).
+  if (!isCatchupEnabled()) { return null; }
   var profile = props.profile;
   var channels = Array.isArray(props.channels) ? props.channels : [];
   var onItemSelect = props.onItemSelect;

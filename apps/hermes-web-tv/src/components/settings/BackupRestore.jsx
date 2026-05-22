@@ -1,5 +1,6 @@
 import React from 'react';
 import * as settingsStore from '../../store/settingsStore.js';
+import { resolveApiBase } from '../../api/apiBase.js';
 import {
   CARD_STYLE, CARD_HEADER_STYLE, CARD_TAGLINE_STYLE,
   BUTTON_STYLE,
@@ -36,16 +37,7 @@ function _filenameFor(profileId) {
   return 'hermestv-backup-' + pid + '-' + stamp + '.json';
 }
 
-function _apiBase() {
-  // Mirrors hermesApi.js's host detection so the import POST hits the
-  // same backend the rest of the app uses.
-  if (typeof window === 'undefined') { return ''; }
-  var h = window.location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1') { return 'http://localhost:3001'; }
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) { return 'http://' + h + ':3001'; }
-  if (h === 'hermestv.local') { return 'http://hermestv.local'; }
-  return '';
-}
+function _apiBase() { return resolveApiBase(); }
 
 function BackupRestore(props) {
   var profileId = (props.profile && (props.profile.profile_id || props.profile.id)) || 'hermestv';

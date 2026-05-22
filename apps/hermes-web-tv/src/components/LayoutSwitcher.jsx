@@ -172,7 +172,8 @@ function LayoutSwitcher(props) {
   // targets. Sherri's TV always satisfies either condition (see
   // user_profiles_sherri_dave) so she gets the larger touch surface.
   var isMomMode = (profile && profile.mom_mode) || fontScale >= 1.4;
-  var gridColumns = isMomMode ? '1fr' : 'repeat(auto-fill, minmax(180px, 1fr))';
+  var categoryColumns = isMomMode ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))';
+  var gridColumns = '1fr';
   var cardPadding = isMomMode ? '20px 20px' : '14px 16px';
   // Touch-target floor: Sherri sometimes uses the TV as a tablet, so each
   // layout tile must be at least 64×64 (WCAG 2.5.5 target-size + the
@@ -200,9 +201,9 @@ function LayoutSwitcher(props) {
       <div
         className="hermes-modal-panel"
         style={{
-          width: '100%',
-          maxWidth: '660px',
-          maxHeight: '82vh',
+          width: 'calc(100vw - 64px)',
+          maxWidth: '1500px',
+          maxHeight: '88vh',
           background: '#15151d',
           border: '1px solid #2a2b3a',
           borderRadius: '20px',
@@ -247,12 +248,13 @@ function LayoutSwitcher(props) {
         </div>
 
         {/* Layout groups */}
-        <div style={{ overflowY: 'auto', padding: '16px 24px 8px' }}>
+        <div style={{ overflowY: 'auto', padding: '22px 32px 14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: categoryColumns, gap: '18px', alignItems: 'start' }}>
           {CAT_ORDER.map(function(cat) {
             var items = groups[cat];
             if (!items || items.length === 0) return null;
             return (
-              <div key={cat} style={{ marginBottom: '20px' }}>
+              <div key={cat} style={{ marginBottom: 0 }}>
                 <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', fontWeight: 700, color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>{cat}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: '10px' }}>
                   {items.map(function(layout) {
@@ -267,6 +269,7 @@ function LayoutSwitcher(props) {
                     return (
                       <button
                         key={layout.id}
+                        data-layout-id={layout.id}
                         tabIndex={isDisabled ? -1 : 0}
                         onClick={function() {
                           if (!isDisabled) {
@@ -360,9 +363,10 @@ function LayoutSwitcher(props) {
           })}
 
           {/* Default grid option */}
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: 0 }}>
             <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', fontWeight: 700, color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>Default</div>
             <button
+              data-layout-id="grid-standard"
               tabIndex={0}
               onClick={function() { if (onSelect) onSelect(''); }}
               onKeyDown={function(e) {
@@ -413,6 +417,7 @@ function LayoutSwitcher(props) {
               </div>
               <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#8a8f9b' }}>Classic catalog grid view — works on all devices</div>
             </button>
+          </div>
           </div>
         </div>
 

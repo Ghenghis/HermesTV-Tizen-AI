@@ -1,0 +1,47 @@
+{
+  "total": 580,
+  "_meta": {
+    "sorted_for_profile": null,
+    "quality_preference": null,
+    "provider_filter": null,
+    "provider_filters": [],
+    "source": "providers",
+    "iptv_org_count": 0,
+    "m3u_count": 600,
+    "m3u_providers": {
+      "apollo_group": {
+        "configured": true,
+        "label": "Apollo Group",
+        "count": 0,
+        "error": "fetch failed",
+        "age_ms": 3502,
+        "registry_id": "env-apollo_group",
+        "source": "env"
+      },
+      "xtremehd": {
+        "configured": true,
+        "label": "xTremeHD",
+        "count": 604,
+        "error": null,
+        "age_ms": 1,
+        "registry_id": "env-xtremehd",
+        "source": "env"
+      }
+    },
+    "xtream_count": 0,
+    "xtream_status": {
+      "configured": false,
+      "label": "Xtream Codes",
+      "count": 0,
+      "live_count": 0,
+      "vod_count": 0,
+      "series_count": 0,
+      "error": null,
+      "age_ms": null,
+      "panel_count": 0
+    },
+    "merged_duplicates": 20,
+    "hidden_dropped": 0,
+    "hidden_providers": []
+  }
+}

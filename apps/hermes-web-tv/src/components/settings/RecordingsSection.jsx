@@ -1,6 +1,7 @@
 import React from 'react';
 import { getSettings, patchSettings } from '../../api/dvrClient.js';
 import RecordingsListModal from '../RecordingsListModal.jsx';
+import { isDvrEnabled } from '../../store/releaseFlags.js';
 import {
   CARD_STYLE, CARD_HEADER_STYLE, CARD_TAGLINE_STYLE,
   LABEL_STYLE, INPUT_STYLE, BUTTON_STYLE,
@@ -114,6 +115,25 @@ function RecordingsSection(props) {
     var n = parseInt(raw, 10);
     if (isNaN(n)) { return fallback; }
     return Math.max(min, Math.min(max, n));
+  }
+
+  // HANDOFF #2 gate. /api/dvr/schedule freezes status at 'scheduled' and
+  // /api/dvr/recordings never advances rows to 'recording' or 'complete'
+  // until the muxer ships. Until then this card renders only an honest
+  // notice — no "View all recordings" entry point, no settings form
+  // (saving knobs for a pipeline that doesn't write bytes is theatre).
+  if (!isDvrEnabled()) {
+    return (
+      <div style={CARD_STYLE}>
+        <div style={CARD_HEADER_STYLE}>Recordings (DVR)</div>
+        <div style={CARD_TAGLINE_STYLE}>
+          Recording isn't live yet. The on-disk muxer that captures
+          live streams to your library lands in a future release.
+          Until then this surface is intentionally inert — no fake
+          scheduling, no recordings that will never start.
+        </div>
+      </div>
+    );
   }
 
   return (

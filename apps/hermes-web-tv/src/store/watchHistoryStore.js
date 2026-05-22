@@ -75,7 +75,8 @@ function _safeId(profileId, itemId) {
 }
 
 function _clampPercent(pos, dur) {
-  if (typeof dur !== 'number' || dur <= 0) { return 0; }
+  if (typeof pos !== 'number' || !isFinite(pos)) { return 0; }
+  if (typeof dur !== 'number' || !isFinite(dur) || dur <= 0) { return 0; }
   var pct = (pos / dur) * 100;
   if (pct < 0) { return 0; }
   if (pct > 100) { return 100; }
@@ -86,8 +87,8 @@ function recordWatch(profileId, item, positionSec, durationSec) {
   if (!profileId || !item || !item.id) {
     return Promise.resolve(null);
   }
-  var pos = typeof positionSec === 'number' && positionSec >= 0 ? positionSec : 0;
-  var dur = typeof durationSec === 'number' && durationSec >= 0 ? durationSec : 0;
+  var pos = typeof positionSec === 'number' && isFinite(positionSec) && positionSec >= 0 ? positionSec : 0;
+  var dur = typeof durationSec === 'number' && isFinite(durationSec) && durationSec >= 0 ? durationSec : 0;
   var record = {
     id: _safeId(profileId, item.id),
     profile_id: profileId,

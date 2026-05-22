@@ -122,6 +122,13 @@ function _isUriTag(line) {
   return false;
 }
 
+function _looksLikePlaylistResource(url, contentType) {
+  var ct = String(contentType || '').toLowerCase();
+  if (ct.indexOf('mpegurl') !== -1 || ct.indexOf('vnd.apple.mpegurl') !== -1) { return true; }
+  var u = String(url || '').toLowerCase();
+  return /\.m3u8?($|[?#])/.test(u);
+}
+
 /**
  * Fetch the upstream HLS playlist with credentials (server-side only),
  * then rewrite every segment URL + every URI attribute to point at the
@@ -149,14 +156,11 @@ function proxyPlaylist(opts) {
   }
 
   var ctrl = new AbortController();
-  // 8 s upstream timeout — tighter than the previous 15 s so Cloudflare's
-  // 100 s edge timeout never fires. Live measurement on 2026-05-20 showed
-  // xTremeHD per-channel playlists timing out at 15 s and Cloudflare
-  // returning 504 to the client. The new 8 s caps it so the user sees our
-  // 502 with a helpful message instead of a Cloudflare error page, and
-  // the auto-fallback added in wave-13 (sources[] walker) can pick the
-  // next provider quickly.
-  var timer = setTimeout(function() { ctrl.abort(); }, 8000);
+  // 4.5 s upstream timeout — playback must fail fast instead of leaving a
+  // black player on dead feeds. Working providers usually return the HLS
+  // manifest in well under a second; slow/dead sources are skipped so the
+  // source walker can try the next provider quickly.
+  var timer = setTimeout(function() { ctrl.abort(); }, 4500);
 
   return fetchImpl(upstreamUrl, {
     method: 'GET',
@@ -273,9 +277,10 @@ function streamSegment(opts) {
     'User-Agent': 'DaveTV/1.0 (+https://daveai.tech) hls-proxy',
     'Accept': '*/*'
   };
-  // Forward Range header so the client can seek within VOD-ish HLS
-  // segments + master playlist byte-ranges.
-  if (req && req.headers && req.headers.range) {
+  // Forward Range header for media bytes, but never for playlist-looking
+  // URLs. Some upstreams answer ranged .m3u8 requests with 206 Partial
+  // Content, which makes hls.js treat the rewritten playlist as incomplete.
+  if (req && req.headers && req.headers.range && !_looksLikePlaylistResource(upstream, '')) {
     headers.Range = req.headers.range;
   }
 
@@ -301,6 +306,24 @@ function streamSegment(opts) {
         return null;
       }
 
+      var upstreamContentType = upstreamRes.headers && typeof upstreamRes.headers.get === 'function'
+        ? upstreamRes.headers.get('content-type')
+        : '';
+
+      // Master playlists can point at variant playlists. Those variant
+      // playlists arrive through this same /api/proxy/.../seg path, so detect
+      // them and rewrite again instead of piping raw upstream-relative segment
+      // URLs back to the browser. This keeps the entire HLS tree on DaveTV's
+      // origin for local dev, Cloudflare, and Tizen.
+      if (_looksLikePlaylistResource(upstream, upstreamContentType)) {
+        return upstreamRes.text().then(function(text) {
+          res.setHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.status(200).send(rewritePlaylist(text, upstream, ticket));
+          return null;
+        });
+      }
+
       var passHeaders = [
         'content-type',
         'content-length',
@@ -315,9 +338,9 @@ function streamSegment(opts) {
         var v = upstreamRes.headers.get(h);
         if (v) { res.setHeader(h, v); }
       }
-      // Default to no-store if upstream didn't set Cache-Control —
-      // we don't want a proxy further down the chain caching the
-      // segment URL (it's tied to a ticket that expires in 5 min).
+      // Default to no-store if upstream didn't set Cache-Control.
+      // Proxy URLs are tied to short-lived play tickets, so a downstream
+      // cache should not replay stale ticketed media paths.
       if (!upstreamRes.headers.get('cache-control')) {
         res.setHeader('Cache-Control', 'no-store');
       }

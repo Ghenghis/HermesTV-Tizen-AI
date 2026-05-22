@@ -2,12 +2,12 @@ import React from 'react';
 import * as playlistClient from '../api/playlistClient.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PlaylistImportModal — 3-step wizard for importing m3u / XMLTV / Xtream /
-// Stalker playlists. Mirrors the IPTV Player Zero "Add Playlist" flow from
+// PlaylistImportModal — 3-step wizard for importing m3u / XMLTV / Xtream
+// playlists. Mirrors the IPTV Player Zero "Add Playlist" flow from
 // G:\Github\IPTV_Player_Zero\docs\USER_JOURNEYS.md §1.
 //
 // Steps:
-//   1. Source     — pick URL / file / Xtream / Stalker; fill source fields.
+//   1. Source     — pick URL / Xtream; fill source fields.
 //   2. Validate   — POST /api/playlists/preview, render channel + group
 //                   counts and the first 10 channel names.
 //   3. Confirm    — pick a name + provider_id tag, POST /api/playlists/save.
@@ -21,23 +21,18 @@ import * as playlistClient from '../api/playlistClient.js';
 // element of each step so remote users can navigate without a mouse.
 //
 // Errors render inline with a "Try again" button (re-runs whatever step
-// the user is on) — no toasts, no silent failures. xtream / stalker stub
-// responses (HTTP 501) get a clear "Not yet — Xtream-Codes ingest lands in
-// a follow-up" message so the operator knows it's a feature gap, not a bug.
+// the user is on) — no toasts, no silent failures. A save is only considered
+// successful when the API returns a durable persisted_provider_id.
 // ─────────────────────────────────────────────────────────────────────────────
 
 var STEP_SOURCE = 'source';
 var STEP_PREVIEW = 'preview';
 var STEP_CONFIRM = 'confirm';
 
-// Wave-17/19: Stalker portal removed (UI for an unimplemented backend = stub
-// content, which violates the no-fakes rule in feedback_no_mocks_no_stubs.md).
-// Xtream-Codes login is REAL — the server backs it via lib/xtreamClient.js
-// (wired into resolveCatalog as of wave-19). When a Stalker adapter exists,
-// re-add that option with a working backend at the same time.
+// Xtream-Codes login is REAL — the server validates the panel, persists the
+// provider row, and the catalog reads it back through providerRegistry.
 var SOURCE_OPTIONS = [
   { id: 'url',     label: 'URL',                hint: 'Paste a public M3U or XMLTV URL.' },
-  { id: 'file',    label: 'Upload file',        hint: 'Choose a local .m3u or .m3u8 file. 10 MB max.' },
   { id: 'xtream',  label: 'Xtream-Codes login', hint: 'Host + username + password.' },
 ];
 
@@ -51,13 +46,9 @@ var INITIAL_STATE = {
   step: STEP_SOURCE,
   sourceType: 'url',
   urlValue: '',
-  fileText: '',
-  fileName: '',
   xtreamHost: '',
   xtreamUser: '',
   xtreamPass: '',
-  stalkerPortal: '',
-  stalkerMac: '',
   // /preview result
   preview: null,
   // step 3 fields
@@ -74,18 +65,13 @@ var INITIAL_STATE = {
 
 function buildSourcePayload(state) {
   if (state.sourceType === 'url') { return { type: 'url', url: state.urlValue }; }
-  if (state.sourceType === 'file') { return { type: 'file', file: state.fileText }; }
   if (state.sourceType === 'xtream') {
     return {
       type: 'xtream',
       credentials: { host: state.xtreamHost, username: state.xtreamUser, password: state.xtreamPass },
     };
   }
-  // stalker
-  return {
-    type: 'stalker',
-    credentials: { portal_url: state.stalkerPortal, mac: state.stalkerMac },
-  };
+  return { type: state.sourceType || 'unknown' };
 }
 
 function isSourceValid(state) {
@@ -94,14 +80,10 @@ function isSourceValid(state) {
     var lower = state.urlValue.toLowerCase();
     return lower.indexOf('http://') === 0 || lower.indexOf('https://') === 0;
   }
-  if (state.sourceType === 'file') {
-    return typeof state.fileText === 'string' && state.fileText.length > 0;
-  }
   if (state.sourceType === 'xtream') {
     return state.xtreamHost.length > 0 && state.xtreamUser.length > 0 && state.xtreamPass.length > 0;
   }
-  // stalker
-  return state.stalkerPortal.length > 0 && state.stalkerMac.length > 0;
+  return false;
 }
 
 // Strip the same patterns the server strips so the inline preview matches
@@ -282,7 +264,6 @@ function SecondaryButton(props) {
 function StepSource(props) {
   var state = props.state;
   var setField = props.setField;
-  var onFileChosen = props.onFileChosen;
 
   function renderSourcePicker() {
     return (
@@ -315,21 +296,6 @@ function StepSource(props) {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
                 <span style={{ fontWeight: 700, fontSize: 'calc(0.92rem * var(--font-scale, 1))' }}>{opt.label}</span>
-                {opt.stub && (
-                  <span
-                    style={{
-                      fontSize: 'calc(0.6rem * var(--font-scale, 1))',
-                      fontWeight: 800,
-                      color: '#0a1628',
-                      background: '#facc15',
-                      padding: '0.05rem 0.4rem',
-                      borderRadius: '999px',
-                      letterSpacing: '0.05em',
-                    }}
-                  >
-                    SOON
-                  </span>
-                )}
               </div>
               <div style={{ marginTop: '0.2rem', fontSize: 'calc(0.72rem * var(--font-scale, 1))', color: 'var(--muted, #8b949e)' }}>
                 {opt.hint}
@@ -357,44 +323,6 @@ function StepSource(props) {
           />
           <div style={{ marginTop: '0.4rem', fontSize: 'calc(0.72rem * var(--font-scale, 1))', color: 'var(--muted, #8b949e)' }}>
             Only <code style={codeStyle}>http://</code> and <code style={codeStyle}>https://</code> are accepted.
-          </div>
-        </div>
-      );
-    }
-    if (state.sourceType === 'file') {
-      return (
-        <div>
-          <FieldLabel htmlFor="pim-file">M3U / XMLTV file</FieldLabel>
-          <input
-            id="pim-file"
-            type="file"
-            accept=".m3u,.m3u8,.xml,.xmltv,text/plain,application/xml"
-            autoFocus
-            tabIndex={0}
-            onChange={onFileChosen}
-            style={{
-              width: '100%',
-              padding: '0.55rem 0.8rem',
-              background: 'var(--surface-raised, #1c2128)',
-              border: '1px solid var(--border, #30363d)',
-              borderRadius: 'var(--radius-md, 10px)',
-              color: 'var(--text, #e6edf3)',
-              outline: 'none',
-              boxSizing: 'border-box',
-              cursor: 'pointer',
-            }}
-          />
-          {state.fileName && (
-            <div style={{ marginTop: '0.4rem', fontSize: 'calc(0.78rem * var(--font-scale, 1))', color: 'var(--text, #e6edf3)' }}>
-              Selected: <strong>{state.fileName}</strong>
-              {' '}
-              <span style={{ color: 'var(--muted, #8b949e)' }}>
-                ({Math.round((state.fileText.length / 1024) * 10) / 10} KB)
-              </span>
-            </div>
-          )}
-          <div style={{ marginTop: '0.4rem', fontSize: 'calc(0.72rem * var(--font-scale, 1))', color: 'var(--muted, #8b949e)' }}>
-            Max upload size: 10 MB. Larger files are rejected.
           </div>
         </div>
       );
@@ -442,48 +370,15 @@ function StepSource(props) {
               fontSize: 'calc(0.75rem * var(--font-scale, 1))',
             }}
           >
-            Xtream-Codes ingest lands in a follow-up. The preview step will return
-            a clear "not yet" message so you know nothing was saved.
+            DaveTV will validate this login, save it durably, and refresh the
+            provider list after the API confirms the saved provider id.
           </div>
         </div>
       );
     }
-    // stalker
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-        <div>
-          <FieldLabel htmlFor="pim-st-portal">Portal URL</FieldLabel>
-          <TextInput
-            id="pim-st-portal"
-            value={state.stalkerPortal}
-            placeholder="http://your-portal.example/c/"
-            autoFocus={true}
-            onChange={function(e) { setField('stalkerPortal', e.target.value); }}
-          />
-        </div>
-        <div>
-          <FieldLabel htmlFor="pim-st-mac">MAC address</FieldLabel>
-          <TextInput
-            id="pim-st-mac"
-            value={state.stalkerMac}
-            placeholder="00:1A:79:XX:XX:XX"
-            onChange={function(e) { setField('stalkerMac', e.target.value); }}
-          />
-        </div>
-        <div
-          role="note"
-          style={{
-            padding: '0.5rem 0.7rem',
-            background: 'rgba(250,204,21,0.08)',
-            border: '1px solid rgba(250,204,21,0.4)',
-            borderRadius: '10px',
-            color: '#facc15',
-            fontSize: 'calc(0.75rem * var(--font-scale, 1))',
-          }}
-        >
-          Stalker portal ingest lands in a follow-up. The preview step will return
-          a clear "not yet" message so you know nothing was saved.
-        </div>
+      <div role="alert" style={{ color: '#f85149', fontSize: 'calc(0.82rem * var(--font-scale, 1))' }}>
+        This source type is not available.
       </div>
     );
   }
@@ -528,27 +423,24 @@ function StepPreview(props) {
   }
 
   if (error) {
-    var isStub = error.code === 'not_implemented';
     return (
       <div
         role="alert"
         style={{
           padding: '0.9rem 1rem',
-          background: isStub ? 'rgba(250,204,21,0.08)' : 'rgba(248,81,73,0.08)',
-          border: '1px solid ' + (isStub ? 'rgba(250,204,21,0.45)' : 'rgba(248,81,73,0.45)'),
+          background: 'rgba(248,81,73,0.08)',
+          border: '1px solid rgba(248,81,73,0.45)',
           borderRadius: '12px',
-          color: isStub ? '#facc15' : '#f85149',
+          color: '#f85149',
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: '0.3rem' }}>
-          {isStub ? 'Not yet — feature gap' : 'Could not validate the source'}
+          Could not validate the source
         </div>
         <div style={{ fontSize: 'calc(0.82rem * var(--font-scale, 1))', marginBottom: '0.6rem' }}>
           {error.message || 'Unknown error'}
         </div>
-        {!isStub && (
-          <PrimaryButton autoFocus onClick={onRetry}>Try again</PrimaryButton>
-        )}
+        <PrimaryButton autoFocus onClick={onRetry}>Try again</PrimaryButton>
       </div>
     );
   }
@@ -843,9 +735,6 @@ function PlaylistImportModal(props) {
         defaultName = u.hostname.replace(/^www\./, '');
       } catch (_) { defaultName = ''; }
     }
-    if (!defaultName && state.sourceType === 'file' && state.fileName) {
-      defaultName = state.fileName.replace(/\.(m3u8?|xml|xmltv|txt)$/i, '');
-    }
     patch({ step: STEP_CONFIRM, error: null, playlistName: clientSanitiseName(defaultName) });
   }
 
@@ -871,35 +760,49 @@ function PlaylistImportModal(props) {
       provider_id: state.providerTag,
       source: buildSourcePayload(state),
     }).then(function(saved) {
+      if ((state.sourceType === 'url' || state.sourceType === 'xtream') &&
+          (!saved || typeof saved.persisted_provider_id !== 'string' || saved.persisted_provider_id.length === 0)) {
+        var missing = new Error('Provider save did not return a durable provider id. Nothing was saved.');
+        missing.code = 'provider_persist_failed';
+        throw missing;
+      }
       patch({ pending: false, saved: saved, error: null });
       // Brief delay so the success state is visible, then trigger the
-      // parent's redirect / refresh callback. The modal stays open just
-      // long enough for the user to register "yes, that worked".
+      // parent's redirect / refresh callback. If the parent returns a
+      // promise, it must resolve only after the durable provider row is
+      // visible through /api/providers; otherwise this modal stays open with
+      // an actionable error instead of giving a false "saved" finish.
       setTimeout(function() {
-        if (typeof onSaved === 'function') { onSaved(saved); }
-        if (typeof onClose === 'function') { onClose(); }
+        var result = null;
+        try {
+          if (typeof onSaved === 'function') { result = onSaved(saved); }
+        } catch (err) {
+          patch({
+            pending: false,
+            saved: null,
+            error: {
+              message: err.message || 'Provider saved, but DaveTV could not confirm it from /api/providers.',
+              code: err.code || 'provider_refresh_failed',
+            },
+          });
+          return;
+        }
+        Promise.resolve(result).then(function() {
+          if (typeof onClose === 'function') { onClose(); }
+        }).catch(function(err) {
+          patch({
+            pending: false,
+            saved: null,
+            error: {
+              message: err.message || 'Provider saved, but DaveTV could not confirm it from /api/providers.',
+              code: err.code || 'provider_refresh_failed',
+            },
+          });
+        });
       }, 1200);
     }).catch(function(err) {
       patch({ pending: false, error: { message: err.message || 'Save failed', code: err.code || 'save_error' } });
     });
-  }
-
-  function handleFileChosen(evt) {
-    var file = evt && evt.target && evt.target.files && evt.target.files[0];
-    if (!file) { return; }
-    if (file.size > 10 * 1024 * 1024) {
-      patch({ error: { message: 'File is larger than 10 MB. Pick a smaller playlist.', code: 'payload_too_large' } });
-      return;
-    }
-    var reader = new FileReader();
-    reader.onload = function() {
-      var text = String(reader.result || '');
-      patch({ fileText: text, fileName: file.name, error: null });
-    };
-    reader.onerror = function() {
-      patch({ error: { message: 'Could not read the file. Try again.', code: 'file_read_error' } });
-    };
-    reader.readAsText(file);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -971,7 +874,7 @@ function PlaylistImportModal(props) {
               <div>
                 <div style={{ fontWeight: 800, fontSize: 'calc(1rem * var(--font-scale, 1))' }}>Import playlist</div>
                 <div style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', color: 'var(--muted, #8b949e)' }}>
-                  M3U / XMLTV / Xtream-Codes / Stalker portal
+                  M3U / XMLTV / Xtream-Codes
                 </div>
               </div>
             </div>
@@ -1005,7 +908,7 @@ function PlaylistImportModal(props) {
         {/* Step body */}
         <div style={{ padding: '1rem 1.3rem 0.4rem', minHeight: '180px' }}>
           {state.step === STEP_SOURCE && (
-            <StepSource state={state} setField={setField} onFileChosen={handleFileChosen} />
+            <StepSource state={state} setField={setField} />
           )}
           {state.step === STEP_PREVIEW && (
             <StepPreview

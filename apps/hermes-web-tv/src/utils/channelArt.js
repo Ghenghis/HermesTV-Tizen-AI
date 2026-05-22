@@ -111,10 +111,16 @@ export function getChannelArt(channel) {
   var url = null;
   var isLive = (safe.type === 'live');
 
+  function _isTransparentPixel(u) {
+    return typeof u === 'string'
+      && u.indexOf('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB') === 0;
+  }
+
   function _ok(u) {
     return typeof u === 'string'
       && u.length > 0
-      && u.indexOf('picsum.photos') === -1;
+      && u.indexOf('picsum.photos') === -1
+      && !_isTransparentPixel(u);
   }
 
   if (isLive) {

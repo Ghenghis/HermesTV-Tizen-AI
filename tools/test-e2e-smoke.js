@@ -31,8 +31,31 @@ const http = require('http');
 process.env.PORT = process.env.PORT || '3199';
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
+// Bootstrap a throwaway Dave admin so the in-process API can authenticate the
+// smoke probes. The auth gate landed in lane-a-provider-registry; protected
+// routes return 401 without a session. We use a smoke-only email/password
+// that exists only in this child process — never committed, never echoed.
+// If the operator passes real DAVETV_ADMIN_* env, we honor that instead.
+process.env.DAVETV_ADMIN_EMAIL = process.env.DAVETV_ADMIN_EMAIL || 'smoke-admin@example.invalid';
+process.env.DAVETV_ADMIN_PASSWORD = process.env.DAVETV_ADMIN_PASSWORD || 'SmokeAdminPass-' + Math.random().toString(36).slice(2, 14);
+// Point the auth store at an in-process temp file so the smoke run never
+// touches the operator's /var/lib/hermestv/auth.json by default. A caller can
+// opt into an external auth store only for a deliberate live-auth proof.
+const os = require('os');
+const fs = require('fs');
+const smokeAuthDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermestv-smoke-auth-'));
+const useExternalAuthStore = /^(1|true|yes)$/i.test(String(process.env.DAVETV_SMOKE_USE_EXTERNAL_AUTH_STORE || ''));
+if (!useExternalAuthStore) {
+  process.env.DAVETV_AUTH_STORE = path.join(smokeAuthDir, 'auth.json');
+}
+
 const PORT = parseInt(process.env.PORT, 10);
 const BASE = 'http://127.0.0.1:' + PORT;
+
+// Session cookie collected from POST /api/auth/login after the API boots.
+// Threaded through every subsequent call() so the smoke proves auth-on
+// behaviour, not auth-bypass behaviour.
+let SMOKE_SESSION_COOKIE = '';
 
 let totalPass = 0;
 let totalFail = 0;
@@ -97,6 +120,9 @@ async function call(method, p, opts) {
     headers: { 'Accept': 'application/json' },
     redirect: opts.redirect || 'manual',
   };
+  if (SMOKE_SESSION_COOKIE && !opts.noAuth) {
+    init.headers['Cookie'] = SMOKE_SESSION_COOKIE;
+  }
   if (opts.body !== undefined) {
     init.headers['Content-Type'] = 'application/json';
     init.body = JSON.stringify(opts.body);
@@ -384,10 +410,37 @@ async function runProbes() {
   }
 }
 
+// Log in as the bootstrapped Dave admin and capture the session cookie. This
+// runs once after bootApi so every subsequent call() automatically threads
+// the cookie via SMOKE_SESSION_COOKIE.
+async function loginAsSmokeAdmin() {
+  const r = await call('POST', '/api/auth/login', {
+    body: {
+      email: process.env.DAVETV_ADMIN_EMAIL,
+      password: process.env.DAVETV_ADMIN_PASSWORD,
+    },
+    noAuth: true,
+  });
+  if (r.status !== 200) {
+    throw new Error('smoke admin login failed: status=' + r.status + ' raw=' + r.raw.slice(0, 160));
+  }
+  // set-cookie may be one or many; the API uses a single session cookie.
+  // Per fetch spec, multiple set-cookie headers collapse into one comma-
+  // separated header value. Extract the FIRST `<name>=<value>` pair.
+  const raw = r.headers['set-cookie'] || '';
+  const first = String(raw).split(/,\s*(?=[^;,]+=[^;,]+)/)[0] || String(raw);
+  const cookiePair = first.split(';')[0];
+  if (!cookiePair || cookiePair.indexOf('=') === -1) {
+    throw new Error('smoke admin login did not return a set-cookie session');
+  }
+  SMOKE_SESSION_COOKIE = cookiePair;
+}
+
 (async () => {
   try {
     console.log('--- HermesTV E2E smoke (PORT=' + PORT + ') ---');
     await bootApi();
+    await loginAsSmokeAdmin();
     await runProbes();
   } catch (e) {
     console.error('boot/runtime error:', e && e.message);
@@ -395,6 +448,13 @@ async function runProbes() {
     fail('boot', e && e.message);
   } finally {
     console.log('\n=== Results: ' + totalPass + ' PASS, ' + totalFail + ' FAIL ===');
+    // Best-effort cleanup of the smoke auth dir so we never leave a temp
+    // store on disk. Quiet on failure — the OS tmpdir cleaner will catch it.
+    try {
+      if (smokeAuthDir && fs.existsSync(smokeAuthDir)) {
+        fs.rmSync(smokeAuthDir, { recursive: true, force: true });
+      }
+    } catch (_) { /* silent */ }
     // Give the API a moment to flush before we exit so the log file is
     // complete when CI uploads the artifact on failure.
     setTimeout(() => process.exit(totalFail > 0 ? 1 : 0), 50);

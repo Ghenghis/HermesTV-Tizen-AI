@@ -253,9 +253,9 @@ function SamsungShell(props) {
           {/* Continue Watching — first row, sits above the Live / Movies /
               Series rows. Returns null on profiles with no playback history. */}
           <ContinueWatchingRail profileId={profile && (profile.profile_id || profile.id)} onItemSelect={onItemSelect} profile={profile} fontScale={fontScale} />
-          <SamsungRow title="Live Channels" items={liveItems.length > 0 ? liveItems : filtered.slice(0, capForProfile(profile, 6))} cardW={200} cardH={112} showLive={true} />
-          <SamsungRow title="Trending Movies" items={movies.length > 0 ? movies : filtered.slice(2)} cardW={130} cardH={195} showLive={false} />
-          <SamsungRow title="Popular Series" items={series.length > 0 ? series : filtered.slice(3)} cardW={130} cardH={195} showLive={false} />
+          <SamsungRow title="Live Channels" items={liveItems} cardW={200} cardH={112} showLive={true} />
+          <SamsungRow title="Trending Movies" items={movies} cardW={130} cardH={195} showLive={false} />
+          <SamsungRow title="Popular Series" items={series} cardW={130} cardH={195} showLive={false} />
         </div>
       </div>
     </div>

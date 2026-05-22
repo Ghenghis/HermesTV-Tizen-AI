@@ -17,8 +17,8 @@
  *   - The raw stream URL is NEVER returned to the client (either path).
  *   - Per-item probe exposes only a redacted hint (scheme + host + path,
  *     no query string).
- *   - Providers without env-configured URLs return { reachable:false,
- *     reason:'not_configured', mock:true } so the UI can render a clear
+ *   - Providers without configured URLs return { reachable:false,
+ *     reason:'not_configured', configured:false } so the UI can render a clear
  *     "Provider not connected" state instead of a fake number.
  *
  * BEHAVIOUR
@@ -133,7 +133,7 @@ router.get('/api/source-health/:provider_id/:item_id', async function(req, res) 
       probe: { reachable: false, reason: 'not_configured' },
       quality: { floor: 'unknown', source: 'url_heuristic' },
       checked_at: checkedAt,
-      mock: true,
+      configured: false,
     });
   }
 
@@ -159,6 +159,7 @@ router.get('/api/source-health/:provider_id/:item_id', async function(req, res) 
     probe: probe,
     quality: quality,
     checked_at: checkedAt,
+    configured: true,
   });
 });
 

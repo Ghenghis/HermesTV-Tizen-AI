@@ -111,6 +111,20 @@ function SleepTimer(props) {
   var saved = stateHook[0];
   var setSaved = stateHook[1];
 
+  React.useEffect(function() {
+    if (!isOpen) { return undefined; }
+    function onKeyDown(e) {
+      if (e && e.key === 'Escape') {
+        e.preventDefault();
+        if (typeof onClose === 'function') { onClose(); }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return function cleanup() {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   function applyMinutes(min) {
@@ -241,6 +255,7 @@ function SleepTimer(props) {
             type="button"
             onClick={function() { if (typeof onClose === 'function') onClose(); }}
             tabIndex={0}
+            aria-label="Close sleep timer"
             style={{
               padding: '0.55rem 1rem',
               fontSize: 'calc(0.95rem * var(--font-scale, 1))',
