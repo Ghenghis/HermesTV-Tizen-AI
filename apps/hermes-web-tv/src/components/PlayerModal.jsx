@@ -34,8 +34,8 @@ var IDLE_MS = 3000;
 
 // Wave-15 — auto-retry on 503 stream_temporarily_unavailable.
 var MAX_RETRIES = 3;
-var RETRY_DELAY_MS = 5000;
-var STARTUP_WATCHDOG_MS = 10000;
+var RETRY_DELAY_MS = 1200;
+var STARTUP_WATCHDOG_MS = 5500;
 
 // Media type from URL — feeds the Chromecast receiver so the right
 // HLS / progressive pipeline is selected on the cast device.
@@ -266,6 +266,7 @@ function PlayerModal(props) {
   // Holds the active retry setTimeout id so a re-mount can cancel it.
   var retryTimerRef = React.useRef(null);
   var startupWatchdogRef = React.useRef(null);
+  var autoSkipTimerRef = React.useRef(null);
   // Keep "what DaveTV should be doing" separate from the media element's
   // momentary state. Browsers and Tizen can pause during source attach,
   // visibility changes, or HLS recovery without the user pressing Pause.
@@ -322,6 +323,10 @@ function PlayerModal(props) {
       clearTimeout(startupWatchdogRef.current);
       startupWatchdogRef.current = null;
     }
+    if (autoSkipTimerRef.current) {
+      clearTimeout(autoSkipTimerRef.current);
+      autoSkipTimerRef.current = null;
+    }
   }, [item && item.id, profileId]); // eslint-disable-line
 
   // Flush any pending throttled position writes when the modal closes so the
@@ -336,6 +341,10 @@ function PlayerModal(props) {
       if (startupWatchdogRef.current) {
         clearTimeout(startupWatchdogRef.current);
         startupWatchdogRef.current = null;
+      }
+      if (autoSkipTimerRef.current) {
+        clearTimeout(autoSkipTimerRef.current);
+        autoSkipTimerRef.current = null;
       }
     };
   }, []);
@@ -478,6 +487,9 @@ function PlayerModal(props) {
       var v = videoRef.current;
       if (!v) { return; }
       if ((v.currentTime || 0) < 0.25) {
+        if (scheduleAutoSkipLive('This channel did not reach a playable frame. DaveTV tried every visible live channel without finding another playable stream.')) {
+          return;
+        }
         rememberFailedChannel();
         desiredPlaybackRef.current = false;
         setPlaying(false);
@@ -509,6 +521,9 @@ function PlayerModal(props) {
     }
     setPlaying(false);
     setLiveStartedAt(0);
+    if (scheduleAutoSkipLive(hlsState.error || 'The live feed stopped before playback could continue.')) {
+      return undefined;
+    }
     rememberFailedChannel();
     setStreamState({
       status: 'error',
@@ -878,16 +893,41 @@ function PlayerModal(props) {
     failedChannelIdsRef.current[String(item.id)] = Date.now();
   }
 
+  function scheduleAutoSkipLive(finalMessage) {
+    if (!isLive || !onSwitchItem || !item || !item.id) { return false; }
+    rememberFailedChannel();
+    desiredPlaybackRef.current = true;
+    setPlaying(true);
+    setLiveStartedAt(0);
+    setStreamState({
+      status: 'loading',
+      message: 'This live feed is offline. Skipping to the next playable channel...',
+    });
+    if (autoSkipTimerRef.current) { clearTimeout(autoSkipTimerRef.current); }
+    autoSkipTimerRef.current = setTimeout(function() {
+      autoSkipTimerRef.current = null;
+      if (!switchChannelBy(1)) {
+        desiredPlaybackRef.current = false;
+        setPlaying(false);
+        setStreamState({
+          status: 'error',
+          message: finalMessage || 'No alternate live channel is playable right now.',
+        });
+      }
+    }, 250);
+    return true;
+  }
+
   function switchChannelBy(delta) {
-    if (!isLive || !onSwitchItem) { return; }
+    if (!isLive || !onSwitchItem) { return false; }
     var channels = liveCatalog();
-    if (!channels.length) { return; }
+    if (!channels.length) { return false; }
     var currentId = item && item.id;
     var idx = -1;
     for (var i = 0; i < channels.length; i++) {
       if (String(channels[i].id) === String(currentId)) { idx = i; break; }
     }
-    if (idx === -1) { return; }
+    if (idx === -1) { return false; }
     var failed = failedChannelIdsRef.current || {};
     var next = idx;
     var hops = 0;
@@ -896,8 +936,12 @@ function PlayerModal(props) {
       if (next < 0) { next = channels.length - 1; }
       if (next >= channels.length) { next = 0; }
       hops += 1;
-    } while (hops < channels.length && failed[String(channels[next].id)]);
-    onSwitchItem(channels[next]);
+      if (next !== idx && !failed[String(channels[next].id)]) {
+        onSwitchItem(channels[next]);
+        return true;
+      }
+    } while (hops < channels.length);
+    return false;
   }
 
   function toggleFullscreen() {

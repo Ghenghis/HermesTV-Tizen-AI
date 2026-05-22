@@ -24,10 +24,10 @@ import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 // ─────────────────────────────────────────────────────────────────────────────
 
 var POWER_ICONS = [
-  { icon: '📡', label: 'Live' },
-  { icon: '🎬', label: 'Movies' },
-  { icon: '📺', label: 'Series' },
-  { icon: '📊', label: 'Stats' },
+  { id: 'live', icon: '📡', label: 'Live' },
+  { id: 'movies', icon: '🎬', label: 'Movies' },
+  { id: 'series', icon: '📺', label: 'Series' },
+  { id: 'stats', icon: '📊', label: 'Stats' },
 ];
 
 var DAVE_ACCENT = '#00d4aa';
@@ -79,9 +79,18 @@ function DavePowerShell(props) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  var displayItems = searchQuery
-    ? filtered.filter(function(i) { return (i.title || '').toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1; })
-    : filtered;
+  var activeIconId = (POWER_ICONS[activeIcon] && POWER_ICONS[activeIcon].id) || 'live';
+  var displayItems = filtered;
+  if (activeIconId === 'live') {
+    displayItems = displayItems.filter(function(i) { return isLive(i); });
+  } else if (activeIconId === 'movies') {
+    displayItems = displayItems.filter(function(i) { return isMovie(i); });
+  } else if (activeIconId === 'series') {
+    displayItems = displayItems.filter(function(i) { return isSeries(i); });
+  }
+  if (searchQuery) {
+    displayItems = displayItems.filter(function(i) { return (i.title || '').toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1; });
+  }
 
   var liveCount = (catalog || []).filter(function(i) { return isLive(i); }).length;
   var movieCount = (catalog || []).filter(function(i) { return isMovie(i); }).length;
@@ -116,6 +125,42 @@ function DavePowerShell(props) {
     overscan: 1,
   });
 
+  function _activatePowerIcon(index) {
+    setActiveIcon(index);
+    setSearchInput('');
+    setSearchQuery('');
+    if (gridScrollRef.current) {
+      try { gridScrollRef.current.scrollTop = 0; } catch (_) {}
+    }
+  }
+
+  function _focusPowerIcon(index) {
+    var el = document.querySelector('[data-power-nav-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handlePowerIconKey(e, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _activatePowerIcon(index);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusPowerIcon((index + 1) % POWER_ICONS.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusPowerIcon((index + POWER_ICONS.length - 1) % POWER_ICONS.length);
+    }
+  }
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr' + (tier === 'enhanced' ? ' 200px' : ''), height: '100%', background: '#0a0e1a', color: '#e0e8f0', overflow: 'hidden', fontFamily: "'Consolas', 'Courier New', monospace" }}>
 
@@ -126,15 +171,12 @@ function DavePowerShell(props) {
             <button
               key={item.label}
               data-focusable="true"
+              data-power-nav-index={i}
               tabIndex={0}
               aria-label={item.label}
-              onClick={function() { setActiveIcon(i); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setActiveIcon(i);
-                }
-              }}
+              aria-current={activeIcon === i ? 'page' : undefined}
+              onClick={function() { _activatePowerIcon(i); }}
+              onKeyDown={function(e) { _handlePowerIconKey(e, i); }}
               title={item.label}
               style={{
                 width: '48px',

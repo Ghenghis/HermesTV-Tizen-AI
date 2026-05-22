@@ -124,6 +124,33 @@ function MomModeShell(props) {
     overscan: 4,
   });
 
+  function _focusMomTab(index) {
+    var el = document.querySelector('[data-mom-tab-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleMomTabKey(e, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      setActiveTab(index);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'Right') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusMomTab((index + 1) % MOM_TABS.length);
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'Left') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusMomTab((index + MOM_TABS.length - 1) % MOM_TABS.length);
+    }
+  }
+
   return (
     <div style={{ background: '#1a1a2e', color: '#f0e6ff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Georgia', 'Times New Roman', serif" }}>
 
@@ -145,15 +172,11 @@ function MomModeShell(props) {
             <button
               key={tab.label}
               data-focusable="true"
+              data-mom-tab-index={i}
               tabIndex={0}
               aria-label={tab.label}
               onClick={function() { setActiveTab(i); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setActiveTab(i);
-                }
-              }}
+              onKeyDown={function(e) { _handleMomTabKey(e, i); }}
               style={{
                 flex: 1,
                 height: '64px',

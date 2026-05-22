@@ -28,8 +28,8 @@
 // Returns a string in every case so the caller can drop it into JSX without
 // needing a guard around it.
 function formatTimeRemaining(positionSec, durationSec) {
-  var pos = typeof positionSec === 'number' && positionSec >= 0 ? positionSec : 0;
-  var dur = typeof durationSec === 'number' && durationSec > 0 ? durationSec : 0;
+  var pos = typeof positionSec === 'number' && isFinite(positionSec) && positionSec >= 0 ? positionSec : 0;
+  var dur = typeof durationSec === 'number' && isFinite(durationSec) && durationSec > 0 ? durationSec : 0;
   if (dur <= 0) {
     return '~half done';
   }
@@ -85,12 +85,13 @@ function progressPercent(item) {
   }
   var pos = typeof item.position_seconds === 'number' ? item.position_seconds : 0;
   var dur = typeof item.duration_seconds === 'number' ? item.duration_seconds : 0;
+  if (!isFinite(pos) || !isFinite(dur)) { return 0; }
   if (dur <= 0) { return 0; }
   return _clamp((pos / dur) * 100);
 }
 
 function _clamp(v) {
-  if (typeof v !== 'number' || isNaN(v)) { return 0; }
+  if (typeof v !== 'number' || isNaN(v) || !isFinite(v)) { return 0; }
   if (v < 0) { return 0; }
   if (v > 100) { return 100; }
   return Math.round(v);

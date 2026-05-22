@@ -98,6 +98,8 @@ function IptvnatorShell(props) {
   var tier = props.tier;
   var providers = props.providers;
   var onItemSelect = props.onItemSelect;
+  var onOpenEPG = props.onOpenEPG;
+  var onOpenSettings = props.onOpenSettings;
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
@@ -276,6 +278,45 @@ function IptvnatorShell(props) {
     }
   }
 
+  function _activateRail(sectionId) {
+    if (sectionId === 'epg') {
+      if (typeof onOpenEPG === 'function') { onOpenEPG(); }
+      return;
+    }
+    if (sectionId === 'settings') {
+      if (typeof onOpenSettings === 'function') { onOpenSettings(); }
+      return;
+    }
+    setActiveRail(sectionId);
+  }
+
+  function _focusRail(index) {
+    var el = document.querySelector('[data-iptvnator-rail-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleRailKey(e, sectionId, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _activateRail(sectionId);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRail((index + 1) % rail.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRail((index + rail.length - 1) % rail.length);
+    }
+  }
+
   var focusedTitle = focusedChannel ? (focusedChannel.title || 'Untitled') : '';
   var chosenName = (profile && (profile.chosen_name || profile.name)) || 'DaveTV viewer';
 
@@ -335,17 +376,17 @@ function IptvnatorShell(props) {
           </div>
         </div>
 
-        {rail.map(function(sec) {
+        {rail.map(function(sec, index) {
           var isActive = activeRail === sec.id;
           return (
             <button
               key={sec.id}
               tabIndex={0}
               data-focusable="true"
-              onClick={function() { setActiveRail(sec.id); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveRail(sec.id); }
-              }}
+              data-iptvnator-rail-index={index}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={function() { _activateRail(sec.id); }}
+              onKeyDown={function(e) { _handleRailKey(e, sec.id, index); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -478,6 +519,21 @@ function IptvnatorShell(props) {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {activeRail === 'favorites' && (
+          <div
+            style={{
+              padding: '0.4rem 0.85rem 0.85rem',
+              borderTop: '1px solid ' + COLOR_BORDER,
+              marginTop: '0.3rem',
+              fontSize: 'calc(0.7rem * var(--font-scale, 1))',
+              color: COLOR_MUTED,
+              lineHeight: 1.4,
+            }}
+          >
+            Favorites will appear here after this profile saves channels.
           </div>
         )}
       </aside>
@@ -657,8 +713,6 @@ function IptvnatorShell(props) {
                       height: '32px',
                       borderRadius: '4px',
                       background: posterBg(ch, idx),
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
                       flexShrink: 0,
                     }}
                   />
@@ -731,8 +785,6 @@ function IptvnatorShell(props) {
               style={{
                 aspectRatio: '16 / 9',
                 background: posterBg(focusedChannel, 0),
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
                 borderRadius: '8px',
                 border: '1px solid ' + COLOR_BORDER,
               }}
@@ -823,8 +875,6 @@ function IptvnatorShell(props) {
               height: '26px',
               borderRadius: '4px',
               background: focusedChannel ? posterBg(focusedChannel, 0) : COLOR_BG,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
               border: '1px solid ' + COLOR_BORDER,
               flexShrink: 0,
             }}

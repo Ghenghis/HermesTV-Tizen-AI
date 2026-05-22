@@ -35,6 +35,7 @@ const nuvioShell = read('apps/hermes-web-tv/src/shells/NuvioShell.jsx');
 const playerModal = read('apps/hermes-web-tv/src/components/PlayerModal.jsx');
 const hlsHook = read('apps/hermes-web-tv/src/hooks/useHlsStream.js');
 const apiIndex = read('services/hermes-tv-api/src/index.js');
+const hlsProxy = read('services/hermes-tv-api/src/lib/hlsProxy.js');
 
 const handleItemClick = app.slice(app.indexOf('function handleItemClick'), app.indexOf('// Explicit "Info" gesture'));
 const netflixWatchButton = buttonBlockBefore(netflixShell, '▶ Watch');
@@ -94,7 +95,7 @@ ok('PlayerModal keeps controls clickable when playback is paused or failed',
     && /var overlayOpacity = \(locked \|\| controlsIdle\) \? 0 : 1;/.test(playerModal)
     && playerModal.indexOf('pointerEvents: (locked || idle)') === -1);
 ok('PlayerModal fails dead live feeds after no first frame',
-  /var STARTUP_WATCHDOG_MS = 10000;/.test(playerModal)
+  /var STARTUP_WATCHDOG_MS = 5500;/.test(playerModal)
     && /startupWatchdogRef = React\.useRef\(null\);/.test(playerModal)
     && /This channel did not reach a playable frame/.test(playerModal)
     && /if \(isLive && v\.currentTime > 0\.25\)[\s\S]*setLiveStartedAt\(Date\.now\(\)\);[\s\S]*clearTimeout\(startupWatchdogRef\.current\);/.test(playerModal)
@@ -103,7 +104,8 @@ ok('PlayerModal fails dead live feeds after no first frame',
 ok('PlayerModal dead-feed state offers explicit channel recovery',
   /failedChannelIdsRef = React\.useRef\(\{\}\);/.test(playerModal)
     && /function rememberFailedChannel\(\)[\s\S]*failedChannelIdsRef\.current\[String\(item\.id\)\] = Date\.now\(\);/.test(playerModal)
-    && /while \(hops < channels\.length && failed\[String\(channels\[next\]\.id\)\]\);/.test(playerModal)
+    && /function scheduleAutoSkipLive\(finalMessage\)[\s\S]*Skipping to the next playable channel/.test(playerModal)
+    && /if \(next !== idx && !failed\[String\(channels\[next\]\.id\)\]\)[\s\S]*onSwitchItem\(channels\[next\]\);[\s\S]*return true;/.test(playerModal)
     && /Previous channel/.test(playerModal)
     && /Next channel/.test(playerModal));
 ok('PlayerModal dead-feed recovery buttons are not blocked by center controls',
@@ -118,9 +120,11 @@ ok('PlayerModal does not claim a dead live channel streamed for zero seconds',
 ok('hls.js requests include session credentials for local API playback',
   /xhrSetup: function\(xhr\)[\s\S]*xhr\.withCredentials = true;/.test(hlsHook));
 ok('hls.js fails bad manifests and fragments quickly',
-  /manifestLoadingTimeOut: 8000/.test(hlsHook)
-    && /levelLoadingTimeOut: 8000/.test(hlsHook)
-    && /fragLoadingTimeOut: 12000/.test(hlsHook));
+  /manifestLoadingTimeOut: 4500/.test(hlsHook)
+    && /levelLoadingTimeOut: 4500/.test(hlsHook)
+    && /fragLoadingTimeOut: 8000/.test(hlsHook));
+ok('API HLS proxy fails dead playlists quickly',
+  /setTimeout\(function\(\) \{ ctrl\.abort\(\); \}, 4500\)/.test(hlsProxy));
 ok('API CORS allows HEAD probes for playback tickets',
   /methods: \['GET', 'HEAD', 'POST', 'PATCH', 'OPTIONS'\]/.test(apiIndex));
 

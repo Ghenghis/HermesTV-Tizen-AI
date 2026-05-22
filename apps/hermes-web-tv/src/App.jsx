@@ -2292,6 +2292,8 @@ function App() {
                   providerFilter={state.providerFilter}
                   qualityFilter={state.qualityFilter}
                   onOpenSettings={function() { patchState({ showSettings: true }); }}
+                  onOpenEPG={function() { patchState({ showEPG: true }); }}
+                  onOpenSearch={function() { patchState({ showSearch: true }); }}
                 />
               </div>
             );

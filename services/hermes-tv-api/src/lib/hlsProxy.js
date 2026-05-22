@@ -156,14 +156,11 @@ function proxyPlaylist(opts) {
   }
 
   var ctrl = new AbortController();
-  // 8 s upstream timeout — tighter than the previous 15 s so Cloudflare's
-  // 100 s edge timeout never fires. Live measurement on 2026-05-20 showed
-  // xTremeHD per-channel playlists timing out at 15 s and Cloudflare
-  // returning 504 to the client. The new 8 s caps it so the user sees our
-  // 502 with a helpful message instead of a Cloudflare error page, and
-  // the auto-fallback added in wave-13 (sources[] walker) can pick the
-  // next provider quickly.
-  var timer = setTimeout(function() { ctrl.abort(); }, 8000);
+  // 4.5 s upstream timeout — playback must fail fast instead of leaving a
+  // black player on dead feeds. Working providers usually return the HLS
+  // manifest in well under a second; slow/dead sources are skipped so the
+  // source walker can try the next provider quickly.
+  var timer = setTimeout(function() { ctrl.abort(); }, 4500);
 
   return fetchImpl(upstreamUrl, {
     method: 'GET',

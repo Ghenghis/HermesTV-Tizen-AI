@@ -1,6 +1,7 @@
 import React from 'react';
 import { applyShellFilters, useGridVirtualizer } from './shellHelpers.js';
 import { isSystemLimited } from '../utils/isSystemLimited.js';
+import { isMovie, isSeries, isLive } from '../utils/contentFilters.js';
 import ContinueWatchingRail from '../components/ContinueWatchingRail.jsx';
 import CategorySidebar from '../components/CategorySidebar.jsx';
 import CatchupRail from '../components/CatchupRail.jsx';
@@ -22,10 +23,10 @@ import CatchupRail from '../components/CatchupRail.jsx';
 // ─────────────────────────────────────────────────────────────────────────────
 
 var NAV_ITEMS = [
-  { icon: '📺', label: 'Live' },
-  { icon: '🎬', label: 'Movies' },
-  { icon: '📺', label: 'Series' },
-  { icon: '🔍', label: 'Search' },
+  { id: 'live', icon: '📺', label: 'Live' },
+  { id: 'movies', icon: '🎬', label: 'Movies' },
+  { id: 'series', icon: '📺', label: 'Series' },
+  { id: 'search', icon: '🔍', label: 'Search' },
 ];
 
 var TIME_SLOTS = ['Now', '+30m', '+1h', '+90m', '+2h'];
@@ -39,12 +40,15 @@ function TiviMateShell(props) {
   var profile = props.profile;
   var tier = props.tier;
   var onItemSelect = props.onItemSelect;
+  var onOpenSearch = props.onOpenSearch;
   var contentFilter = props.contentFilter;
   var providerFilter = props.providerFilter;
   var qualityFilter = props.qualityFilter;
 
   var filtered = applyShellFilters(catalog, contentFilter, providerFilter, qualityFilter);
-  var liveItems = filtered.filter(function(i) { return i.type === 'live'; });
+  var liveItems = filtered.filter(function(i) { return isLive(i); });
+  var movieItems = filtered.filter(function(i) { return isMovie(i); });
+  var seriesItems = filtered.filter(function(i) { return isSeries(i); });
 
   // Category filter — chosen via the new CategorySidebar rail on the far
   // left of the shell. 'all' = no filter; otherwise the slug must match the
@@ -53,6 +57,9 @@ function TiviMateShell(props) {
   var categoryFilterResult = React.useState('all');
   var categoryFilter = categoryFilterResult[0];
   var setCategoryFilter = categoryFilterResult[1];
+  var activeNavResult = React.useState('live');
+  var activeNav = activeNavResult[0];
+  var setActiveNav = activeNavResult[1];
 
   var categoryItems = liveItems;
   if (categoryFilter !== 'all') {
@@ -61,7 +68,52 @@ function TiviMateShell(props) {
       return String(slug).toLowerCase() === categoryFilter;
     });
   }
-  var channelList = categoryItems.length > 0 ? categoryItems : filtered;
+  var channelList = activeNav === 'movies' ? movieItems
+    : activeNav === 'series' ? seriesItems
+    : categoryItems;
+
+  function _activateBottomNav(id) {
+    if (id === 'search') {
+      if (typeof onOpenSearch === 'function') { onOpenSearch(); }
+      return;
+    }
+    setActiveNav(id);
+    setActiveIdx(0);
+    if (id !== 'live') { setCategoryFilter('all'); }
+    if (sidebarScrollRef.current) {
+      try { sidebarScrollRef.current.scrollTop = 0; } catch (_) {}
+    }
+    if (epgScrollRef.current) {
+      try { epgScrollRef.current.scrollTop = 0; } catch (_) {}
+    }
+  }
+
+  function _focusBottomNav(index) {
+    var el = document.querySelector('[data-tivimate-nav-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleBottomNavKey(e, id, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _activateBottomNav(id);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'Right') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusBottomNav((index + 1) % NAV_ITEMS.length);
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'Left') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusBottomNav((index + NAV_ITEMS.length - 1) % NAV_ITEMS.length);
+    }
+  }
 
   var activeIdxResult = React.useState(0);
   var activeIdx = activeIdxResult[0];
@@ -252,17 +304,22 @@ function TiviMateShell(props) {
           gap: '6px',
           flexWrap: 'wrap',
         }}>
-          {NAV_ITEMS.map(function(n) {
+          {NAV_ITEMS.map(function(n, index) {
             // The "Search" entry is the primary CTA — gets the gradient
             // accent pill treatment so it reads like a tab anchor, not just
             // another rail item.
             var isPrimary = n.label === 'Search';
+            var isActiveNav = n.id !== 'search' && n.id === activeNav;
             return (
               <div
                 key={n.label}
                 tabIndex={0}
                 role="button"
                 aria-label={n.label}
+                aria-current={isActiveNav ? 'page' : undefined}
+                data-tivimate-nav-index={index}
+                onClick={function() { _activateBottomNav(n.id); }}
+                onKeyDown={function(e) { _handleBottomNavKey(e, n.id, index); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -272,13 +329,14 @@ function TiviMateShell(props) {
                   // like a tab strip rather than rail rows.
                   padding: '8px 14px',
                   fontSize: 'calc(12px * ' + fontScale + ')',
-                  color: isPrimary ? '#0a0e1a' : '#8c95a5',
+                  color: isPrimary ? '#0a0e1a' : (isActiveNav ? '#fff' : '#8c95a5'),
                   cursor: 'pointer',
                   borderRadius: 'var(--radius-pill, 9999px)',
                   background: isPrimary
                     ? 'linear-gradient(135deg, ' + TM_ACCENT + ', #f59e0b)'
-                    : 'transparent',
-                  fontWeight: isPrimary ? 800 : 500,
+                    : (isActiveNav ? 'rgba(255,125,58,0.18)' : 'transparent'),
+                  border: isActiveNav ? '1px solid ' + TM_ACCENT : '1px solid transparent',
+                  fontWeight: isPrimary || isActiveNav ? 800 : 500,
                   letterSpacing: isPrimary ? '0.04em' : '0',
                   boxShadow: isPrimary
                     ? 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))'
@@ -287,11 +345,13 @@ function TiviMateShell(props) {
                   outline: 'none',
                 }}
                 onMouseEnter={function(e) {
-                  if (!isPrimary) e.currentTarget.style.color = '#fff';
+                  if (!isPrimary) { e.currentTarget.style.color = '#fff'; }
                   if (allowMotion) e.currentTarget.style.transform = 'translateY(-2px)';
                 }}
                 onMouseLeave={function(e) {
-                  if (!isPrimary) e.currentTarget.style.color = '#8c95a5';
+                  if (!isPrimary) {
+                    e.currentTarget.style.color = isActiveNav ? '#fff' : '#8c95a5';
+                  }
                   e.currentTarget.style.transform = 'none';
                 }}
                 onFocus={function(e) {
@@ -304,7 +364,7 @@ function TiviMateShell(props) {
                     ? 'var(--shadow-md, 0 6px 18px rgba(0,0,0,0.28))'
                     : 'none';
                   e.currentTarget.style.transform = 'none';
-                  if (!isPrimary) e.currentTarget.style.color = '#8c95a5';
+                  if (!isPrimary) { e.currentTarget.style.color = isActiveNav ? '#fff' : '#8c95a5'; }
                 }}
               >
                 <span>{n.icon}</span><span>{n.label}</span>

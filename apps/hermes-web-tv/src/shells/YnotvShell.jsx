@@ -311,6 +311,33 @@ function YnotvShell(props) {
   var pillNow = focusedItem ? _nowPlayingLabel(focusedItem) : 'Browse the catalog';
   var pillNext = focusedItem ? _upNextLabel(focusedItem) : '';
 
+  function _focusRailItem(index) {
+    var el = document.querySelector('[data-ynotv-rail-index="' + index + '"]');
+    if (el && typeof el.focus === 'function') {
+      try { el.focus(); } catch (_) {}
+    }
+  }
+
+  function _handleRailKey(e, itemId, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      setActiveTab(itemId);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'Down') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRailItem((index + 1) % RAIL_ITEMS.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'Up') {
+      e.preventDefault();
+      if (e.stopPropagation) { e.stopPropagation(); }
+      _focusRailItem((index + RAIL_ITEMS.length - 1) % RAIL_ITEMS.length);
+    }
+  }
+
   // ── Calendar derived ──────────────────────────────────────────────────────
   // Pre-compute the release map + grid so the render path stays straight.
   var releaseMap = React.useMemo(function() {
@@ -539,7 +566,7 @@ function YnotvShell(props) {
           overflow: 'hidden',
         }}
       >
-        {RAIL_ITEMS.map(function(it) {
+        {RAIL_ITEMS.map(function(it, index) {
           var isActive = activeTab === it.id;
           return (
             <button
@@ -547,17 +574,13 @@ function YnotvShell(props) {
               tabIndex={0}
               data-focusable="true"
               data-focus-group="ynotv-rail"
+              data-ynotv-rail-index={index}
               data-card-id={'rail-' + it.id}
               aria-pressed={isActive}
               aria-label={it.label}
               title={it.label}
               onClick={function() { setActiveTab(it.id); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setActiveTab(it.id);
-                }
-              }}
+              onKeyDown={function(e) { _handleRailKey(e, it.id, index); }}
               style={{
                 width: '44px',
                 height: '44px',
