@@ -1,5 +1,8 @@
 'use strict';
 
+var fs = require('fs');
+var os = require('os');
+var path = require('path');
 var guard = require('../../../tools/local-noauth-env');
 
 var totalPass = 0;
@@ -47,6 +50,24 @@ try {
 ok('local no-auth guard refuses production',
   refused,
   'production must fail closed');
+
+var tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-local-env-'));
+var envFile = path.join(tmp, '.env');
+fs.writeFileSync(envFile, [
+  'AZURE_SPEECH_KEY=test-key',
+  'AZURE_SPEECH_REGION=eastus',
+  'OPENROUTER_API_KEY=must-not-load',
+  'APOLLO_M3U_URL=must-not-load',
+].join('\n'), 'utf8');
+var privateEnv = {};
+var loaded = guard.loadWhitelistedEnvFile(privateEnv, envFile);
+ok('local private env loader imports Azure voice keys only',
+  privateEnv.AZURE_SPEECH_KEY === 'test-key' &&
+    privateEnv.AZURE_SPEECH_REGION === 'eastus' &&
+    privateEnv.OPENROUTER_API_KEY === undefined &&
+    privateEnv.APOLLO_M3U_URL === undefined,
+  JSON.stringify({ loaded: loaded, keys: Object.keys(privateEnv).sort() }));
+fs.rmSync(tmp, { recursive: true, force: true });
 
 console.log('\n=== Results: ' + totalPass + ' PASS, ' + totalFail + ' FAIL ===');
 process.exitCode = totalFail > 0 ? 1 : 0;

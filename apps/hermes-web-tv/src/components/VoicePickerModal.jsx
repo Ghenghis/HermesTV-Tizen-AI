@@ -21,6 +21,14 @@ function VoicePickerModal(props) {
   var voices = voicesResult[0];
   var setVoices = voicesResult[1];
 
+  var catalogInfoResult = React.useState({ count: 0, source: '', azure_configured: false });
+  var catalogInfo = catalogInfoResult[0];
+  var setCatalogInfo = catalogInfoResult[1];
+
+  var filterResult = React.useState('');
+  var filterText = filterResult[0];
+  var setFilterText = filterResult[1];
+
   var loadingResult = React.useState(true);
   var loading = loadingResult[0];
   var setLoading = loadingResult[1];
@@ -56,6 +64,11 @@ function VoicePickerModal(props) {
     setLoading(true);
     voiceClient.listVoices().then(function(data) {
       setVoices(data.voices || []);
+      setCatalogInfo({
+        count: data.count || (data.voices ? data.voices.length : 0),
+        source: data.source || '',
+        azure_configured: !!data.azure_configured,
+      });
       setAzureReady(!!data.azure_configured);
       setLoading(false);
     }).catch(function(err) {
@@ -84,7 +97,7 @@ function VoicePickerModal(props) {
   function handleRowKeyDown(e, idx, voice, isCurrent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setFocusIdx(Math.min(voices.length - 1, idx + 1));
+      setFocusIdx(Math.min(visibleVoices.length - 1, idx + 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setFocusIdx(Math.max(0, idx - 1));
@@ -99,6 +112,40 @@ function VoicePickerModal(props) {
   }
 
   if (!isOpen) return null;
+
+  var normalizedFilter = String(filterText || '').trim().toLowerCase();
+  var visibleVoices = voices.filter(function(voice) {
+    if (!normalizedFilter) { return true; }
+    var haystack = [
+      voice.id,
+      voice.name,
+      voice.local_name,
+      voice.locale,
+      voice.locale_name,
+      voice.gender,
+      voice.tone,
+      voice.voice_type,
+      Array.isArray(voice.styles) ? voice.styles.join(' ') : '',
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(normalizedFilter) !== -1;
+  });
+
+  function voiceMetaText(voice) {
+    var parts = [];
+    if (voice.locale) { parts.push(voice.locale); }
+    if (voice.gender) { parts.push(voice.gender); }
+    if (voice.tone) { parts.push(voice.tone); }
+    else if (Array.isArray(voice.styles) && voice.styles.length > 0) { parts.push(voice.styles[0]); }
+    else if (voice.voice_type) { parts.push(voice.voice_type); }
+    return parts.join(' · ');
+  }
+
+  function catalogLabel() {
+    if (catalogInfo.source === 'azure_live') {
+      return String(catalogInfo.count || voices.length) + ' Azure English voices';
+    }
+    return String(catalogInfo.count || voices.length) + ' fallback voices';
+  }
 
   function handlePreview(voice) {
     setPreviewing(voice.id);
@@ -159,7 +206,7 @@ function VoicePickerModal(props) {
         }}>
           <div>
             <div id="voice-modal-title" style={{ fontSize: 'calc(1.2rem * var(--font-scale, 1))', fontWeight: 800, color: '#e8edf5', letterSpacing: '0.01em' }}>{t('voice.title', { name: agentName })}</div>
-            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#8a8f9b', marginTop: '4px' }}>{t('voice.subtitle')}</div>
+            <div style={{ fontSize: 'calc(0.8rem * var(--font-scale, 1))', color: '#8a8f9b', marginTop: '4px' }}>{catalogLabel()}</div>
           </div>
           <button
             onClick={onClose}
@@ -190,13 +237,35 @@ function VoicePickerModal(props) {
           </div>
         )}
 
+        <div style={{ padding: '12px 24px 0' }}>
+          <input
+            value={filterText}
+            onChange={function(e) { setFilterText(e.target.value); }}
+            placeholder="Find a voice"
+            aria-label="Find a voice"
+            style={{
+              width: '100%',
+              minHeight: '46px',
+              borderRadius: '12px',
+              border: '1px solid #2a2b3a',
+              background: '#101018',
+              color: '#e8edf5',
+              padding: '0 14px',
+              fontSize: 'calc(0.86rem * var(--font-scale, 1))',
+              outline: 'none',
+            }}
+            onFocus={function(e) { e.currentTarget.style.borderColor = 'var(--accent-color, var(--accent, #58a6ff))'; }}
+            onBlur={function(e) { e.currentTarget.style.borderColor = '#2a2b3a'; }}
+          />
+        </div>
+
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
           {loading && (
             <div style={{ padding: '12px 0' }}>
               <LoadingSkeleton variant="card" count={5} />
             </div>
           )}
-          {!loading && voices.length === 0 && (
+          {!loading && visibleVoices.length === 0 && (
             <div style={{ padding: '12px 0' }}>
               <EmptyState
                 icon="🔊"
@@ -204,8 +273,9 @@ function VoicePickerModal(props) {
               />
             </div>
           )}
-          {voices.map(function(voice, idx) {
+          {visibleVoices.map(function(voice, idx) {
             var isCurrent = voice.id === currentVoiceId;
+            var metaText = voiceMetaText(voice);
             return (
               <div
                 key={voice.id}
@@ -234,7 +304,7 @@ function VoicePickerModal(props) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <span style={{ fontWeight: 700, fontSize: 'calc(0.95rem * var(--font-scale, 1))', color: '#e8edf5' }}>{voice.name}</span>
-                    <span style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{voice.locale} · {voice.gender} · {voice.tone}</span>
+                    {metaText ? <span style={{ fontSize: 'calc(0.7rem * var(--font-scale, 1))', color: '#8a8f9b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{metaText}</span> : null}
                     {isCurrent && <span aria-label="Selected" style={{ fontSize: 'calc(0.65rem * var(--font-scale, 1))', fontWeight: 800, color: '#ff7eb3', border: '1px solid #ff7eb3', borderRadius: '999px', padding: '2px 9px', letterSpacing: '0.06em', background: 'rgba(255,126,179,0.08)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span aria-hidden="true">✓</span>{t('voice.current_badge')}</span>}
                   </div>
                   <div style={{ fontSize: 'calc(0.75rem * var(--font-scale, 1))', color: '#9aa3b2', fontStyle: 'italic' }}>"{voice.sample}"</div>
