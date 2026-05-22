@@ -1,0 +1,35 @@
+{
+  "timestamp": "20260522-091040",
+  "mode": "live",
+  "base": "http://127.0.0.1:3199",
+  "env": {
+    "APOLLO_M3U_URL": "<set>",
+    "XTREMEHD_M3U_URL": "<set>",
+    "XTREAM_URL": null,
+    "XTREAM_USERNAME": null,
+    "XTREAM_PASSWORD": null,
+    "JELLYFIN_URL": null,
+    "JELLYFIN_API_KEY": null,
+    "IPTV_ORG_ENABLED": "<set>",
+    "DAVETV_PROOF_EMAIL": "<set>",
+    "DAVETV_PROOF_PASSWORD": "<set>",
+    "HERMES_PROVIDER_E2E_EMAIL": null,
+    "HERMES_PROVIDER_E2E_PASSWORD": null
+  },
+  "pass": [
+    "auth_session",
+    "_api_providers_response_no_credential_leak",
+    "providers_count_3",
+    "_api_catalog_response_no_credential_leak",
+    "catalog_nonzero_580",
+    "_api_play_response_no_credential_leak",
+    "play_ticket",
+    "stream_head_status_200",
+    "stream_get_response_no_credential_leak",
+    "stream_get_status_200",
+    "stream_media_bytes_8192",
+    "_api_source_health_response_no_credential_leak"
+  ],
+  "fail": [],
+  "notes": []
+}

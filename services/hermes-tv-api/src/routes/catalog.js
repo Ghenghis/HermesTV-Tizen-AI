@@ -338,7 +338,7 @@ router.get('/api/catalog', async function(req, res) {
   var providerParse = parseProviderIds(req.query);
   var providerIds = providerParse.ids;
   var hiddenSet = parseHideProviders(req.query.hide_providers);
-  var waitForColdMs = 2000;
+  var waitForColdMs = 6000;
   if (req.query && req.query.wait_for_cold_ms !== undefined) {
     var parsedWait = Number(req.query.wait_for_cold_ms);
     if (isFinite(parsedWait) && parsedWait > 0) {
